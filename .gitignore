@@ -1,0 +1,10 @@
+# Session transcripts — local working artifacts, not source
+omo-psmux-bridge.md
+
+# Agent tooling state
+.omo/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.swp
