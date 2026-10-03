@@ -2,7 +2,7 @@
 
 本專案的議題與規格存放於 GitHub Issues，所有操作使用 `gh` CLI。
 
-> ⚠️ 目前此目錄尚未初始化為 git repo，也沒有 GitHub remote。在 `git init` 並設定 remote 之前，`gh` 無法自動推斷目標 repo，必須顯式加上 `--repo <owner>/<repo>`。
+Repo：`github.com/danielrepublic/omo-psmux-bridge`（private）。`gh` 在此 clone 內會自動推斷目標 repo。
 
 ## 慣例
 
