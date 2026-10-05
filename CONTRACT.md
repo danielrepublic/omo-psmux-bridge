@@ -544,7 +544,7 @@ section 9 settled the other way. Its stdout, stderr and exit code are all
 discarded: OmO spawns its own layout calls with `stdout: "ignore", stderr:
 "ignore"` (`index.js:8915-8916`, `index.js:8921`) and awaits each without reading
 a code (`index.js:8918`, `index.js:8922`), and the primary command's exit code is
-the only one OmO branches on (`index.js:8390-8393`).
+the only one OmO branches on (`index.js:8415`).
 
 **Unrecorded, not measured.** The geometry below is what the cited lines imply,
 not a result: no capture of it exists in version control in this repository.

@@ -18,7 +18,13 @@
 //   3. `respawn-pane` needs `--` before the command operand (CONTRACT.md 7.1) and
 //      needs `-e` applied by the bridge rather than by psmux (CONTRACT.md 7.2).
 //
-// Nothing else moves. No flag is stripped, reordered or rewritten.
+// Nothing else moves. No flag is stripped, reordered or rewritten, and no
+// invocation is added. The ONLY exceptions are the three layout rules below
+// (1a, 1b, 1c), and each one is pinned to a cited psmux defect rather than to
+// a preference. Rule 1a edits one argument value; rule 1b adds ONE `select-layout`
+// invocation the caller did not ask for; rule 1c forwards nothing at all for a
+// command that would destroy the layout. Read those three, not this line, to know
+// what the bridge rewrites.
 //
 // ---------------------------------------------------------------------------
 // THE HELPER INVOCATION CONTRACT — this is todo 11's interface
@@ -188,16 +194,40 @@
 //   (`src/window_ops.rs:1771-1796`) assigns the caller-supplied value straight
 //   into the layout tree's `sizes` array, but those entries are PERCENTAGES
 //   (`src/layout.rs:1136` builds `vec![main_v_pct, 100 - main_v_pct]`), whereas
-//   tmux's `-x`/`-y` is a CELL COUNT. So `-x 99` writes `99` as a percentage: with
-//   `sizes = [60, 20, 20]` the sibling takes `20 - (99 - 60)` and is floored at 1,
-//   i.e. `[99, 1, 1]` — a 197-column main pane and 2-column siblings. Measured
-//   exactly: `resize-pane -t %1 -x 99` turned `[119, 80, 80]` into `[197, 2, 2]`.
+//   tmux's `-x`/`-y` is a CELL COUNT. So `-x 99` writes `99` into a slot that
+//   means "percent", and the damage is structural rather than arithmetic. `main-vertical`
+//   does NOT build a flat three-element `sizes` array: it nests. The root is a
+//   `Horizontal` split of `vec![main_v_pct, 100 - main_v_pct]` (`src/layout.rs:1136`)
+//   whose children are `[main_pane, right]`, and `right` is itself a `Vertical`
+//   split of `equal_sizes(n)` (`src/layout.rs:1085-1092`). So the array
+//   `resize_pane_absolute` writes into is that root pair — `[60, 40]` at defaults —
+//   and only the root's own two entries move:
 //
-//   No argument form rescues it: `-x 99`, `-x 99%`, `-x 100` and `-x +0` are all
-//   wrong or destructive, `-x -20` and `-l 25` are silent no-ops, and
-//   `src/server/connection.rs:1767-1778` shows why — psmux parses a bare `-x`
-//   token as an ABSOLUTE value and only treats a `%` suffix as a percentage, so
-//   there is no spelling of the cell count that means "cell count" to it.
+//     sizes[0] = 99                      // src/window_ops.rs:1784
+//     diff     = 99 - 60 = 39           //                       :1783
+//     sizes[1] = (40 - 39).max(1) = 1    //                       :1787, ONE neighbour
+//
+//   One neighbour, because `:1786-1789` is `if idx + 1 < sizes.len()` / `else if
+//   idx > 0` — a single `if`, not a loop, so only the immediate sibling absorbs.
+//   The result is `[99, 1]`: the main pane takes 99% and the entire right-hand
+//   column — however many subagent panes it holds — is squeezed into the last 1%.
+//   Its own `equal_sizes` split is untouched, so each subagent pane is rendered
+//   inside a region one cell wide and floors at one cell. That is the destruction:
+//   not a wrong number, but a whole subtree starved of width.
+//
+//   No `-x`/`-y` argument form rescues it, and
+//   `src/server/connection.rs:1767-1778` shows why: psmux parses a bare `-x` token
+//   as an ABSOLUTE value and only treats a `%` suffix as a percentage, so there is
+//   no spelling of the cell count that means "cell count" to it. `-x 99` and `-x 100`
+//   are the destructive case, and `-x 99%` is a percentage of a percentage.
+//
+//   SCOPE, because the suppression is narrower than the damage. Rule 1c keys on a
+//   bare `-x` or `-y` ELEMENT, so `resize-pane -l 25` is NOT suppressed — and it is
+//   not inert either. `src/server/connection.rs:1781-1791` shows that with no `-Z`,
+//   no `-x` and no `-y`, psmux takes the first argument that parses as `u16` as an
+//   amount with `dir = "D"` and sends `CtrlReq::ResizePane("D", 25)`: a 25-cell
+//   DOWNWARD step. So `-l` reaches psmux and does something, and it is outside what
+//   this rule was sized for. CONTRACT.md 3.9 records the same boundary.
 //
 //   So the command is not forwarded at all. With rules 1a and 1b the geometry is
 //   already correct, so this command is a no-op in INTENT, and forwarding a
@@ -369,9 +399,20 @@ export interface Translation {
   /** Extra psmux invocations to run after `argv`, in order (rule 1b). Empty on
    *  every ordinary path, `passthrough` and `helper` included. */
   readonly followUps: readonly FollowUpCommand[];
-  /** True iff any element differs from the input. Never true when the argv came
-   *  back verbatim, so never for `passthrough` or `suppressed`; true for every
-   *  `helper`, and true for the `%`-stripped sizing option of rule 1a. */
+  /** True iff the argv handed to the backend differs from the argv received.
+   *
+   *  NOT the same question as `kind`, and the two were previously documented as
+   *  if they were — which is wrong, because rule 1a returns `kind: "passthrough"`
+   *  WITH `rewritten: true`. It edits a value in place and does not reclassify the
+   *  command: the verb, the flag order and the target are untouched, only `50%`
+   *  became `50`. So `kind` answers "what shape did the input have" and this
+   *  answers "did the bytes change".
+   *
+   *  A byte-identical pass-through is `false`. A suppressed command is also
+   *  `false` — deliberately: there the argv came back verbatim and the decision
+   *  itself is what a reader needs, so it is recorded in `kind` and in the call
+   *  log's `outcome`, not here. Follow-up invocations do NOT affect this either;
+   *  they are counted in `followUps`. */
   readonly rewritten: boolean;
   /** True iff `--` was inserted. True for exactly two classifications. */
   readonly dashDashInserted: boolean;
