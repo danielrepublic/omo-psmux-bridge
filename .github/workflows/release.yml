@@ -1,0 +1,882 @@
+# ============================================================================
+#  release.yml -- produce the opencode-psmux-bridge win-x64 zip and publish it
+#                 as a GitHub release.
+#
+#  This is the repository's first CI workflow. It exists to make ONE guarantee
+#  that has no other enforcement point: that the .ps1/.cmd files shipped to
+#  %LOCALAPPDATA%\opencode-psmux-bridge are byte-identical to the tracked bytes
+#  in this repository.
+#
+#  WHY THAT GUARANTEE NEEDS A GATE, not a convention
+#  --------------------------------------------------
+#  .gitattributes marks `scripts/windows/**` as `-text` precisely because those
+#  files are byte artifacts. Historically git normalised CRLF->LF on commit on
+#  some machines and psmux.cmd silently drifted (see .gitattributes). The fix
+#  was a VCS attribute, but a VCS attribute only protects the paths git is
+#  configured to protect. Anything downstream of git -- checkout filters, an
+#  editor with autocrlf, `git archive` text conversion, a careless `dos2unix`
+#  in a future refactor -- can still rewrite the bytes, and nothing in the
+#  repository would notice. The scripts would still run (PowerShell and cmd.exe
+#  both tolerate either ending), so the failure mode is NOT a crash; it is a
+#  release that no longer matches its source of truth and nobody finds out until
+#  someone diffs a deployed copy against the repo by hand.
+#
+#  So the invariant is checked mechanically here, on every release, against the
+#  committed blob at HEAD rather than against the worktree file: sha256 of the
+#  staged copy vs sha256 of `git show HEAD:<path>`. Any drift at any hop --
+#  checkout, copy, tool -- fails the job and names the file.
+#
+#  OTHER INVARIANTS THIS WORKFLOW ENFORCES
+#  -----------------------------------------
+#  * `bun test` is a hard gate. A release built from a red suite is worse than
+#    no release: it looks shipped.
+#  * The cross-compiled bin/tmux.exe is built HERE, from the committed src/, not
+#    copied from the repo. dist/ is gitignored, so there is nothing to copy and
+#    a stale local binary can never reach a user.
+#  * The staging tree is built from scratch in the runner temp directory and
+#    then asserted to contain EXACTLY the release manifest. `src/`, `test/`,
+#    `scripts/windows/parity/`, `scripts/windows/pty/`, docs and lockfiles
+#    therefore cannot leak in by accident -- and because
+#    scripts/windows/runtime/Start-OpenCode.ps1 exists in the tree but is
+#    deliberately NOT shipped, "copy the directory" would be actively wrong here.
+#  * A tag that already has a release is a hard failure. Overwriting it would
+#    make the tag's asset mutable, which breaks every checksum anyone recorded.
+#
+#  Exit codes: this job either publishes a complete, verified release or it
+#  fails with a message naming what was expected and where it looked.
+# ============================================================================
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  # Manual re-run for a tag that already exists as a ref. The version input is
+  # optional on purpose: empty means "derive it from the tag", and dispatching
+  # from a branch with no version is refused rather than guessed at.
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, with or without the leading v (e.g. 0.2.0). Empty = derive from the pushed tag.'
+        required: false
+        type: string
+        default: ''
+
+# `contents: write` is required for `gh release create` to upload an asset and
+# create the tag when dispatching from a branch.
+permissions:
+  contents: write
+
+# One release at a time per ref. cancel-in-progress is deliberately FALSE: a
+# half-finished release upload must not be killed and silently replaced, and a
+# queued run that fails on "release already exists" is the correct outcome.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  # Pinned, never floated. The bun release that produced every binary verified
+  # so far is 1.4.2; a floating `bun-version` would make a release's artifact
+  # non-reproducible and would quietly change the compiled shim between tags.
+  BUN_VERSION: '1.4.2'
+  # The psmux build this repo's parity work and CONTRACT.md are frozen against.
+  VERIFIED_PSMUX_VERSION: '3.3.8'
+  # Single top-level directory inside the zip. Never a versioned name: the
+  # install instructions and the doctor both resolve %LOCALAPPDATA%\
+  # opencode-psmux-bridge\bin, so the extracted folder name must be stable
+  # across versions or every upgrade moves the target out from under PATH.
+  STAGE_PKG: 'opencode-psmux-bridge'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      # -------------------------------------------------------------------------
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # fetch-depth 0 is load-bearing twice over: `git show HEAD:<path>` in
+          # the byte-exactness check needs the objects (shallow would still have
+          # HEAD, but a full clone removes any doubt), and the release gate needs
+          # the tag resolved locally rather than fetched on demand.
+          fetch-depth: 0
+
+      # -------------------------------------------------------------------------
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.2'
+
+      # -------------------------------------------------------------------------
+      # bun.lock is committed, so --frozen-lockfile is what makes this step a
+      # gate instead of a suggestion: if the lockfile and package.json disagree,
+      # or the lockfile is missing, the install FAILS here rather than silently
+      # resolving a different dependency set than the one that was committed.
+      - name: Install dependencies
+        run: |
+          set -euo pipefail
+
+          # The 1.4.2 pin appears twice on purpose -- once in env.BUN_VERSION and
+          # once in the setup-bun step's `with:` -- because GitHub does not expose
+          # the env context to a `uses:` step, so they cannot be one value. Assert
+          # they agree instead of trusting a comment to keep them in sync: a
+          # release whose recorded Bun version is not the version that compiled
+          # the binary is a release nobody can reproduce.
+          ACTUAL_BUN=$(bun --version)
+          if [ "$ACTUAL_BUN" != "$BUN_VERSION" ]; then
+            echo "::error title=toolchain::setup-bun installed bun ${ACTUAL_BUN} but this release is pinned to ${BUN_VERSION}. The two pins (env.BUN_VERSION and the bun-version in the 'Set up Bun' step) have drifted; fix them before publishing."
+            exit 1
+          fi
+          echo "[release] bun ${ACTUAL_BUN} (pinned, matches env.BUN_VERSION)"
+
+          bun install --frozen-lockfile
+
+      # -------------------------------------------------------------------------
+      # HARD GATE. No continue-on-error, no `|| true`. Five test files in test/
+      # cover the descriptor/grammar/translate/cli contract against a frozen
+      # OmO version; a red suite must never reach a release tag.
+      - name: Test (hard gate)
+        run: bun test
+
+      # -------------------------------------------------------------------------
+      # Resolve the version, the tag, the staging paths, and write the release
+      # manifest ONCE. Every later step reads the manifest from $RUNNER_TEMP
+      # instead of re-declaring the file list, because a manifest duplicated
+      # across steps is a manifest that will drift: the copy step would stage
+      # 8 files while the assertion expected 9, and the mismatch would either be
+      # invisible or would surface as a confusing diff rather than as "you
+      # forgot to add a file to one of the two lists".
+      #
+      # Manifest format: <source-repo-relative>| <path-inside-zip> | <required|optional>
+      # A source of `-` means "built by this workflow, no repo source path".
+      - name: Resolve version, staging paths, and release manifest
+        run: |
+          set -euo pipefail
+
+          MANIFEST="$RUNNER_TEMP/release-manifest.txt"
+
+          # The 9 REQUIRED entries are the 8 shipped scripts plus the binary.
+          # INSTALL.md and bin/install.cmd are OPTIONAL: they are authored by a
+          # different change to this repository, so their absence at the moment
+          # this workflow runs must not fail an otherwise-correct build. They
+          # are still declared here so the tree assertion can REJECT them if
+          # something unexpected lands at those paths, and their presence or
+          # absence is reported in the step summary and in the release notes --
+          # a missing file is never allowed to be merely unmentioned.
+          #
+          # Note what is deliberately ABSENT from this list:
+          # scripts/windows/runtime/Start-OpenCode.ps1 is in the repository but
+          # is not part of the release. Copying the directory would ship it.
+          cat > "$MANIFEST" <<'MANIFEST_EOF'
+          scripts/windows/bin/install.ps1|bin/install.ps1|required
+          scripts/windows/bin/uninstall.ps1|bin/uninstall.ps1|required
+          scripts/windows/bin/bridge-doctor.ps1|bin/bridge-doctor.ps1|required
+          scripts/windows/bin/bridge-doctor.cmd|bin/bridge-doctor.cmd|required
+          scripts/windows/bin/psmux.cmd|bin/psmux.cmd|required
+          scripts/windows/bin/opencode.cmd|bin/opencode.cmd|required
+          scripts/windows/bin/omo-opencode-port.ps1|bin/omo-opencode-port.ps1|required
+          scripts/windows/runtime/Start-PaneFromDescriptor.ps1|runtime/Start-PaneFromDescriptor.ps1|required
+          -|bin/tmux.exe|required
+          scripts/windows/bin/install.cmd|bin/install.cmd|optional
+          INSTALL.md|INSTALL.md|optional
+          MANIFEST_EOF
+
+          # --- version -------------------------------------------------------
+          # Three sources, in order: explicit dispatch input, the pushed tag,
+          # nothing. The third case is a refusal, not a default, because
+          # guessing a version produces a release that is mislabelled forever.
+          #
+          # The input is read from the INPUT_VERSION environment variable rather
+          # than interpolated as `${{ inputs.version }}`: expression
+          # substitution is textual, so a value containing a quote would splice
+          # itself into this script. INPUT_VERSION is only set for
+          # workflow_dispatch, hence the `:-` default for the push path.
+          if [ -n "${INPUT_VERSION:-}" ]; then
+            VERSION="${INPUT_VERSION}"
+          elif [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            echo "::error title=release version::cannot determine a version: GITHUB_REF_TYPE is '${GITHUB_REF_TYPE}' (not a tag) and the 'version' dispatch input was empty. Push a v* tag, or re-run with an explicit version (e.g. 0.2.0)."
+            exit 1
+          fi
+          VERSION="${VERSION#v}"
+          if [ -z "$VERSION" ]; then
+            echo "::error title=release version::the derived version is empty. Expected a 'v*' tag or a non-empty 'version' input."
+            exit 1
+          fi
+          TAG="v${VERSION}"
+
+          # --- staging paths -------------------------------------------------
+          # Built from scratch under the runner temp dir, never inside the
+          # checkout. That is what makes "nothing unexpected got in" true by
+          # construction rather than by careful exclusion globs.
+          STAGE_PARENT="$RUNNER_TEMP/stage"
+          STAGE_PKG_DIR="$STAGE_PARENT/$STAGE_PKG"
+          ASSET_NAME="opencode-psmux-bridge-${TAG}-win-x64.zip"
+          ZIP_PATH="$RUNNER_TEMP/$ASSET_NAME"
+
+          # The bootstrap is published under a VERSION-LESS name on purpose. It is
+          # what the copy-paste install line fetches, via releases/latest/download,
+          # so that line can be pasted once and keep installing the newest release
+          # instead of pinning a reader to whatever version the page described.
+          BOOTSTRAP_ASSET_NAME="install-bootstrap.ps1"
+          BOOTSTRAP_URL="https://github.com/${{ github.repository }}/releases/latest/download/$BOOTSTRAP_ASSET_NAME"
+
+          {
+            echo "VERSION=$VERSION"
+            echo "TAG=$TAG"
+            echo "STAGE_PARENT=$STAGE_PARENT"
+            echo "STAGE_PKG_DIR=$STAGE_PKG_DIR"
+            echo "ASSET_NAME=$ASSET_NAME"
+            echo "ZIP_PATH=$ZIP_PATH"
+            echo "BOOTSTRAP_ASSET_NAME=$BOOTSTRAP_ASSET_NAME"
+            echo "BOOTSTRAP_URL=$BOOTSTRAP_URL"
+          } >> "$GITHUB_ENV"
+
+          echo "[release] version=$VERSION"
+          echo "[release] tag=$TAG"
+          echo "[release] ref=${GITHUB_REF} ref_type=${GITHUB_REF_TYPE}"
+          echo "[release] commit=$GITHUB_SHA"
+          echo "[release] stage=$STAGE_PKG_DIR"
+          echo "[release] asset=$ASSET_NAME"
+          echo "[release] manifest=$MANIFEST"
+
+      # -------------------------------------------------------------------------
+      # Cross-compile. `bun build --compile` targeting bun-windows-x64 from a
+      # Linux runner produces a real PE32+ executable in well under a second;
+      # there is no reason to spend a Windows runner on this. The output goes
+      # straight into the staging tree so that dist/ (gitignored) is never a
+      # source of a release artifact and a stale local build cannot be shipped.
+      - name: Cross-compile bin/tmux.exe (Linux -> Windows)
+        run: |
+          set -euo pipefail
+
+          mkdir -p "$STAGE_PKG_DIR/bin" "$STAGE_PKG_DIR/runtime"
+
+          bun build --compile src/cli.ts \
+            --outfile "$STAGE_PKG_DIR/bin/tmux.exe" \
+            --target=bun-windows-x64
+
+          echo "[release] cross-compiled bun $(bun --version) -> $STAGE_PKG_DIR/bin/tmux.exe"
+
+      # -------------------------------------------------------------------------
+      # Copy -- never generate, never transform. `cp` moves bytes; no
+      # dos2unix, no sed, no PowerShell round trip, no `git archive` (which
+      # applies export-subst and, with the wrong attributes, text conversion).
+      # The byte-exactness step below is what proves this held.
+      #
+      # Optional entries that are absent are recorded in GITHUB_ENV so the
+      # release notes can say so out loud instead of the user discovering a
+      # missing install.cmd by running it.
+      - name: Stage the shipped scripts
+        run: |
+          set -euo pipefail
+
+          MANIFEST="$RUNNER_TEMP/release-manifest.txt"
+          MISSING_OPTIONAL=""
+
+          while IFS='|' read -r src dst kind; do
+            [ -n "$src" ] || continue
+            # The binary was produced by the previous step; it has no repo source.
+            if [ "$src" = '-' ]; then
+              continue
+            fi
+
+            if [ -n "$dst" ]; then
+              mkdir -p "$STAGE_PKG_DIR/$(dirname "$dst")"
+            fi
+
+            if [ ! -e "$src" ]; then
+              if [ "$kind" = "required" ]; then
+                echo "::error title=missing release file::$src is listed as required in the release manifest but does not exist in the checkout. Refusing to build a zip with a required file absent."
+                exit 1
+              fi
+              echo "[release] OPTIONAL-ABSENT $src -> $dst (not staged; the release notes will say so)"
+              MISSING_OPTIONAL="${MISSING_OPTIONAL}${dst} "
+              continue
+            fi
+
+            cp "$src" "$STAGE_PKG_DIR/$dst"
+            echo "[stage] $src -> $dst ($(wc -c < "$STAGE_PKG_DIR/$dst") bytes)"
+          done < "$MANIFEST"
+
+          echo "MISSING_OPTIONAL=${MISSING_OPTIONAL% }" >> "$GITHUB_ENV"
+
+      # -------------------------------------------------------------------------
+      # THE load-bearing check. For each of the 8 copied scripts:
+      #   sha256(staged copy)  ==  sha256(git show HEAD:<source>)
+      #
+      # Two details make this trustworthy rather than decorative:
+      #
+      #  1. `git cat-file -e` is checked FIRST. Without it, a source path that
+      #     is missing from HEAD makes `git show` fail, `sha256sum` then hashes
+      #     an EMPTY stream, and if the staged file were also missing the two
+      #     empty hashes would MATCH -- a green check for a file that does not
+      #     exist. A verification step that can pass on absent inputs is worse
+      #     than no verification step.
+      #
+      #  2. `core.autocrlf=false` is pinned for the `git show` read. On a Linux
+      #     runner it is already false, but the whole point of this check is to
+      #     be independent of ambient git configuration; if a future runner
+      #     image or a repo-level config sets it true, the blob would be
+      #     converted on the way out of `git show` and this comparison would
+      #     stop meaning what it claims to mean.
+      #
+      # Comparing against HEAD and not against the worktree source is
+      # deliberate: the staged file arrived via the worktree, so a worktree-vs-
+      # staged comparison would only prove `cp` is faithful, while worktree/HEAD
+      # could already have drifted at checkout time. Comparing staged directly
+      # to the committed blob covers every hop at once.
+      - name: Stage the bootstrap release asset
+        run: |
+          set -euo pipefail
+
+          # The bootstrap ships as a SECOND release asset rather than inside the
+          # zip, because the zip is what it downloads: putting it in the archive it
+          # fetches would make the one-line install unable to bootstrap itself.
+          #
+          # It is staged to RUNNER_TEMP, not into the package directory, so the
+          # "staged tree is exactly the manifest" assertion below does not have to
+          # learn about a file that is not in the zip.
+          #
+          # Byte-verified exactly like the other seven shipped scripts. This one is
+          # the highest-consequence file in the release: it is the only thing a user
+          # pastes, it runs before anything has been verified locally, and a
+          # truncated or converted copy would fail on their machine and nowhere
+          # else.
+          SRC="scripts/windows/release/install-bootstrap.ps1"
+          if [ ! -f "$SRC" ]; then
+            echo "::error title=bootstrap missing::$SRC is not in the repository. The one-line install path cannot be published without it."
+            exit 1
+          fi
+
+          git cat-file -e "HEAD:$SRC" 2> /dev/null || {
+            echo "::error title=bootstrap untracked::$SRC is not committed at HEAD. Commit it; a release must never ship a file the tag does not contain."
+            exit 1
+          }
+
+          BOOTSTRAP_PATH="$RUNNER_TEMP/$BOOTSTRAP_ASSET_NAME"
+          cp "$SRC" "$BOOTSTRAP_PATH"
+
+          EXPECTED=$(git -c core.autocrlf=false show "HEAD:$SRC" | sha256sum | cut -d' ' -f1)
+          ACTUAL=$(sha256sum "$BOOTSTRAP_PATH" | cut -d' ' -f1)
+          if [ "$EXPECTED" != "$ACTUAL" ]; then
+            echo "::error title=bootstrap not byte-identical::expected sha256 $EXPECTED from HEAD:$SRC but the staged asset hashed $ACTUAL. Refusing to publish an asset whose bytes differ from the committed source."
+            exit 1
+          fi
+
+          echo "BOOTSTRAP_PATH=$BOOTSTRAP_PATH" >> "$GITHUB_ENV"
+          echo "[bootstrap] staged=$BOOTSTRAP_PATH"
+          echo "[bootstrap] bytes=$(wc -c < "$BOOTSTRAP_PATH" | tr -d ' ')"
+          echo "[bootstrap] sha256=$ACTUAL"
+          echo "[bootstrap] byte_identical_to_head=yes"
+
+      - name: Verify staged scripts are byte-identical to HEAD (hard gate)
+        run: |
+          set -euo pipefail
+
+          MANIFEST="$RUNNER_TEMP/release-manifest.txt"
+          REQ_VERIFIED=0
+          OPT_VERIFIED=0
+          FAILED=0
+
+          # The -text attribute is what makes the comparison above achievable at
+          # all. Assert it rather than assume it: if someone deletes or narrows
+          # .gitattributes, checkout starts converting line endings, and BOTH
+          # sides of this check would convert together and still agree. The
+          # check would stay green while the property it exists to protect was
+          # gone. This is the one failure that sha256 alone cannot see.
+          ATTR=$(git check-attr text -- scripts/windows/bin/psmux.cmd)
+          if [ "$ATTR" != "scripts/windows/bin/psmux.cmd: text: unset" ]; then
+            echo "::error title=byte-exactness precondition::expected 'scripts/windows/bin/psmux.cmd: text: unset' from .gitattributes but got '$ATTR'. The scripts/windows/** -text attribute is what keeps git from rewriting CRLF; without it this job's byte-exactness guarantee is void even if every comparison below passes."
+            exit 1
+          fi
+          echo "[verify] gitattributes scripts/windows/bin/psmux.cmd: text: unset (precondition OK)"
+
+          while IFS='|' read -r src dst kind; do
+            [ -n "$src" ] || continue
+            if [ "$src" = '-' ]; then
+              continue
+            fi
+
+            # Nothing staged, nothing to verify. An OPTIONAL manifest entry that
+            # the checkout does not contain is a normal, expected state -- the
+            # staging step reported it and recorded it in MISSING_OPTIONAL --
+            # so it must not be counted as a verification failure. A REQUIRED
+            # entry cannot reach this branch: the staging step refuses to build
+            # when one is absent from the checkout.
+            STAGED="$STAGE_PKG_DIR/$dst"
+            if [ ! -f "$STAGED" ]; then
+              echo "[verify] SKIP ${dst} (optional manifest entry absent from this checkout)"
+              continue
+            fi
+
+            # Checked AFTER the staged-file test, so it reports what it can
+            # actually catch: a file that WAS staged but whose source is not in
+            # HEAD. That is a real hazard for the optional entries -- someone
+            # could add scripts/windows/bin/install.cmd, stage it, and ship
+            # bytes that exist in no commit, under a tag that claims to name
+            # reproducible source. The release ships committed bytes or it does
+            # not ship.
+            if ! git cat-file -e "HEAD:${src}" 2>/dev/null; then
+              echo "::error title=byte-exactness::${dst} was staged from ${src}, which is NOT present at HEAD (commit ${GITHUB_SHA}). A release must ship the committed bytes of a file that exists in history; untracked or unstaged work cannot be verified and cannot be published."
+              FAILED=$((FAILED + 1))
+              continue
+            fi
+
+            HEAD_SHA=$(git -c core.autocrlf=false show "HEAD:${src}" | sha256sum | cut -d' ' -f1)
+            STAGED_SHA=$(sha256sum "$STAGED" | cut -d' ' -f1)
+
+            if [ "$HEAD_SHA" != "$STAGED_SHA" ]; then
+              echo "::error title=byte-exactness::${dst} differs from the committed blob. staged sha256=${STAGED_SHA} HEAD:${src} sha256=${HEAD_SHA}. Something between checkout and staging rewrote this file's bytes -- check for a dos2unix/editor/LF-normalising step and for .gitattributes still marking scripts/windows/** as -text."
+              FAILED=$((FAILED + 1))
+              continue
+            fi
+
+            echo "[verify] OK  $dst  sha256=$STAGED_SHA  == HEAD:${src}"
+            if [ "$kind" = "required" ]; then
+              REQ_VERIFIED=$((REQ_VERIFIED + 1))
+            else
+              OPT_VERIFIED=$((OPT_VERIFIED + 1))
+            fi
+          done < "$MANIFEST"
+
+          # The 8 REQUIRED scripts are the release contract and must all verify.
+          # Optional entries are verified too when staged, and deliberately do
+          # not participate in this count: hardcoding "8 total" here would make
+          # the build FAIL the day bin/install.cmd lands, which is the opposite
+          # of what an assertion is for.
+          #
+          # FAILED is checked BEFORE the count, so that a byte mismatch is reported as
+          # the byte mismatch it is. The other order prints "the manifest and the
+          # release contract disagree" -- a message that sends the reader off to
+          # audit a list that is in fact correct -- and buries the line that
+          # actually names the offending file and both of its hashes.
+          if [ "$FAILED" -ne 0 ]; then
+            echo "::error title=byte-exactness::${FAILED} file(s) failed the byte-exactness check. Refusing to publish an artifact that does not match its source of truth."
+            exit 1
+          fi
+          if [ "$REQ_VERIFIED" -ne 8 ]; then
+            echo "::error title=byte-exactness::expected 8 required scripts to verify byte-exactly, verified ${REQ_VERIFIED}. Every required file verified individually, so the manifest and the release contract disagree about how many scripts are shipped; this must be settled by a human, not inferred."
+            exit 1
+          fi
+
+          echo "[verify] byte-exact: ${REQ_VERIFIED}/8 required scripts match their HEAD blobs (+${OPT_VERIFIED} optional)"
+
+      # -------------------------------------------------------------------------
+      # Two independent assertions, because "the expected files are present" and
+      # "nothing else is present" fail differently and only one of them is
+      # usually written:
+      #
+      #   (a) every REQUIRED manifest path exists and is non-empty. The
+      #       non-empty half matters: `cp` of a source that exists but is empty,
+      #       or a `bun build` that wrote a 0-byte outfile, would otherwise
+      #       produce a zip that installs cleanly and does nothing.
+      #   (b) the staged tree's file set is EXACTLY the manifest set, compared as
+      #       two sorted lists via `diff`. diff is what actually names the
+      #       offender: the output shows `src/cli.ts` or
+      #       `scripts/windows/parity/sweep.cjs` as an extra line, rather than
+      #       just a count mismatch that leaves the reader to guess. This is the
+      #       gate that catches src/, test/, docs/, bun.lock and the pty/parity
+      #       harnesses leaking into a user's install directory.
+      #
+      # Directories are asserted too, because `find -type f` cannot see an empty
+      # stray directory -- and a shipped empty `parity/` is exactly the kind of
+      # thing that looks harmless in a manifest diff.
+      - name: Assert the staged tree is exactly the release manifest
+        run: |
+          set -euo pipefail
+
+          # (a) required paths present and non-empty
+          while IFS='|' read -r src dst kind; do
+            [ -n "$dst" ] || continue
+            [ "$kind" = "required" ] || continue
+            if [ ! -f "$STAGE_PKG_DIR/$dst" ]; then
+              echo "::error title=manifest::required path $dst is absent from the staged tree. Expected it under $STAGE_PKG_DIR."
+              exit 1
+            fi
+            if [ ! -s "$STAGE_PKG_DIR/$dst" ]; then
+              echo "::error title=manifest::required path $dst is present but EMPTY. An empty tmux.exe installs cleanly and silently does nothing; an empty .ps1 fails at first use, far from this build."
+              exit 1
+            fi
+          done < "$RUNNER_TEMP/release-manifest.txt"
+
+          # (b) exact file set. Built from the manifest restricted to what is
+          # actually staged, so an absent optional file is not reported as a
+          # missing required one.
+          find "$STAGE_PKG_DIR" -type f -printf '%P\n' | LC_ALL=C sort > "$RUNNER_TEMP/actual-files.txt"
+
+          : > "$RUNNER_TEMP/expected-files.txt"
+          while IFS='|' read -r src dst kind; do
+            [ -n "$dst" ] || continue
+            [ -f "$STAGE_PKG_DIR/$dst" ] || continue
+            echo "$dst" >> "$RUNNER_TEMP/expected-files.txt"
+          done < "$RUNNER_TEMP/release-manifest.txt"
+          LC_ALL=C sort -o "$RUNNER_TEMP/expected-files.txt" "$RUNNER_TEMP/expected-files.txt"
+
+          if ! diff -u "$RUNNER_TEMP/expected-files.txt" "$RUNNER_TEMP/actual-files.txt"; then
+            echo "::error title=manifest::the staged tree does not match the release manifest. The diff above is authoritative: every line prefixed '+' is a file that would ship but is not in the manifest -- by construction there can be no '-' lines, because the expected list is itself derived from what was staged. A missing REQUIRED file is reported by assertion (a) above with its own message; this diff is about unexpected EXTRA files."
+            exit 1
+          fi
+          echo "[assert] file set matches manifest exactly ($(wc -l < "$RUNNER_TEMP/actual-files.txt") files)"
+
+          # Directories: exactly bin/ and runtime/, and no empty extras.
+          find "$STAGE_PKG_DIR" -mindepth 1 -type d -printf '%P\n' | LC_ALL=C sort > "$RUNNER_TEMP/actual-dirs.txt"
+          printf 'bin\nruntime\n' | LC_ALL=C sort > "$RUNNER_TEMP/expected-dirs.txt"
+          if ! diff -u "$RUNNER_TEMP/expected-dirs.txt" "$RUNNER_TEMP/actual-dirs.txt"; then
+            echo "::error title=manifest::the staged tree contains directories other than bin/ and runtime/. An empty stray directory still ships, and still shows up in a user's install directory as unexplained clutter."
+            exit 1
+          fi
+          echo "[assert] directory set matches manifest exactly"
+
+          # The binary gets one explicit assertion of its own kind: not merely
+          # non-empty, but a Windows PE. A Linux ELF would satisfy every check
+          # above and still fail on the user's machine with "not a valid
+          # Win32 application", which is the single most likely way this
+          # release could be wrong. The magic is read into a variable rather than
+          # piped to `grep -q`, because grep -q exits early and would hand the
+          # upstream process a SIGPIPE that `pipefail` reports as a failure.
+          MAGIC=$(head -c 2 "$STAGE_PKG_DIR/bin/tmux.exe")
+          if [ "$MAGIC" != "MZ" ]; then
+            echo "::error title=cross-compile::bin/tmux.exe begins with '$MAGIC', not the MZ signature, so it is not a Windows PE. Expected a bun-windows-x64 cross-compile; check that --target=bun-windows-x64 was passed and not bun-linux-x64."
+            exit 1
+          fi
+          echo "[assert] bin/tmux.exe carries the MZ (Windows PE) signature; size=$(wc -c < "$STAGE_PKG_DIR/bin/tmux.exe") bytes"
+
+      # -------------------------------------------------------------------------
+      # Run from INSIDE $STAGE_PARENT so the archive's single top-level entry is
+      # opencode-psmux-bridge/. Zipping the package directory from the repo root
+      # instead would put the whole checkout in the user's download folder.
+      - name: Create the release zip
+        run: |
+          set -euo pipefail
+
+          # zip(1) is preinstalled on ubuntu-latest, but a missing tool must name
+          # itself rather than surface later as "zip: command not found" in a
+          # different step's output.
+          if ! command -v zip > /dev/null 2>&1; then
+            echo "::error title=tooling::'zip' is not on PATH on this runner image, so the release archive cannot be built. Install zip (e.g. 'sudo apt-get install -y zip') or pin a runner image that has it."
+            exit 1
+          fi
+          if ! command -v unzip > /dev/null 2>&1; then
+            echo "::error title=tooling::'unzip' is not on PATH on this runner image; it is needed to read the archive back and verify its contents."
+            exit 1
+          fi
+
+          rm -f "$ZIP_PATH"
+          cd "$STAGE_PARENT"
+          # -x excludes are belt-and-braces: the staging tree is built from
+          # scratch so __MACOSX/ and .DS_Store cannot be present, and excluding
+          # them by name means a future step that copies a developer's home
+          # directory into the stage still cannot ship Finder debris.
+          zip -r -9 "$ZIP_PATH" "$STAGE_PKG" \
+            -x '*__MACOSX*' '*/.DS_Store' '.DS_Store' > /dev/null
+
+          # Read the archive back rather than trusting the staging directory:
+          # the zip is what a user receives, so the zip is what gets counted.
+          ZIP_LIST_TOTALS=$(unzip -l "$ZIP_PATH" | tail -n 1)
+          ZIP_UNCOMP_BYTES=$(printf '%s\n' "$ZIP_LIST_TOTALS" | awk '{print $1}')
+          ZIP_FILE_COUNT=$(printf '%s\n' "$ZIP_LIST_TOTALS" | awk '{print $2}')
+
+          if ! printf '%s\n' "$ZIP_FILE_COUNT" | grep -Eq '^[0-9]+$'; then
+            echo "::error title=archive::could not read a file count out of 'unzip -l $ZIP_PATH' (last line was: ${ZIP_LIST_TOTALS}). The archive may be truncated or corrupt."
+            exit 1
+          fi
+
+          STAGED_COUNT=$(find "$STAGE_PKG_DIR" -type f | wc -l)
+          if [ "$ZIP_FILE_COUNT" -ne "$STAGED_COUNT" ]; then
+            echo "::error title=archive::the archive holds ${ZIP_FILE_COUNT} files but the staged tree holds ${STAGED_COUNT}. The zip does not represent what was staged, so it must not be published."
+            exit 1
+          fi
+
+          ZIP_SHA256=$(sha256sum "$ZIP_PATH" | cut -d' ' -f1)
+
+          {
+            echo "ZIP_SHA256=$ZIP_SHA256"
+            echo "ZIP_UNCOMP_BYTES=$ZIP_UNCOMP_BYTES"
+            echo "ZIP_FILE_COUNT=$ZIP_FILE_COUNT"
+          } >> "$GITHUB_ENV"
+
+          echo "[zip] $ZIP_PATH"
+          echo "[zip] sha256=$ZIP_SHA256"
+          echo "[zip] files=$ZIP_FILE_COUNT uncompressed_bytes=$ZIP_UNCOMP_BYTES size_on_disk=$(wc -c < "$ZIP_PATH")"
+          echo "[zip] entries:"
+          unzip -Z1 "$ZIP_PATH" | sed 's/^/[zip]   /'
+
+      # -------------------------------------------------------------------------
+      - name: Report the artifact to the step summary
+        run: |
+          set -euo pipefail
+
+          {
+            echo "### opencode-psmux-bridge $TAG (win-x64)"
+            echo
+            echo "| fact | value |"
+            echo "| --- | --- |"
+            echo "| asset | \`$ASSET_NAME\` |"
+            echo "| sha256 | \`$ZIP_SHA256\` |"
+            echo "| files in zip | $ZIP_FILE_COUNT |"
+            echo "| uncompressed size | $ZIP_UNCOMP_BYTES bytes |"
+            echo "| compressed size | $(wc -c < "$ZIP_PATH") bytes |"
+            echo "| built with | Bun $BUN_VERSION (cross-compiled from linux-latest) |"
+            echo "| verified against psmux | $VERIFIED_PSMUX_VERSION |"
+            echo "| shipped scripts | 8/8 byte-identical to their HEAD blobs |"
+            echo
+            if [ -n "${MISSING_OPTIONAL:-}" ]; then
+              echo "> **Optional files absent from this artifact:** \`$MISSING_OPTIONAL\`."
+              echo "> They are authored by a separate change to this repository. The release was"
+              echo "> still published because every REQUIRED file is present and verified; if one of"
+              echo "> these is supposed to have shipped, treat this release as incomplete."
+            else
+              echo "> All manifest entries staged, including the optional ones."
+            fi
+            echo
+            echo "<details><summary>archive contents</summary>"
+            echo
+            echo '```'
+            unzip -Z1 "$ZIP_PATH"
+            echo '```'
+            echo
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # -------------------------------------------------------------------------
+      # Release notes are written from a QUOTED heredoc. That is not stylistic:
+      # the notes contain fenced code blocks (backticks) and PowerShell paths
+      # ($env:LOCALAPPDATA), and in an unquoted heredoc bash would execute the
+      # backticks as command substitution and expand $env to the empty string,
+      # producing a release page with a broken JSON snippet and a wrong install
+      # command. Everything dynamic is emitted by a printf BEFORE the quoted
+      # block instead, so there is nothing left for bash to interpret.
+      - name: Generate release notes
+        run: |
+          set -euo pipefail
+
+          NOTES_FILE="$RUNNER_TEMP/release-notes.md"
+          REPO_URL="https://github.com/${{ github.repository }}"
+          DOWNLOAD_URL="$REPO_URL/releases/download/$TAG/$ASSET_NAME"
+
+          {
+            printf '## opencode-psmux-bridge %s (win-x64)\n\n' "$TAG"
+            printf 'Windows executable shim that answers to the name `tmux`, so the opencode\n'
+            printf '`oh-my-openagent` (OmO) plugin opens subagent panes under **psmux** instead\n'
+            printf 'of real tmux. No WSL, no Git Bash, no Cygwin.\n\n'
+            printf '### What this build is\n\n'
+            printf 'Tested and cross-compiled **from Linux** (`ubuntu-latest`) with **Bun %s** via\n' "$BUN_VERSION"
+            printf '`bun build --compile src/cli.ts --target=bun-windows-x64`, with the full `bun test`\n'
+            printf 'suite green before the artifact was produced. No Windows runner was involved, and\n'
+            printf 'none is needed: the output is a native Windows PE32+ executable.\n\n'
+            printf '| fact | value |\n| --- | --- |\n'
+            printf '| asset | `%s` |\n' "$ASSET_NAME"
+            printf '| sha256 | `%s` |\n' "$ZIP_SHA256"
+            printf '| files in zip | %s |\n' "$ZIP_FILE_COUNT"
+            printf '| uncompressed size | %s bytes |\n' "$ZIP_UNCOMP_BYTES"
+            printf '| verified against psmux | %s |\n\n' "$VERIFIED_PSMUX_VERSION"
+          } > "$NOTES_FILE"
+
+          cat >> "$NOTES_FILE" <<'NOTES_EOF'
+
+          ### Contents
+
+          One top-level directory, `opencode-psmux-bridge/`, containing exactly these files:
+
+          ```
+          opencode-psmux-bridge/
+          ├── INSTALL.md
+          ├── bin/
+          │   ├── tmux.exe
+          │   ├── install.cmd
+          │   ├── install.ps1
+          │   ├── uninstall.ps1
+          │   ├── bridge-doctor.ps1
+          │   ├── bridge-doctor.cmd
+          │   ├── psmux.cmd
+          │   ├── opencode.cmd
+          │   └── omo-opencode-port.ps1
+          └── runtime/
+              └── Start-PaneFromDescriptor.ps1
+          ```
+
+          `bin/tmux.exe` is the shim opencode invokes. `bin/psmux.cmd` and `bin/opencode.cmd`
+          are the launchers that shadow the real commands once the bin directory is first on
+          PATH. `runtime/Start-PaneFromDescriptor.ps1` is the helper the shim calls to open a
+          pane. Everything else is install, uninstall, and the read-only doctor.
+
+          ### Prerequisites
+
+          **psmux, opencode, and the `oh-my-openagent` (OmO) plugin must already be
+          installed.** This archive ships the bridge only. It installs no multiplexer, no
+          agent runtime, and no plugin; it makes exactly one machine change, prepending its
+          own `bin` directory to the *user* PATH. Verified against **psmux 3.3.8**.
+
+          ### Required: `tmux.enabled` must be true
+
+          This is the setting people miss. Without it you get **zero subagent panes and no
+          error message at all** — `[opencode].tmux.enabled` defaults to `false`, so the plugin
+          never tries to spawn a pane. Add this to your opencode config (`opencode.json` /
+          `opencode.jsonc`):
+
+          ```json
+          {
+            "tmux": { "enabled": true }
+          }
+          ```
+
+          If panes still do not appear, run `bin\bridge-doctor.cmd`. It is read-only and
+          reports, in one screen, which of the four gates is responsible: the `tmux` name
+          resolving to something other than this bridge, a psmux server that is not running,
+          `tmux.enabled` being false, or a **stale psmux server** started before the bridge was
+          on PATH (a long-lived psmux server's panes inherit *its* environment, and no client
+          attach will ever add the bridge to it — restart the server).
+
+          ### Install
+
+          `bin\install.cmd` is the entry point; it wraps `install.ps1`, which is the only
+          thing that touches the registry. There are two ways to reach it, and both end
+          there.
+
+          **From the zip you just downloaded.** Extract it, then double-click
+          `opencode-psmux-bridge\bin\install.cmd` — or run it from a terminal:
+
+          ```
+          & .\opencode-psmux-bridge\bin\install.cmd
+          ```
+
+          **Without downloading anything by hand.** Use the one-line command at the very
+          end of these notes. It fetches a small bootstrap script rather than the zip,
+          and the bootstrap does the downloading.
+
+          `install.ps1` **refuses** (exit 2, writes nothing) if a *different*
+          `opencode-psmux-bridge\bin` directory is already on your PATH, because owning the
+          `psmux`/`tmux`/`opencode` names from two directories at once is a silent-failure
+          factory. It never touches the machine (HKLM) PATH, never uses `setx`, preserves
+          the registry value kind, and is idempotent. **Open a new terminal afterwards** —
+          a running shell keeps its old environment.
+
+          ### Uninstall
+
+          ```
+          powershell -NoProfile -ExecutionPolicy Bypass -File "%LOCALAPPDATA%\opencode-psmux-bridge\bin\uninstall.ps1"
+          ```
+
+          It removes only that one PATH entry, leaves every other entry in its original
+          order, never touches the machine PATH, and reports whether the bridge directory
+          itself could be deleted right now (naming any file that refused and any running
+          process whose image lives inside it). Deleting the extracted directory afterwards
+          is safe and leaves nothing behind.
+          NOTES_EOF
+
+          # The one-liner is emitted AFTER the quoted heredoc, because inside a
+          # quoted heredoc nothing expands and the note would ship a literal
+          # placeholder.
+          #
+          # It fetches install-bootstrap.ps1 rather than the zip, and that is the
+          # whole point. The obvious one-liner -- download the zip, expand it, call
+          # install.cmd, all inline -- was written first and was wrong twice: it
+          # expanded into %LOCALAPPDATA%, which is exactly where install.ps1 stages
+          # the payload, so it unpacked the archive into the directory it was about
+          # to install over; and it invoked the entry point unquoted, so a Windows
+          # account name containing a space produced a command that would not
+          # parse. Both defects only ever appear on somebody else's machine. The
+          # complexity lives in a reviewed, testable file instead of a string.
+          {
+            printf '\n### Install in one line\n\n'
+            printf 'Open a terminal (PowerShell or cmd) and paste this single line:\n\n'
+            printf '```\n'
+            printf 'iwr -useb %s -OutFile "$env:TEMP\\omo-bridge-install.ps1"; powershell -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\\omo-bridge-install.ps1"\n' "$BOOTSTRAP_URL"
+            printf '```\n\n'
+            printf 'That fetches the newest published release, prints the archive size and its\n'
+            printf 'sha256, unpacks it somewhere disposable, runs the installer, and removes\n'
+            printf 'its own temp files. It needs no git, no bun, and no admin rights.\n'
+          } >> "$NOTES_FILE"
+
+          if [ -n "${MISSING_OPTIONAL:-}" ]; then
+            {
+              printf '\n> **Incomplete artifact:** the following manifest entries were absent from\n'
+              printf '> this build and are NOT in the zip: `%s`.\n' "$MISSING_OPTIONAL"
+              printf '> Everything required is present and byte-verified, so the release was\n'
+              printf '> published; if one of those files was supposed to ship, treat it as broken.\n'
+            } >> "$NOTES_FILE"
+          fi
+
+          echo "[notes] wrote $NOTES_FILE ($(wc -c < "$NOTES_FILE") bytes)"
+
+      # -------------------------------------------------------------------------
+      # The overwrite gate. `gh release create` on an existing tag UPDATES the
+      # release and replaces the asset, which would make the artifact behind a
+      # published tag mutable: every sha256 anyone recorded in an issue, a
+      # dotfile, or a package manifest would silently become wrong, with no
+      # signal to either party. A build that cannot have its own output is a
+      # build that must stop.
+      #
+      # The existence check runs immediately before the create so there is no
+      # window in which this job could publish something it did not verify. An
+      # `if` condition is exempt from `set -e`, which is what makes the
+      # "release exists -> fail" direction expressible without `|| true`.
+      - name: Refuse to overwrite an existing release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          echo "[gate] checking whether $TAG already has a release on ${{ github.repository }}"
+
+          if gh release view "$TAG" --repo "${{ github.repository }}" > /dev/null 2>&1; then
+            echo "::error title=release exists::a release already exists for tag $TAG on ${{ github.repository }}. Refusing to overwrite it: a published asset must stay byte-identical to what the tag first shipped, or every recorded sha256 becomes wrong. Delete the release by hand if you really mean to replace it."
+            exit 1
+          fi
+
+          # A tag push with no release and no gh-visible repo access is a
+          # different failure from "release exists", and must not be reported as
+          # if the gate simply passed.
+          if ! gh api "repos/${{ github.repository }}" --jq '.permissions.push' 2>/dev/null | grep -qx 'true'; then
+            echo "::error title=release permissions::cannot determine push permission on ${{ github.repository }}. The workflow declares 'permissions: contents: write'; if GH_TOKEN is empty or the repository is not writable, the release cannot be created and must not be skipped silently."
+            exit 1
+          fi
+
+          echo "[gate] no existing release for $TAG; publishing"
+
+      # -------------------------------------------------------------------------
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          # --target pins a tag created from a manual dispatch to the commit this
+          # artifact was actually built from. Left to its default it would point
+          # at the repository's default branch, so a re-run dispatched from an
+          # older commit would publish a release tagged to different code than
+          # the binary it ships.
+          #
+          # --verify-tag is deliberately NOT passed: it requires the tag to
+          # already exist remotely, which is true for the tag-push trigger but
+          # false for the manual dispatch that supplies its own version, and it
+          # contradicts --target. The tag push path is covered by the assertion
+          # below instead, which is a stronger check than --verify-tag anyway
+          # because it compares the tag's target to the commit that was built.
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            TAG_SHA=$(git rev-list -n 1 "$TAG")
+            if [ "$TAG_SHA" != "$GITHUB_SHA" ]; then
+              echo "::error title=tag mismatch::tag $TAG points at $TAG_SHA but this run built $GITHUB_SHA. Refusing to attach an artifact to a tag that names different code. Investigate the tag before re-running."
+              exit 1
+            fi
+            echo "[release] tag $TAG confirmed at $TAG_SHA"
+          fi
+
+          gh release create "$TAG" "$ZIP_PATH" "$BOOTSTRAP_PATH" \
+            --repo "${{ github.repository }}" \
+            --target "$GITHUB_SHA" \
+            --title "opencode-psmux-bridge $TAG (win-x64)" \
+            --notes-file "$RUNNER_TEMP/release-notes.md"
+
+          echo "[release] published $TAG -> https://github.com/${{ github.repository }}/releases/tag/$TAG"
+          {
+            echo
+            echo "**Release published:** [$TAG](https://github.com/${{ github.repository }}/releases/tag/$TAG)"
+          } >> "$GITHUB_STEP_SUMMARY"
