@@ -41,6 +41,7 @@ import type { BackendOutcome, Resolution, ResolvedBackend } from "../src/backend
 import {
   CLI_CONTRACT,
   buildCallRecord,
+  buildTraceRecord,
   main,
   planInvocation,
   resolveCallLogPath,
@@ -110,7 +111,12 @@ beforeEach(() => {
       `const callsPath = ${JSON.stringify(callsPath)};`,
       "const argv = process.argv.slice(2);",
       'const stdout = argv[0] === "-V" ? process.env["OMO_TEST_VERSION"] ?? "" : "";',
-      'const exitCode = Number.parseInt(process.env["OMO_TEST_EXIT"] ?? "0", 10);',
+      // A `select-layout` fails on purpose. The bridge INJECTS that command, and
+      // the invariant under test is that a failing injected command does not
+      // become the shim's exit code — which is only provable against a child that
+      // really exits non-zero. No other test in this file sends one.
+      'const injected = argv[0] === "select-layout";',
+      'const exitCode = injected ? 42 : Number.parseInt(process.env["OMO_TEST_EXIT"] ?? "0", 10);',
       'appendFileSync(callsPath, JSON.stringify({ argv, stdout }) + "\\n");',
       'if (stdout.length > 0) process.stdout.write(stdout);',
       "process.exit(exitCode);",
@@ -317,7 +323,255 @@ describe("wiring: grammar -> translate -> backend -> exec", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 2. The opt-in trace
+// 2. The layout rules, end to end: what actually reaches the backend
+// ---------------------------------------------------------------------------
+//
+// Driven through the same real `psmux.exe` stand-in as section 1, because the
+// thing under test is the ORDER of three real process invocations and which one's
+// exit code survives. The stand-in fails any `select-layout` on purpose (exit 42),
+// so "the follow-up's exit code is discarded" is a fact about a real non-zero
+// child rather than about a stub.
+//
+// The argv under test is OmO's own, from `index.js:8921`. See
+// `test/translate.test.ts` section 10 for the translation-level rules and
+// `src/translate.ts` for the psmux defects each one works around.
+
+describe("the layout rules reach the backend as a corrected command plus a follow-up", () => {
+  test("the sizing option runs the re-applied layout AFTER it, and the follow-up's 42 does not become the exit code", async () => {
+    const exitCode = await main(["set-window-option", "main-pane-width", "50%"], deps());
+
+    expect(exitCode).toBe(0);
+    // Two invocations, in this order. The order IS the fix: psmux reads
+    // `main_pane_width` from inside `apply_layout` (src/layout.rs:1094-1096), so
+    // a layout applied first would read the OLD value.
+    expect(box.calls().map((c) => c.argv)).toEqual([
+      ["set-window-option", "main-pane-width", "50"],
+      ["select-layout", "main-vertical"],
+    ]);
+  });
+
+  test("the follow-up is run with its output captured, so nothing reaches the shim's stdout", async () => {
+    const seen: { readonly argv: readonly string[]; readonly captureOutput: boolean | undefined }[] = [];
+    const run: NonNullable<MainDeps["run"]> = (backend, argv, options) => {
+      seen.push({ argv, captureOutput: options.captureOutput });
+      return runBackend(backend, argv, options);
+    };
+
+    await main(["set-window-option", "main-pane-height", "50%"], deps({ run }));
+
+    // The primary inherits stdio exactly as every other forwarded command does;
+    // only the injected follow-up is captured, because its bytes are not OmO's.
+    expect(seen.map((s) => s.argv)).toEqual([
+      ["set-window-option", "main-pane-height", "50"],
+      ["select-layout", "main-horizontal"],
+    ]);
+    expect(seen.map((s) => s.captureOutput)).toEqual([undefined, true]);
+  });
+
+  test("a suppressed `resize-pane -x` runs NO backend, exits 0, and the record says suppressed", async () => {
+    const exitCode = await main(["resize-pane", "-t", "%1", "-x", "99"], deps());
+
+    expect(exitCode).toBe(0);
+    // Not a run of an empty argv, not a run of the original argv: nothing.
+    expect(box.calls()).toHaveLength(0);
+
+    const record = callRecords()[0];
+    expect(record?.kind).toBe("suppressed");
+    expect(record?.outcome).toBe("suppressed");
+    expect(record?.exitCode).toBe(0);
+    // The dropped command is still on the record, which is what makes the
+    // suppression auditable instead of invisible.
+    expect(record?.argv).toEqual(["resize-pane", "-t", "%1", "-x", "99"]);
+    expect(record?.followUps).toEqual([]);
+  });
+
+  test("the follow-up is on the call log, with its reason, beside the primary argv", async () => {
+    await main(["set-window-option", "main-pane-width", "50%"], deps());
+
+    const record = callRecords()[0];
+    expect(record?.kind).toBe("passthrough");
+    expect(record?.outcome).toBe("forwarded");
+    expect(record?.argv).toEqual(["set-window-option", "main-pane-width", "50"]);
+    expect(record?.followUps).toEqual([
+      {
+        reason: "psmux-reads-main-pane-size-only-inside-apply-layout",
+        argv: ["select-layout", "main-vertical"],
+      },
+    ]);
+  });
+
+  test("an ordinary pass-through runs one backend call and logs no follow-up", async () => {
+    const exitCode = await main(["select-layout", "main-vertical"], deps());
+
+    // 42, not 0: this `select-layout` is the PRIMARY here, and the primary's exit
+    // code is the shim's exit code. The stand-in's deliberate failure is what
+    // makes that visible — the injected follow-up in the test above is discarded,
+    // and this one is not, because this one is the command OmO asked for.
+    expect(exitCode).toBe(42);
+    expect(box.calls().map((c) => c.argv)).toEqual([["select-layout", "main-vertical"]]);
+    expect(callRecords()[0]?.followUps).toEqual([]);
+  });
+
+  test("leading globals reach BOTH the sizing command and its follow-up", async () => {
+    await main(["-L", "ns", "set-window-option", "main-pane-width", "50%"], deps());
+
+    // Without the globals on the follow-up, the re-layout would land in the
+    // default namespace and the option that was just set would not be read.
+    expect(box.calls().map((c) => c.argv)).toEqual([
+      ["-L", "ns", "set-window-option", "main-pane-width", "50"],
+      ["-L", "ns", "select-layout", "main-vertical"],
+    ]);
+  });
+
+  test("a NON-ZERO primary exit means NO follow-up: one backend call, not two", async () => {
+    // `runBackend` never throws (`src/backend.ts:663`), so a bad `-t`, a dead
+    // server or a psmux rejection all arrive here as a non-zero exit code from a
+    // call that returned normally. The stand-in's `OMO_TEST_EXIT` produces exactly
+    // that against a real child.
+    //
+    // The follow-up is a CORRECTION to an effect the primary was supposed to have
+    // had. With a non-zero primary the option was never set, so there is nothing
+    // to correct, and injecting `select-layout` would silently re-lay-out a window
+    // the user never asked to change.
+    const exitCode = await main(
+      ["set-window-option", "main-pane-width", "50%"],
+      deps({ backendEnv: { OMO_TEST_EXIT: "7" } }),
+    );
+
+    expect(exitCode).toBe(7);
+    // The count is the assertion: 2 would mean the gate is missing.
+    expect(box.calls()).toHaveLength(1);
+    expect(box.calls()[0]?.argv).toEqual(["set-window-option", "main-pane-width", "50"]);
+    // No `select-layout` reached the child at all, and none is claimed on the log.
+    expect(box.calls().some((c) => c.argv[0] === "select-layout")).toBe(false);
+    expect(callRecords()[0]?.followUps).toEqual([
+      {
+        reason: "psmux-reads-main-pane-size-only-inside-apply-layout",
+        argv: ["select-layout", "main-vertical"],
+      },
+    ]);
+  });
+
+  test("a zero primary exit still runs the follow-up: the gate is SUCCESS, not mere execution", async () => {
+    // The counterpart, so the test above cannot pass by a gate that never fires.
+    await main(
+      ["set-window-option", "main-pane-width", "50%"],
+      deps({ backendEnv: { OMO_TEST_EXIT: "0" } }),
+    );
+
+    expect(box.calls()).toHaveLength(2);
+    expect(box.calls().map((c) => c.argv)).toEqual([
+      ["set-window-option", "main-pane-width", "50"],
+      ["select-layout", "main-vertical"],
+    ]);
+  });
+
+  test("the gate is the PRIMARY's code, not the follow-up's: a failing follow-up still exits 0", async () => {
+    // The stand-in fails every `select-layout` with 42. That failure is still
+    // discarded, because the gate is read from `fromRun` — the primary — and never
+    // from the follow-up's own outcome.
+    const exitCode = await main(["set-window-option", "main-pane-width", "50%"], deps());
+
+    expect(exitCode).toBe(0);
+    expect(box.calls()).toHaveLength(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 2b. The record schema, pinned
+// ---------------------------------------------------------------------------
+//
+// `ShimCallRecord` gained `followUps` and `ShimOutcome` gained `"suppressed"`
+// WITHOUT a version bump at the time they landed, which is exactly the situation
+// `recordVersion` exists to prevent: a v1 reader cannot tell, from the line, that
+// the schema moved. `CLI_CONTRACT.recordVersion` is therefore 2. These tests pin
+// both the version and the exact key set, so a future field cannot be added
+// silently either.
+
+describe("the record schema", () => {
+  test("recordVersion is 2, because `followUps` and `outcome: \"suppressed\"` are both new", () => {
+    // Changing this value is a breaking change to every consumer of both logs and
+    // must be made loudly, not folded into a feature commit.
+    expect(CLI_CONTRACT.recordVersion).toBe(2);
+  });
+
+  test("buildCallRecord emits exactly the documented key set, and no more", async () => {
+    await main(["set-window-option", "main-pane-width", "50%"], deps());
+
+    const record = callRecords()[0];
+    expect(record).toBeDefined();
+    // Sorted so the assertion does not depend on declaration order, which is not
+    // part of the schema.
+    expect(Object.keys(record ?? {}).sort()).toEqual([
+      "argc",
+      "argv",
+      "at",
+      "backend",
+      "backendName",
+      "backendSource",
+      "classification",
+      "correlationId",
+      "dashDashInserted",
+      "descriptorFileUsed",
+      "durationMs",
+      "envSlotCount",
+      "envSlotNames",
+      "exitCode",
+      "followUps",
+      "helper",
+      "installDir",
+      "kind",
+      "outcome",
+      "pid",
+      "resolution",
+      "rewritten",
+      "v",
+      "verb",
+    ]);
+    expect(record?.v).toBe(CLI_CONTRACT.recordVersion);
+  });
+
+  test("buildTraceRecord is the same record minus the call-only keys", async () => {
+    // Pins the split, so `followUps` cannot quietly migrate into the trace record
+    // (which has no place for it — it carries no argv) or out of the call record.
+    const context = planInvocation(["-V"], deps());
+    const record = buildCallRecord({
+      invocation: context,
+      at: "2026-10-06T00:00:00.000Z",
+      pid: 1,
+      outcome: "forwarded",
+      exitCode: 0,
+      durationMs: 1,
+      descriptorFileUsed: false,
+    });
+
+    expect(Object.keys(record).sort()).toEqual(
+      [...Object.keys(buildTraceRecord({
+        invocation: context,
+        at: "2026-10-06T00:00:00.000Z",
+        pid: 1,
+        outcome: "forwarded",
+        exitCode: 0,
+        durationMs: 1,
+        descriptorFileUsed: false,
+      })), "argv", "backendName", "followUps", "helper", "installDir"].sort(),
+    );
+  });
+
+  test("a `\"suppressed\"` record carries the dropped argv and an empty follow-up list", async () => {
+    await main(["resize-pane", "-t", "%1", "-x", "99"], deps());
+
+    const record = callRecords()[0];
+    expect(record?.v).toBe(CLI_CONTRACT.recordVersion);
+    expect(record?.outcome).toBe("suppressed");
+    expect(record?.kind).toBe("suppressed");
+    expect(record?.argv).toEqual(["resize-pane", "-t", "%1", "-x", "99"]);
+    expect(record?.followUps).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 3. The opt-in trace
 // ---------------------------------------------------------------------------
 
 describe("the trace hook", () => {
@@ -351,7 +605,14 @@ describe("the trace hook", () => {
     expect(box.lines(box.tracePath)).toHaveLength(2);
 
     const first = JSON.parse(box.lines(box.tracePath)[0] ?? "{}") as Record<string, unknown>;
-    expect(first["v"]).toBe(1);
+    // BEHAVIOUR CHANGE: was `toBe(1)`, and is now asserted against the constant
+    // rather than against a literal. `recordVersion` moved 1 -> 2 because
+    // `ShimCallRecord` gained the required key `followUps` and `ShimOutcome` gained
+    // `"suppressed"` — two changes a v1 reader cannot detect from the line, which is
+    // the one thing the field is for. Reading it from the constant is what stops
+    // the next bump from silently invalidating this assertion.
+    expect(first["v"]).toBe(CLI_CONTRACT.recordVersion);
+    expect(first["v"]).toBe(2);
     expect(first["verb"]).toBe("-V");
     expect(first["classification"]).toBe("pass-through");
     expect(first["outcome"]).toBe("forwarded");
@@ -378,7 +639,7 @@ describe("the trace hook", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 3. The fixed-path call log — the attribution proof
+// 4. The fixed-path call log — the attribution proof
 // ---------------------------------------------------------------------------
 
 describe("the fixed-path call log", () => {
@@ -497,7 +758,7 @@ describe("the fixed-path call log", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 4. No credential reaches either log
+// 5. No credential reaches either log
 // ---------------------------------------------------------------------------
 
 describe("no credential in either log", () => {

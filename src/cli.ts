@@ -71,7 +71,7 @@ import { randomBytes } from "node:crypto";
 import { classifyArgv, splitLeadingGlobals } from "./grammar";
 import type { Classified } from "./grammar";
 import { HELPER_CONTRACT, parseHelperCommandLine, translateArgv } from "./translate";
-import type { Translation } from "./translate";
+import type { FollowUpCommand, Translation } from "./translate";
 import { BACKEND_CANDIDATE_NAMES, describeResolution, exitCodeFor, resolveBackend, runBackend } from "./backend";
 import type {
   BackendOutcome,
@@ -100,8 +100,22 @@ export const CLI_CONTRACT = {
   callLogFileName: "shim-calls.jsonl",
 
   /** Schema version on both records, so a reader can tell a line it understands
-   *  from one it must not trust. */
-  recordVersion: 1,
+   *  from one it must not trust.
+   *
+   *  BUMPED 1 -> 2 for the layout rules, and the bump is not bookkeeping: the
+   *  version is only worth carrying if a change that a v1 reader CANNOT detect
+   *  moves it. Both of these are undetectable from the line itself — a v1 reader
+   *  sees `v: 1` and has no way to know the schema moved underneath it:
+   *
+   *   * `ShimCallRecord` gained the required key `followUps`, so a strict v1
+   *     validator rejects every record this shim now writes.
+   *   * `ShimOutcome` gained the member `"suppressed"`, so `outcome` can now
+   *     carry a value no v1 switch has a case for — and a v1 reader sees it as an
+   *     unknown string on a record it believes it understands.
+   *
+   *  Leaving it at 1 would mean the version field asserts a compatibility that
+   *  does not exist, which is strictly worse than having no version at all. */
+  recordVersion: 2,
 
   /** Upper bound on one logged argv element, in characters. A 30 KB argument is
    *  a legal thing to forward and a terrible thing to write to a log; the tail
@@ -131,6 +145,14 @@ export const CLI_CONTRACT = {
 /** What happened to one invocation. One of these appears in every record. */
 export type ShimOutcome =
   | "forwarded"
+  /** The command was deliberately NOT forwarded: `resize-pane -x` / `-y`, which
+   *  psmux 3.3.8 applies as a PERCENTAGE and which would destroy the layout the
+   *  other two rules just built (`src/window_ops.rs:1771-1796` against
+   *  `src/layout.rs:1136`). See `src/translate.ts` rule 1c and CONTRACT.md 3.9.
+   *  A distinct member rather than `"forwarded"`, because "I ran it" and "I
+   *  deliberately did not run it" are different facts about the same argv, and
+   *  the call log is the record that has to be able to tell them apart. */
+  | "suppressed"
   | "chain-guard"
   | "backend-missing"
   | "install-dir-unresolved"
@@ -421,9 +443,23 @@ export interface ShimTraceRecord {
  *  was executed: the projected argv, the helper summary, and the backend path. */
 export interface ShimCallRecord extends ShimTraceRecord {
   readonly argv: readonly string[];
+  /** The extra invocations the shim ran after `argv`, in order, each with the
+   *  reason it exists. Non-empty only for the layout rules in `src/translate.ts`
+   *  (rule 1b), and recorded because a command the SHIM invented has to be
+   *  distinguishable from one OmO asked for; an attribution record that silently
+   *  omitted it would understate what the bridge did. Empty on every other path,
+   *  `suppressed` included: nothing ran, so nothing is listed. */
+  readonly followUps: readonly LoggedFollowUp[];
   readonly helper: HelperView | null;
   readonly backendName: string | null;
   readonly installDir: string | null;
+}
+
+/** One injected follow-up as the log records it: the reason slug plus the argv
+ *  projection, never the raw argv — the same rule every other logged field obeys. */
+export interface LoggedFollowUp {
+  readonly reason: string;
+  readonly argv: readonly string[];
 }
 
 export interface RecordContext {
@@ -471,6 +507,10 @@ export function buildCallRecord(context: RecordContext): ShimCallRecord {
   return {
     ...trace,
     argv: loggedArgv(invocation.translation),
+    followUps: invocation.translation.followUps.map((followUp) => ({
+      reason: followUp.reason,
+      argv: sanitisedArgv(followUp.argv),
+    })),
     helper: invocation.helper ?? null,
     backendName: resolved?.backendName ?? null,
     installDir: resolved?.installDir ?? null,
@@ -627,19 +667,50 @@ export async function main(argv: readonly string[], deps: MainDeps = {}): Promis
 
   try {
     invocation = planInvocation(argv, deps);
+    const resolution = invocation.resolution;
 
-    if (invocation.resolution.kind !== "resolved") {
-      exitCode = exitCodeFor(invocation.resolution);
-      outcome = outcomeForResolution(invocation.resolution);
-      writeStderr(`${describeResolution(invocation.resolution)}\n`);
+    if (resolution.kind !== "resolved") {
+      exitCode = exitCodeFor(resolution);
+      outcome = outcomeForResolution(resolution);
+      writeStderr(`${describeResolution(resolution)}\n`);
+    } else if (invocation.translation.kind === "suppressed") {
+      // Deliberate non-execution (`src/translate.ts` rule 1c). NO backend run at
+      // all — not a run of an empty argv, not a run of the original argv — and
+      // exit 0, because OmO emits `resize-pane` on a fire-and-forget path
+      // (`index.js:8937`, awaited for completion and never inspected for an exit
+      // code) and a non-zero code here would read as a failed teardown. The
+      // record still carries the dropped argv, so the decision is auditable.
+      exitCode = 0;
+      outcome = "suppressed";
     } else {
       descriptorFileUsed = deliverEnvSlots(invocation, deps);
-      const runOptions: RunBackendOptions = { ...(deps.backendEnv ? { env: deps.backendEnv } : {}) };
       const fromRun = await (deps.run ?? runBackend)(
-        invocation.resolution,
+        resolution,
         invocation.translation.argv,
-        runOptions,
+        backendRunOptions(deps),
       );
+      // A follow-up is gated on the primary SUCCEEDING, and it never touches
+      // `exitCode` or `outcome`. All three facts are load-bearing:
+      //
+      //   * the ordering is the fix. `src/layout.rs:1094-1096` reads the sizing
+      //     option from inside `apply_layout`, so the re-layout has to come after
+      //     the `set-window-option` that set it or it reads the old value.
+      //   * SUCCESS is the gate, not merely "it ran". `runBackend` never throws
+      //     (`src/backend.ts:663`), so a bad `-t`, a dead server or a psmux
+      //     rejection all arrive here as a non-zero `exitCode` from a call that
+      //     returned normally — and then the option the follow-up exists to
+      //     consume was never set. A follow-up is a CORRECTION to an effect the
+      //     primary was supposed to have had; with no effect there is nothing to
+      //     correct, and injecting `select-layout` anyway would silently re-lay-out
+      //     a window the user never asked to change, applying whatever
+      //     `main_pane_width` happened to hold before the failed call.
+      //   * the primary's exit code is OmO's only signal for this command
+      //     (`index.js:8415`), and OmO itself discards the exit code of the
+      //     layout calls (`index.js:8918`, `index.js:8922`), so inheriting a
+      //     follow-up's code would manufacture a failure that did not happen.
+      if (fromRun.exitCode === 0) {
+        await runFollowUps(resolution, invocation.translation.followUps, deps);
+      }
       exitCode = fromRun.exitCode;
       outcome = "forwarded";
     }
@@ -651,7 +722,7 @@ export async function main(argv: readonly string[], deps: MainDeps = {}): Promis
 
   // Both writes are best-effort and both failures are silent by design: a log
   // that cannot be written must not change the exit code, because the exit code
-  // is what OmO branches on (index.js:8390-8394) and the log is only evidence.
+  // is what OmO branches on (index.js:8415) and the log is only evidence.
   // An invocation that failed before `planInvocation` returned still gets both
   // lines, so "exactly one line per invocation" does not depend on the path.
   const endedAt = clock();
@@ -670,6 +741,41 @@ export async function main(argv: readonly string[], deps: MainDeps = {}): Promis
   return exitCode;
 }
 
+/**
+ * Run the extra psmux invocations a translation asked for, in order.
+ *
+ * Sequentially, each awaited, because they are order-dependent by construction:
+ * the `select-layout` re-application exists to consume the option the primary
+ * just set, so overlapping the two would race the very read it is there to serve.
+ *
+ * `captureOutput: true` is how the output is DISCARDED. `runBackend` then pipes
+ * both streams instead of inheriting them (`src/backend.ts`, `BackendSpawnOptions`),
+ * so the bytes are collected into a `BackendOutcome` nobody reads and never reach
+ * the shim's own stdout — which matters because a stray line there would land in
+ * the pane text OmO captures when it reads a pane id (CONTRACT.md 3.7).
+ *
+ * The outcome is discarded too, deliberately; see the comment in `main`.
+ */
+async function runFollowUps(
+  backend: ResolvedBackend,
+  followUps: readonly FollowUpCommand[],
+  deps: MainDeps,
+): Promise<void> {
+  if (followUps.length === 0) return;
+  const run = deps.run ?? runBackend;
+  const options = backendRunOptions(deps);
+  for (const followUp of followUps) {
+    await run(backend, followUp.argv, { ...options, captureOutput: true });
+  }
+}
+
+/** The environment handed to a backend child, or nothing at all so the child
+ *  inherits the shim's own environment in full. One function so the primary and
+ *  its follow-ups are spawned identically except for `captureOutput`. */
+function backendRunOptions(deps: MainDeps): RunBackendOptions {
+  return { ...(deps.backendEnv ? { env: deps.backendEnv } : {}) };
+}
+
 /** The record context for an invocation that never got as far as a plan. Its
  *  resolution is `backend-missing`, which is already a real resolution kind and
  *  makes the record self-consistent: no backend was found, so nothing ran. */
@@ -685,6 +791,7 @@ function degradedInvocation(
     translation: {
       argv: [...argv],
       kind: "passthrough",
+      followUps: [],
       rewritten: false,
       dashDashInserted: false,
       psmuxPath: "",

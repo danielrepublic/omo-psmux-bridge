@@ -4,12 +4,14 @@
 // path. It executes nothing, spawns nothing, touches no file, and reads no
 // environment variable. Every environment value it needs is handed in.
 //
-// The whole design is three rules, in priority order:
+// The whole design is three rules, in priority order (rule 1 has three
+// sub-rules, 1a to 1c, which is where every layout rule lives):
 //
 //   1. `pass-through` is returned byte-identically. OmO drives tmux from
 //      LLM-authored argv via the `interactive_bash` tool, so unrecognised input
 //      is routine, not exceptional, and rewriting it would be worse than not
-//      translating at all.
+//      translating at all. The three LAYOUT RULES below (rules 1a, 1b, 1c) are
+//      the only exceptions, and each one is pinned to a psmux defect.
 //   2. The five payload-carrying forms get their POSIX `/bin/sh -c "…"` operand
 //      replaced by ONE PowerShell helper invocation. The helper applies the `-e`
 //      pairs to the child's environment and then execs the command.
@@ -98,6 +100,134 @@
 // fallback.
 //
 // ---------------------------------------------------------------------------
+// THE LAYOUT RULES — three exceptions to rule 1, each pinned to a psmux defect
+// ---------------------------------------------------------------------------
+//
+// Every subagent spawn and every subagent close makes OmO emit exactly three tmux
+// commands, in this order, as three separate process invocations (`index.js:8914`,
+// `index.js:8921`, `index.js:8937`). None of them carries a payload, so all three
+// classify as `pass-through` and all three used to be forwarded byte-identically.
+// Forwarding them is what produces the reported geometry: a main pane about 197
+// columns wide and every subagent pane crushed to 2. Three independent psmux
+// 3.3.8 defects conspire to do that, and each one is neutralised here by exactly
+// as much rewriting as it takes — no more.
+//
+// THE GOAL is the geometry, and it is a layout question, not a translation one:
+// the main pane must occupy the LEFT half of the window and the subagent panes
+// must stack in the RIGHT half. `main-vertical` is that layout in psmux
+// (`src/layout.rs:1129-1136`, an `Horizontal` split of `vec![main_v_pct, 100 -
+// main_v_pct]` with the main pane first), so `main-horizontal` — which would put
+// the main pane on TOP — is NOT substituted anywhere. OmO already asks for
+// `main-vertical` (`index.js:8914`) and that choice is correct as it stands.
+//
+// RULE 1a — strip the `%` from a main-pane sizing option.
+//
+//   OmO writes the size as a percentage (`index.js:8921` builds
+//   `` `${mainPaneSize}%` ``) and tmux accepts that spelling. psmux does not: it
+//   parses the value with `value.parse::<u16>()` in BOTH
+//   `src/server/options.rs:527` and `src/config.rs:1207`, `"50%".parse::<u16>()`
+//   fails, the `if let Ok(n)` arm simply never fires, and there is no error — the
+//   option is never set at all. Measured on the host: `set-window-option
+//   main-pane-width "50%"` leaves the main pane at 119/199 (its 60% default),
+//   while `set-window-option main-pane-width "50"` yields 99/199.
+//
+//   So when the verb is one of the four set-option spellings and the option being
+//   set is `main-pane-width` or `main-pane-height`, ONE trailing `%` comes off the
+//   value. Nothing else moves: same verb, same flags, same order, same target. A
+//   value without a `%`, or any other option name, is forwarded byte-identically,
+//   because the defect is specifically about a unit the backend cannot parse.
+//
+// RULE 1b — re-apply the layout, because setting the option is not applying it.
+//
+//   psmux reads `main_pane_width` and `main_pane_height` from INSIDE
+//   `apply_layout` (`src/layout.rs:1094-1096`), so setting the option changes
+//   nothing until a layout is applied. Measured: set the option, list panes, still
+//   119; set the option, then `select-layout main-vertical`, 99. And OmO emits
+//   `select-layout` BEFORE `set-window-option` (`index.js:8914` precedes
+//   `index.js:8921`), so even a corrected value would arrive too late to matter.
+//   The fix is to run the matching layout again, after the option is set, which is
+//   what `followUps` on the Translation is for.
+//
+//   The mapping is not a guess. psmux reads `main_pane_width` for its
+//   `main-vertical` layout (`src/layout.rs:1096` feeds `main_v_pct`, consumed at
+//   `src/layout.rs:1129-1136`) and `main_pane_height` for `main-horizontal`
+//   (`src/layout.rs:1095` feeds `main_h_pct`, consumed at `src/layout.rs:1109`),
+//   and OmO emits these two options for its two `main-*` layouts and nothing else
+//   (`index.js:8920` picks the dimension from the layout name). One option, one
+//   consumer.
+//
+//   BUT ONLY FOR THE EXACT SHAPE OmO EMITS: verb, option name, value, no flags and
+//   no `-t` (`index.js:8921`). That is a real restriction and not a stylistic one,
+//   because `select-layout` and `set-window-option` are SEPARATE process
+//   invocations — a pure per-argv translator can never know what layout the
+//   previous one left behind, so a follow-up injected for a shape OmO never emits
+//   is a layout change nobody asked for. `-u` and `-ga` are the sharp cases: psmux
+//   routes them to handlers that only touch `@` options (`src/server/mod.rs:446-463`),
+//   so those commands change nothing and a follow-up would still re-lay-out. Rule
+//   1a is NOT so restricted, because stripping a `%` is always the safe direction.
+//   The residual case this leaves, and why it is accepted rather than hidden, is
+//   argued at `stripPercentAndReapplyLayout`.
+//
+//   The re-applied command carries NO `-t`, matching OmO's own un-targeted call
+//   (`index.js:8914`) and CONTRACT.md 9 Option A. It carries the same
+//   `leadingGlobals` the primary got, because `-L <ns>` is what selects the server
+//   (`src/types.rs:1345-1347`) and a follow-up aimed at the wrong one would
+//   re-lay-out a namespace nobody is looking at.
+//
+//   Its stdout, stderr and exit code are all discarded by the caller. OmO spawns
+//   the two layout commands it does spawn itself with `stdout: "ignore",
+//   stderr: "ignore"` (`index.js:8915-8916` and `index.js:8921`), awaits both
+//   without reading a code (`index.js:8918`, `index.js:8922`), and the bridge has
+//   to be at least as quiet as that: the primary command's exit code is the only
+//   one OmO branches on.
+//
+// RULE 1c — suppress `resize-pane -x` / `-y` entirely.
+//
+//   OmO's third command (`index.js:8937`) hardens the width with an explicit cell
+//   count. psmux's `resize-pane -x/-y` is destructive: `resize_pane_absolute`
+//   (`src/window_ops.rs:1771-1796`) assigns the caller-supplied value straight
+//   into the layout tree's `sizes` array, but those entries are PERCENTAGES
+//   (`src/layout.rs:1136` builds `vec![main_v_pct, 100 - main_v_pct]`), whereas
+//   tmux's `-x`/`-y` is a CELL COUNT. So `-x 99` writes `99` as a percentage: with
+//   `sizes = [60, 20, 20]` the sibling takes `20 - (99 - 60)` and is floored at 1,
+//   i.e. `[99, 1, 1]` — a 197-column main pane and 2-column siblings. Measured
+//   exactly: `resize-pane -t %1 -x 99` turned `[119, 80, 80]` into `[197, 2, 2]`.
+//
+//   No argument form rescues it: `-x 99`, `-x 99%`, `-x 100` and `-x +0` are all
+//   wrong or destructive, `-x -20` and `-l 25` are silent no-ops, and
+//   `src/server/connection.rs:1767-1778` shows why — psmux parses a bare `-x`
+//   token as an ABSOLUTE value and only treats a `%` suffix as a percentage, so
+//   there is no spelling of the cell count that means "cell count" to it.
+//
+//   So the command is not forwarded at all. With rules 1a and 1b the geometry is
+//   already correct, so this command is a no-op in INTENT, and forwarding a
+//   no-op that is actively destructive is strictly worse than dropping it. The
+//   suppression is a deliberate, user-approved tradeoff, which is why it is a
+//   first-class `Translation.kind` rather than a silent drop: the call log names
+//   `kind: "suppressed"` and still records the argv that was dropped, so the
+//   decision is auditable rather than invisible.
+//
+//   `-Z` BEATS `-x`/`-y`, so `-Z` is checked first and suppresses nothing.
+//   psmux dispatches zoom at `src/server/connection.rs:1236`, an arm of the same
+//   `match cmd` that opens at 1061 and carries the guard `args.iter().any(|a| *a
+//   == "-Z")`, before the `-x`/`-y` arms at `src/server/connection.rs:1767-1778`
+//   are ever reached. So in `resize-pane -Z -x 99` the `-x 99` is never read by
+//   psmux at all, and dropping that argv would drop the ZOOM.
+//
+// WHY ALL THREE LIVE HERE AND NOT IN src/grammar.ts. These verbs carry no payload,
+// so `classifyArgv` is right to call them `pass-through` and its verb switch and
+// `RecognisedKind` union are unchanged: what the bridge does to them is a
+// TRANSLATE-stage concern, and keeping the classification honest is what lets
+// CONTRACT.md 3.9 still say "no payload, therefore no new classification".
+//
+// WHAT IS NOT HANDLED, DELIBERATELY. The unset alias `-U`
+// (`src/server/connection.rs:2368` treats `-U`/`-u` as "unset this option") is
+// off-path: OmO's only `set-window-option` call is `index.js:8921`, which carries
+// no flag at all, and an unset has no `%` for rule 1a to find. An agent that
+// unsets `main-pane-width` through the `interactive_bash` tool is forwarded
+// untouched, which is the pass-through guarantee doing its job.
+//
+// ---------------------------------------------------------------------------
 // WHAT IS DELIBERATELY NOT DONE HERE
 // ---------------------------------------------------------------------------
 //
@@ -109,8 +239,9 @@
 // but src/grammar.ts has no `RecognisedKind` for it and CONTRACT.md 7.3 forbids
 // handling it. This module follows the types and the contract.
 //
-// `select-layout` with no `-t` is forwarded unchanged (CONTRACT.md 9, Option A:
-// the lower-risk default). Nothing is injected.
+// `select-layout` with no `-t` is forwarded unchanged when OmO sends one
+// (CONTRACT.md 9, Option A). The only `select-layout` the bridge INVENTS is the
+// follow-up in rule 1b, and it is un-targeted for the same reason.
 
 import { classifyArgv } from "./grammar";
 import type { AuthEnvArg, Classification, Classified } from "./grammar";
@@ -200,12 +331,47 @@ export interface EnvSlot {
   readonly assignment: string;
 }
 
-export interface Translation {
-  /** Exactly what to hand to psmux, after the psmux path itself. */
+/**
+ * Why the bridge added a psmux command of its own.
+ *
+ * A stable slug rather than prose, because it is written verbatim into the call
+ * log, where a reader has to match it against this file and against CONTRACT.md
+ * 3.9. One member today because one rule needs it; a second rule that invents a
+ * command adds a member here rather than a free-text string, so the log stays a
+ * closed vocabulary.
+ */
+export type FollowUpReason = "psmux-reads-main-pane-size-only-inside-apply-layout";
+
+/**
+ * One extra psmux invocation, to be run AFTER the primary `argv`.
+ *
+ * A separate argv rather than a verb and a flag list because the follow-up is a
+ * complete command in its own right: it needs its own leading globals to reach
+ * the same server, and it must be independently projectable into the log.
+ */
+export interface FollowUpCommand {
+  /** The psmux defect this command works around. Recorded verbatim. */
+  readonly reason: FollowUpReason;
+  /** The argv for THIS invocation, after the psmux path. Never contains the
+   *  primary's helper operand, because no follow-up is a helper invocation. */
   readonly argv: readonly string[];
-  /** `"passthrough"` or `"helper"`. */
-  readonly kind: "passthrough" | "helper";
-  /** True iff any element differs from the input. Never true for pass-through. */
+}
+
+export interface Translation {
+  /** Exactly what to hand to psmux, after the psmux path itself. ALWAYS THE
+   *  PRIMARY command, even when `followUps` is non-empty — so every existing
+   *  caller, and every existing assertion, keeps meaning what it meant. */
+  readonly argv: readonly string[];
+  /** `"passthrough"`, `"helper"`, or `"suppressed"` for the one command this
+   *  bridge refuses to forward at all (rule 1c). A `suppressed` translation's
+   *  `argv` is still the input, verbatim: it is the record of what was dropped. */
+  readonly kind: "passthrough" | "helper" | "suppressed";
+  /** Extra psmux invocations to run after `argv`, in order (rule 1b). Empty on
+   *  every ordinary path, `passthrough` and `helper` included. */
+  readonly followUps: readonly FollowUpCommand[];
+  /** True iff any element differs from the input. Never true when the argv came
+   *  back verbatim, so never for `passthrough` or `suppressed`; true for every
+   *  `helper`, and true for the `%`-stripped sizing option of rule 1a. */
   readonly rewritten: boolean;
   /** True iff `--` was inserted. True for exactly two classifications. */
   readonly dashDashInserted: boolean;
@@ -234,7 +400,9 @@ export interface Translation {
  */
 export function translateArgv(classified: Classified, options: TranslateOptions): Translation {
   if (classified.kind === "pass-through") {
-    return passthrough(classified.argv, options);
+    // The layout rules live on this branch and nowhere else, because all three
+    // act on payload-free commands, which is exactly what `pass-through` is.
+    return translatePassThrough(classified.argv, options);
   }
 
   const verb = classified.argv[0];
@@ -269,6 +437,7 @@ export function translateArgv(classified: Classified, options: TranslateOptions)
       commandLine,
     ],
     kind: "helper",
+    followUps: [],
     rewritten: true,
     dashDashInserted: dashDash,
     psmuxPath: options.psmuxPath,
@@ -288,7 +457,269 @@ function passthrough(argv: readonly string[], options: TranslateOptions): Transl
   return {
     argv: [...(options.leadingGlobals ?? []), ...argv],
     kind: "passthrough",
+    followUps: [],
     rewritten: false,
+    dashDashInserted: false,
+    psmuxPath: options.psmuxPath,
+    envSlots: [],
+    envSlotCount: 0,
+    helperCommandLine: undefined,
+    correlationId: undefined,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// The layout rules, on the pass-through branch
+// ---------------------------------------------------------------------------
+
+/** The four spellings psmux itself accepts for the same verb
+ *  (`src/server/connection.rs:2355`), and tmux accepts for the same one. All
+ *  four are handled because OmO emits only `set-window-option`
+ *  (`index.js:8921`) and an agent using `interactive_bash` may emit any of the
+ *  others. */
+const OPTION_SET_VERBS: ReadonlySet<string> = new Set([
+  "set-window-option",
+  "setw",
+  "set-option",
+  "set",
+]);
+
+/** Sizing option → the layout whose `apply_layout` arm CONSUMES it. The keys are
+ *  the two options `src/server/options.rs:527-532` parses as `u16`, and the
+ *  values are the two layouts OmO pairs them with at `index.js:8920`. One map,
+ *  because "which option" and "which layout" are the same question: psmux reads
+ *  `main_pane_width` in the `main-vertical` arm (`src/layout.rs:1096,1129`) and
+ *  `main_pane_height` in the `main-horizontal` arm (`src/layout.rs:1095,1109`). */
+const SIZING_OPTION_LAYOUT: ReadonlyMap<string, string> = new Map([
+  ["main-pane-width", "main-vertical"],
+  ["main-pane-height", "main-horizontal"],
+]);
+
+/** Of `set-window-option`'s flags, the one that takes a value: `-t <target>`.
+ *  psmux says so in as many words (`src/server/connection.rs:2376`: "Only -t takes
+ *  a value here."); the rest are bare or combined booleans it reads by letter
+ *  (`src/server/connection.rs:2356-2377`: `-g`, `-a`, `-q`, `-o`, `-u`/`-U`,
+ *  `-p`). A value flag is skipped together with its value so the walk lands on
+ *  the option NAME and not on a target. */
+const OPTION_SET_VALUE_FLAGS: ReadonlySet<string> = new Set(["-t"]);
+
+/** Both spellings of the resize verb (`src/server/connection.rs:1760`). */
+const RESIZE_VERBS: ReadonlySet<string> = new Set(["resize-pane", "resizep"]);
+
+/**
+ * The layout rules, applied to one pass-through argv.
+ *
+ * Three mutually exclusive shapes, decided by the verb alone, so the order here
+ * is a readability choice and not a priority one. Anything not named by a rule
+ * comes out of `passthrough()` untouched.
+ */
+function translatePassThrough(argv: readonly string[], options: TranslateOptions): Translation {
+  if (carriesDestructiveResize(argv)) return suppressed(argv, options);
+  return stripPercentAndReapplyLayout(argv, options);
+}
+
+/**
+ * Does this argv carry a `resize-pane -x` / `-y`?
+ *
+ * Element equality, not a prefix test, and that is not a shortcut:
+ * `src/server/connection.rs:1767-1778` looks for a bare `-x` / `-y` token with
+ * `args.windows(2).find(|w| w[0] == "-x")`, so a combined `-x99` element is not
+ * even read as a resize request and is harmless. Only the bare form can do
+ * damage, so only the bare form is suppressed.
+ *
+ * `-Z` is checked FIRST and returns false, which is the precedence psmux itself
+ * applies. `-Z` is dispatched at `src/server/connection.rs:1236`, an arm of the
+ * same `match cmd` that opens at 1061 and closes after 3632, and it carries the
+ * guard `args.iter().any(|a| *a == "-Z")`. So `resize-pane -Z -x 99` is a ZOOM to
+ * psmux and the `-x 99` beside it is never read. Suppressing that argv would
+ * suppress a zoom the user asked for, on the strength of a flag psmux ignores --
+ * so the check has to be an early return, not a note in a comment.
+ */
+function carriesDestructiveResize(argv: readonly string[]): boolean {
+  const verb = argv[0];
+  if (verb === undefined || !RESIZE_VERBS.has(verb)) return false;
+  if (argv.includes("-Z")) return false;
+  return argv.includes("-x") || argv.includes("-y");
+}
+
+/** A command the bridge refuses to forward (rule 1c).
+ *
+ * `argv` is the INPUT, verbatim, not an empty array: the call log's whole job is
+ * to say what the shim was asked to do, so the dropped command is recorded rather
+ * than erased, and `kind: "suppressed"` is what distinguishes "deliberately not
+ * run" from "nothing to run". */
+function suppressed(argv: readonly string[], options: TranslateOptions): Translation {
+  return {
+    argv: [...(options.leadingGlobals ?? []), ...argv],
+    kind: "suppressed",
+    followUps: [],
+    rewritten: false,
+    dashDashInserted: false,
+    psmuxPath: options.psmuxPath,
+    envSlots: [],
+    envSlotCount: 0,
+    helperCommandLine: undefined,
+    correlationId: undefined,
+  };
+}
+
+/** Where the option name and its value sit, once both have been found. */
+interface SizingOption {
+  /** Index in argv of the VALUE element. */
+  readonly valueIndex: number;
+  /** The value, byte-exact. Guaranteed present and guaranteed not to be a flag. */
+  readonly value: string;
+  /** The layout that consumes this option — see `SIZING_OPTION_LAYOUT`. */
+  readonly layout: string;
+  /**
+   * True iff the argv carried NO flag at all and NO `-t`.
+   *
+   * True is exactly `index === 1` at the end of the walk below, because the walk
+   * starts at 1 and only ever advances past a flag — so it did not advance iff it
+   * never saw one. This is the shape OmO emits and the ONLY shape rule 1b fires
+   * on; see `stripPercentAndReapplyLayout` for why that distinction is load
+   * bearing rather than cosmetic.
+   */
+  readonly flagless: boolean;
+}
+
+/**
+ * Find `main-pane-width` / `main-pane-height` and the value OmO gave it.
+ *
+ * The walk skips flags to reach the option NAME, then takes the element after it
+ * as the value. Anything that does not fit that shape — a different option, no
+ * value at all, a dangling `-t` — returns undefined and the caller forwards the
+ * command untouched, which is the safe direction for every one of those cases:
+ * psmux produces its own diagnostic for a command the bridge did not understand,
+ * whereas a rewrite of a command the bridge half-understood would be silent.
+ *
+ * It also RECORDS whether it had to skip anything, as `flagless`. That is not the
+ * same question as "did it find a sizing option", and the difference is rule 1b's
+ * whole gate — see `stripPercentAndReapplyLayout`.
+ */
+function findSizingOption(argv: readonly string[]): SizingOption | undefined {
+  const verb = argv[0];
+  if (verb === undefined || !OPTION_SET_VERBS.has(verb)) return undefined;
+
+  let index = 1;
+  while (index < argv.length) {
+    const element = argv[index];
+    if (element === undefined) return undefined;
+    // The first element that is not a flag is the option NAME. A bare `-` is a
+    // filename in tmux's grammar, not a flag, and a post-`--` element is an
+    // operand; both end the flag run.
+    if (!element.startsWith("-") || element === "-") break;
+    index += OPTION_SET_VALUE_FLAGS.has(element) ? 2 : 1;
+  }
+
+  const name = argv[index];
+  if (name === undefined) return undefined;
+  const layout = SIZING_OPTION_LAYOUT.get(name);
+  if (layout === undefined) return undefined;
+
+  const valueIndex = index + 1;
+  const value = argv[valueIndex];
+  if (value === undefined || value.startsWith("-")) return undefined;
+
+  return { valueIndex, value, layout, flagless: index === 1 };
+}
+
+/**
+ * Rules 1a and 1b together: one trailing `%` off the value, and — ONLY for the
+ * exact argv shape OmO emits — the consuming layout re-applied afterwards.
+ *
+ * Rule 1a is gated on "a main-pane sizing option whose value ends in `%`",
+ * because `%` is the whole of defect A and a value without it already parses in
+ * psmux. That gate is deliberately WIDE: it fires on every spelling an agent can
+ * produce, including the flagged ones below, because in that direction stripping
+ * is always the safe correction — psmux ignores an unparseable value silently, so
+ * the worst outcome of stripping is that a value the user meant literally lost its
+ * unit, versus the worst outcome of not stripping, which is a size that never
+ * applies.
+ *
+ * Rule 1b is gated on `sizing.flagless` instead, and the two gates are not
+ * interchangeable, because rule 1b is the only rule here that CHANGES THE LAYOUT
+ * rather than repairing a value. OmO emits exactly one spelling of this command
+ * — `index.js:8921`, `spawnCommand([tmux, "set-window-option", dimension,
+ * `${mainPaneSize}%`], {...})` — which is three elements: verb, option name,
+ * value. No flags, no `-t`. `flagless` is precisely that shape, because the walk
+ * starts at 1 and only advances past a flag.
+ *
+ * WHY THE OTHER THREE SHAPES MUST NOT GET A FOLLOW-UP. A per-argv translator
+ * cannot see what the previous process invocation did, and that is not a
+ * limitation to work around here, it is the reason this gate exists. `select-
+ * layout main-vertical` (`index.js:8914`) and `set-window-option main-pane-width
+ * 50%` (`index.js:8921`) are SEPARATE invocations, so nothing in this argv says
+ * which layout the window is currently in. Injecting `select-layout` on a shape
+ * OmO never emits therefore applies a layout nobody asked for:
+ *
+ *   * `set-window-option -u main-pane-width 50%` — psmux routes `-u` to
+ *     `SetOptionUnset` (`src/server/mod.rs:459-463`), whose handler only removes
+ *     `@`-prefixed user options. The unset is itself a no-op and the value is
+ *     never read by anything, so a follow-up here would re-lay-out the window on
+ *     the strength of a command that did nothing at all.
+ *   * `set-window-option -ga main-pane-width 50%` — same story via
+ *     `SetOptionAppend` (`src/server/mod.rs:446-458`), which only touches `@`
+ *     options and the three `status-*` strings.
+ *   * `set-window-option -t <target> main-pane-width 50%` — the option did set,
+ *     but a `-t` may name a pane or window other than the one holding the main
+ *     pane, and the follow-up carries no `-t` by design (CONTRACT.md 9, Option A),
+ *     so it would re-lay-out the CURRENT window in answer to a command aimed at
+ *     some other one.
+ *
+ * RESIDUAL EXPOSURE, STATED PLAINLY RATHER THAN HIDDEN. The bare, un-targeted,
+ * un-flagged shape is what the gate keys on, and rule 1b cannot tell whether the
+ * window it is about is already in the matching layout. So an agent that authors
+ * `set-window-option main-pane-height 50%` by hand through `interactive_bash`,
+ * intending to resize the main pane of a window that is CURRENTLY
+ * `main-vertical`, still gets switched to `main-horizontal` — the exact defect
+ * this fix addresses, narrowed but not closed.
+ *
+ * It is narrowed rather than closed because closing it needs information this
+ * module does not have and cannot get: the window's current layout, which lives
+ * in the psmux server, behind a socket, in a state this pure, runtime-free
+ * translator never observes. The reviewer's suggested alternative — gate on
+ * "whether this argv already names that layout" — cannot work at all, because the
+ * argv names an OPTION (`main-pane-width`), never a layout: the `select-layout`
+ * that set the current layout was a different process invocation, already gone.
+ * Choosing the option→layout map as the gate is what keeps this one line of
+ * inference where the defect is actually decidable. The residual case is
+ * accepted deliberately rather than papered over, and it is reachable only by an
+ * agent writing a raw sizing command, which is off every path OmO takes.
+ */
+function stripPercentAndReapplyLayout(
+  argv: readonly string[],
+  options: TranslateOptions,
+): Translation {
+  const sizing = findSizingOption(argv);
+  if (sizing === undefined || !sizing.value.endsWith("%")) {
+    return passthrough(argv, options);
+  }
+
+  const leadingGlobals = options.leadingGlobals ?? [];
+  const rewrittenArgv = [...argv];
+  // Exactly one trailing character, which `endsWith` has established is `%`. So
+  // `50%` becomes `50` and `50%%` becomes `50%`, which is what "remove a single
+  // trailing `%`" means and not "strip every `%`".
+  rewrittenArgv[sizing.valueIndex] = sizing.value.slice(0, -1);
+
+  return {
+    argv: [...leadingGlobals, ...rewrittenArgv],
+    kind: "passthrough",
+    // One follow-up, and only when no flag was skipped — the gate and its
+    // residual exposure are argued above, not repeated here.
+    followUps: sizing.flagless
+      ? [
+          {
+            reason: "psmux-reads-main-pane-size-only-inside-apply-layout",
+            // No `-t`, matching OmO's own un-targeted call (`index.js:8914`); the
+            // same leading globals as the primary, so both invocations reach the
+            // one server this translation is about.
+            argv: [...leadingGlobals, "select-layout", sizing.layout],
+          },
+        ]
+      : [],
+    rewritten: true,
     dashDashInserted: false,
     psmuxPath: options.psmuxPath,
     envSlots: [],

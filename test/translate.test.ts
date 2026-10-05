@@ -307,8 +307,6 @@ describe("pass-through — argv comes back untouched", () => {
     ["select-pane", "-t", "%7", "-T", "omo-subagent-explore the tm"],
     ["send-keys", "-t", "%3", "C-c"],
     ["display", "-p", "-t", "%1", "#{window_width}"],
-    ["set-window-option", "-g", "main-pane-height", "50%"],
-    ["resize-pane", "-t", "%1", "-x", "109"],
     ["has-session", "-t", "omo-iso-4711"],
     ["list-sessions", "-F", "#{session_name}"],
     // respawn-window is OFF-PATH (CONTRACT.md 7.3) and carries no payload, but an
@@ -880,6 +878,7 @@ describe("translation result", () => {
       "dashDashInserted",
       "envSlotCount",
       "envSlots",
+      "followUps",
       "helperCommandLine",
       "kind",
       "psmuxPath",
@@ -940,5 +939,428 @@ describe("no shell wrapper, no cat special case", () => {
     const tail = translation.argv.slice(translation.argv.indexOf("--") + 1);
 
     expect(tail).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 10. THE LAYOUT RULES — the three carve-outs from pass-through
+// ---------------------------------------------------------------------------
+//
+// `set-window-option main-pane-width 50%` and `resize-pane -t %1 -x 99` USED to
+// sit in the ADVERSARIAL array above, asserting byte-identical pass-through. Both
+// assertions are withdrawn, deliberately, because forwarding them is what produces
+// the reported geometry: a 197-column main pane and 2-column subagent panes.
+//
+// The fixtures here are the argv OmO 5.1.18 actually emits for the layout, in
+// order, after every subagent spawn and after every subagent close:
+//
+//   1. index.js:8914  ["select-layout", "main-vertical"]
+//   2. index.js:8921  ["set-window-option", dimension, `${mainPaneSize}%`]
+//   3. index.js:8937  ["resize-pane", "-t", mainPaneId, "-x", String(mainWidth)]
+//
+// and every test here is pinned to a psmux defect: `options.rs:527` parses the
+// value as `u16` so `"50%"` never lands, `layout.rs:1094-1096` reads the option
+// only from inside `apply_layout`, and `window_ops.rs:1771-1796` writes a cell
+// count into a PERCENTAGE array (`layout.rs:1136`). CONTRACT.md 3.9 records the
+// rules; section 9 there records why the re-applied layout carries no `-t`.
+
+/** The layout trio as OmO emits it, with `-L <ns>` so the leading globals and
+ *  their propagation onto BOTH commands are visible in every assertion below. */
+const LAYOUT_OPTS = { ...OPTS, leadingGlobals: ["-L", "ns"] } as const;
+
+describe("layout rule 1a: one trailing `%` is stripped from a main-pane sizing option", () => {
+  test("`set-window-option main-pane-width 50%` becomes `50`, with `select-layout main-vertical` as the follow-up", () => {
+    const translation = translate(["set-window-option", "main-pane-width", "50%"], LAYOUT_OPTS);
+
+    expect(translation.argv).toEqual(["-L", "ns", "set-window-option", "main-pane-width", "50"]);
+    expect(translation.kind).toBe("passthrough");
+    expect(translation.rewritten).toBe(true);
+    // Not a payload form, so nothing else about the translation changes.
+    expect(translation.dashDashInserted).toBe(false);
+    expect(translation.helperCommandLine).toBeUndefined();
+    expect(translation.envSlotCount).toBe(0);
+
+    // The follow-up is what makes the stripped value MEAN anything: psmux reads
+    // `main_pane_width` only from inside `apply_layout`.
+    expect(translation.followUps).toHaveLength(1);
+    expect(translation.followUps[0]?.argv).toEqual(["-L", "ns", "select-layout", "main-vertical"]);
+    expect(translation.followUps[0]?.reason).toBe(
+      "psmux-reads-main-pane-size-only-inside-apply-layout",
+    );
+  });
+
+  test("`main-pane-height` maps to `main-horizontal`, because that is the layout that reads it", () => {
+    const translation = translate(["set-window-option", "main-pane-height", "50%"], LAYOUT_OPTS);
+
+    expect(translation.argv).toEqual(["-L", "ns", "set-window-option", "main-pane-height", "50"]);
+    expect(translation.followUps[0]?.argv).toEqual(["-L", "ns", "select-layout", "main-horizontal"]);
+  });
+
+  test("a value with no `%` is forwarded byte-identically and asks for no follow-up", () => {
+    // psmux parses a bare number fine, so there is no defect to work around and
+    // therefore nothing to rewrite. Emitting a follow-up here would be a second
+    // unrequested layout application on a command the contract says is untouched.
+    const translation = translate(["set-window-option", "main-pane-width", "50"], LAYOUT_OPTS);
+
+    expect(translation.argv).toEqual(["-L", "ns", "set-window-option", "main-pane-width", "50"]);
+    expect(translation.kind).toBe("passthrough");
+    expect(translation.rewritten).toBe(false);
+    expect(translation.followUps).toEqual([]);
+  });
+
+  test("exactly ONE trailing `%` comes off, so `50%%` becomes `50%`", () => {
+    const translation = translate(["set-window-option", "main-pane-width", "50%%"], LAYOUT_OPTS);
+
+    expect(translation.argv.at(-1)).toBe("50%");
+    expect(translation.followUps).toHaveLength(1);
+  });
+
+  test("a non-sizing option is forwarded byte-identically, `%` and all", () => {
+    // `status` is a STRING option (`src/server/options.rs:71-74`, arms that yield
+    // `"off"` / `"on"` / a line count), so a `%` in some other option's value is
+    // not this defect. Rewriting it would be rewriting a command nobody measured.
+    for (const option of ["status", "window-size", "mode-keys"]) {
+      const translation = translate(["set-window-option", "-g", option, "50%"], LAYOUT_OPTS);
+
+      expect(translation.argv).toEqual(["-L", "ns", "set-window-option", "-g", option, "50%"]);
+      expect(translation.rewritten).toBe(false);
+      expect(translation.followUps).toEqual([]);
+    }
+  });
+
+  test("all four set-option spellings are handled, because psmux accepts all four", () => {
+    for (const verb of ["set-window-option", "setw", "set-option", "set"]) {
+      const translation = translate([verb, "main-pane-width", "50%"], LAYOUT_OPTS);
+
+      expect(translation.argv).toEqual(["-L", "ns", verb, "main-pane-width", "50"]);
+      expect(translation.followUps[0]?.argv).toEqual(["-L", "ns", "select-layout", "main-vertical"]);
+    }
+  });
+
+  test("`-g` and `-t <target>` keep their positions, and NO follow-up is invented", () => {
+    const translation = translate(
+      ["set-window-option", "-t", "%4", "-g", "main-pane-width", "50%"],
+      LAYOUT_OPTS,
+    );
+
+    // Only the VALUE moved. The verb, the flag order, and the target are byte-identical.
+    expect(translation.argv).toEqual([
+      "-L",
+      "ns",
+      "set-window-option",
+      "-t",
+      "%4",
+      "-g",
+      "main-pane-width",
+      "50",
+    ]);
+    expect(translation.argv.indexOf("-t")).toBe(3);
+    expect(translation.argv.indexOf("-g")).toBe(5);
+    // BEHAVIOUR CHANGE. This test used to assert that the follow-up existed and
+    // merely did not leak `-t`/`%4` into it. It no longer exists at all. The
+    // follow-up is now gated on `flagless`, i.e. on OmO's own three-element shape
+    // (`index.js:8921`), and this argv has two flags. Asserting the leak-absence
+    // on a command that gets no follow-up was asserting a weaker property than
+    // the one that actually matters: that the bridge invents nothing here.
+    expect(translation.followUps).toEqual([]);
+    // Rule 1a is NOT gated the same way — the `%` still comes off. Stripping is
+    // always the safe direction; only the layout change is restricted.
+    expect(translation.rewritten).toBe(true);
+  });
+
+  test("leading globals land on BOTH commands, so the re-layout reaches the same server", () => {
+    const translation = translate(["set-window-option", "main-pane-width", "50%"], {
+      ...OPTS,
+      leadingGlobals: ["-L", "ns", "-f", "C:\\conf\\psmux.cfg"],
+    });
+
+    expect(translation.argv).toEqual([
+      "-L",
+      "ns",
+      "-f",
+      "C:\\conf\\psmux.cfg",
+      "set-window-option",
+      "main-pane-width",
+      "50",
+    ]);
+    expect(translation.followUps[0]?.argv).toEqual([
+      "-L",
+      "ns",
+      "-f",
+      "C:\\conf\\psmux.cfg",
+      "select-layout",
+      "main-vertical",
+    ]);
+  });
+
+  test("a `-t` with no value, and a sizing option with no value, are both left alone", () => {
+    // The walk cannot find a value, so it forwards rather than guessing. psmux
+    // produces its own diagnostic; a rewrite of a half-understood command would
+    // be silent.
+    const danglingTarget = translate(["set-window-option", "-t"], LAYOUT_OPTS);
+    expect(danglingTarget.argv).toEqual(["-L", "ns", "set-window-option", "-t"]);
+    expect(danglingTarget.followUps).toEqual([]);
+
+    const noValue = translate(["set-window-option", "main-pane-width"], LAYOUT_OPTS);
+    expect(noValue.argv).toEqual(["-L", "ns", "set-window-option", "main-pane-width"]);
+    expect(noValue.followUps).toEqual([]);
+  });
+
+  test("OmO's own un-targeted `select-layout` is still pass-through, with no follow-up of its own", () => {
+    const translation = translate(["select-layout", "main-vertical"], LAYOUT_OPTS);
+
+    expect(translation.kind).toBe("passthrough");
+    expect(translation.argv).toEqual(["-L", "ns", "select-layout", "main-vertical"]);
+    expect(translation.rewritten).toBe(false);
+    expect(translation.followUps).toEqual([]);
+  });
+});
+
+describe("layout rule 1b: the follow-up fires ONLY for the exact shape OmO emits", () => {
+  // The gate is `flagless` — verb, option name, value, nothing else — because
+  // that is byte-for-byte what `index.js:8921` spawns, and because a per-argv
+  // pure translator CANNOT know what layout the previous separate invocation left
+  // behind. `select-layout main-vertical` (index.js:8914) and this command are two
+  // different processes, so nothing in this argv names the current layout.
+  //
+  // The point of every test below is therefore not "did the `%` get stripped" but
+  // "did the bridge invent a `select-layout` nobody asked for". Stripping is gated
+  // wide and deliberately stays that way; only the layout change is restricted.
+
+  test("the POSITIVE case: the bare three-element shape still gets exactly one follow-up", () => {
+    const translation = translate(["set-window-option", "main-pane-width", "50%"], OPTS);
+
+    expect(translation.argv).toEqual(["set-window-option", "main-pane-width", "50"]);
+    expect(translation.followUps).toHaveLength(1);
+    expect(translation.followUps[0]?.argv).toEqual(["select-layout", "main-vertical"]);
+    expect(translation.followUps[0]?.reason).toBe(
+      "psmux-reads-main-pane-size-only-inside-apply-layout",
+    );
+  });
+
+  test("`set-window-option -u main-pane-width 50%`: the `%` IS stripped, and no follow-up is invented", () => {
+    // psmux routes `-u` to `CtrlReq::SetOptionUnset` (`src/server/mod.rs:459-463`),
+    // whose handler only removes `@`-prefixed user options. The unset is itself a
+    // no-op and `main-pane-width` is never read by anything — so a follow-up here
+    // would re-lay-out the window on the strength of a command that did nothing.
+    const translation = translate(["set-window-option", "-u", "main-pane-width", "50%"], LAYOUT_OPTS);
+
+    expect(translation.argv).toEqual(["-L", "ns", "set-window-option", "-u", "main-pane-width", "50"]);
+    expect(translation.rewritten).toBe(true);
+    expect(translation.followUps).toEqual([]);
+  });
+
+  test("`set-window-option -ga main-pane-width 50%`: same, via `SetOptionAppend`", () => {
+    // `src/server/mod.rs:446-458`: `SetOptionAppend` touches only `@` options and
+    // the three `status-*` strings. `-g` is a bare boolean flag, `-a` another, so
+    // the walk skips two elements and `flagless` is false.
+    const translation = translate(["set-window-option", "-ga", "main-pane-width", "50%"], LAYOUT_OPTS);
+
+    expect(translation.argv).toEqual(["-L", "ns", "set-window-option", "-ga", "main-pane-width", "50"]);
+    expect(translation.rewritten).toBe(true);
+    expect(translation.followUps).toEqual([]);
+  });
+
+  test("a bare untargeted `main-pane-height 50%` is the gated-IN shape, and is NOT residual exposure", () => {
+    // NAMED DELIBERATELY, because this is the shape the residual case rides on.
+    // It is indistinguishable from a layout re-application the user did not want:
+    // see the residual-exposure paragraph on `stripPercentAndReapplyLayout`. The
+    // honest statement of what this fix achieves is that the three FLAGGED shapes
+    // are closed and the bare one is still open — so this test pins the OPEN half
+    // rather than implying the defect is gone.
+    const translation = translate(["set-window-option", "main-pane-height", "50%"], LAYOUT_OPTS);
+
+    // The `%` still comes off, which is the half that is unconditionally safe.
+    expect(translation.argv).toEqual(["-L", "ns", "set-window-option", "main-pane-height", "50"]);
+    expect(translation.argv.at(-1)).toBe("50");
+  });
+
+  test("every flagged shape loses the follow-up while keeping the `%` strip", () => {
+    // One table, because the property is uniform: a flag anywhere before the
+    // option name closes rule 1b and leaves rule 1a alone.
+    const FLAGGED = [
+      ["set-window-option", "-u", "main-pane-width", "50%"],
+      ["set-window-option", "-U", "main-pane-width", "50%"],
+      ["set-window-option", "-g", "main-pane-width", "50%"],
+      ["set-window-option", "-ga", "main-pane-width", "50%"],
+      ["set-window-option", "-ag", "main-pane-width", "50%"],
+      ["set-window-option", "-t", "%4", "main-pane-width", "50%"],
+      ["set-window-option", "-t", "%4", "-g", "main-pane-width", "50%"],
+      ["set-window-option", "-q", "main-pane-height", "50%"],
+      ["setw", "-u", "main-pane-height", "50%"],
+    ] as const;
+
+    for (const argv of FLAGGED) {
+      const translation = translate([...argv], LAYOUT_OPTS);
+
+      expect(translation.followUps).toEqual([]);
+      expect(translation.rewritten).toBe(true);
+      // Exactly the value changed, one trailing `%`, nothing else moved.
+      expect(translation.argv).toEqual(["-L", "ns", ...argv.slice(0, -1), "50"]);
+    }
+  });
+
+  test("a `-g` on its own is enough to close the gate: one flag, no value, still not flagless", () => {
+    // Pins that `flagless` is `index === 1` and nothing looser, rather than a
+    // test for "two or more flags" that would also pass.
+    const translation = translate(["set-window-option", "-g", "main-pane-width", "50%"], LAYOUT_OPTS);
+
+    expect(translation.followUps).toEqual([]);
+    expect(translation.argv).toEqual(["-L", "ns", "set-window-option", "-g", "main-pane-width", "50"]);
+  });
+});
+
+describe("layout rule 1c: `resize-pane -x` / `-y` is suppressed, not forwarded", () => {
+  test("`resize-pane -t %1 -x 99` is marked suppressed, runs nothing, and records what it dropped", () => {
+    const translation = translate(["resize-pane", "-t", "%1", "-x", "99"], LAYOUT_OPTS);
+
+    expect(translation.kind).toBe("suppressed");
+    // The argv is the INPUT, verbatim: the log's job is to say what was asked
+    // for, so the dropped command is recorded rather than erased.
+    expect(translation.argv).toEqual(["-L", "ns", "resize-pane", "-t", "%1", "-x", "99"]);
+    expect(translation.rewritten).toBe(false);
+    expect(translation.dashDashInserted).toBe(false);
+    expect(translation.followUps).toEqual([]);
+    expect(translation.helperCommandLine).toBeUndefined();
+    expect(translation.envSlotCount).toBe(0);
+    expect(translation.psmuxPath).toBe(PSMUX_PATH);
+  });
+
+  test("EVERY value form is suppressed, because psmux mishandles all of them", () => {
+    // `99` and `100` are destructive (written as percentages, absorbing the
+    // difference from a sibling floored at 1); `99%` is a percentage of a
+    // percentage; `+5` and `-20` are relative syntax psmux does not parse at all.
+    // Every measurement of every form is in the header of `src/translate.ts`.
+    const VALUES = ["99", "99%", "100", "+5", "-20", "0", "197"];
+    for (const value of VALUES) {
+      for (const axis of ["-x", "-y"]) {
+        const translation = translate(["resize-pane", "-t", "%1", axis, value], LAYOUT_OPTS);
+
+        expect(translation.kind).toBe("suppressed");
+        expect(translation.followUps).toEqual([]);
+      }
+    }
+  });
+
+  test("both verb spellings and a bare `-x` with no target are suppressed", () => {
+    for (const argv of [
+      ["resize-pane", "-x", "99"],
+      ["resizep", "-t", "%1", "-y", "24"],
+      ["resize-pane", "-t", "%1", "-x", "99", "-y", "12"],
+    ] as const) {
+      expect(translate([...argv], LAYOUT_OPTS).kind).toBe("suppressed");
+    }
+  });
+
+  test("`resize-pane -Z` is forwarded byte-identically: zoom is a different, working path", () => {
+    const translation = translate(["resize-pane", "-Z"], LAYOUT_OPTS);
+
+    expect(translation.kind).toBe("passthrough");
+    expect(translation.argv).toEqual(["-L", "ns", "resize-pane", "-Z"]);
+    expect(translation.rewritten).toBe(false);
+    expect(translation.followUps).toEqual([]);
+  });
+
+  test("`-Z` WINS over `-x`/`-y` in the same argv: `resize-pane -Z -x 99` is a zoom, not a resize", () => {
+    // The case that decided the precedence. psmux dispatches zoom at
+    // `src/server/connection.rs:1236` — an arm of the same `match cmd` that opens
+    // at 1061, carrying the guard `args.iter().any(|a| *a == "-Z")` — before the
+    // `-x`/`-y` arms at `src/server/connection.rs:1767-1778` are reached at all.
+    // So psmux never reads the `-x 99` beside it, and suppressing this argv would
+    // suppress a zoom the user asked for on the strength of a flag psmux ignores.
+    for (const axis of ["-x", "-y"]) {
+      const translation = translate(["resize-pane", "-Z", "-t", "%1", axis, "99"], LAYOUT_OPTS);
+
+      expect(translation.kind).toBe("passthrough");
+      expect(translation.argv).toEqual(["-L", "ns", "resize-pane", "-Z", "-t", "%1", axis, "99"]);
+      expect(translation.rewritten).toBe(false);
+    }
+
+    // `-Z` anywhere in the argv wins, not just in second position: the guard is
+    // `args.iter().any(..)` over the whole argument list.
+    const trailing = translate(["resize-pane", "-t", "%1", "-x", "99", "-Z"], LAYOUT_OPTS);
+    expect(trailing.kind).toBe("passthrough");
+    expect(trailing.argv).toContain("-Z");
+    expect(trailing.argv).toContain("99");
+  });
+
+  test("a `resize-pane` with neither `-x`, `-y` nor anything broken is forwarded byte-identically", () => {
+    // The relative resize arms, and `-Z` beside a target. None of these is the
+    // defect, so none of them is the bridge's business.
+    for (const argv of [
+      ["resize-pane", "-t", "%1", "-U"],
+      ["resize-pane", "-t", "%1", "-D", "2"],
+      ["resize-pane", "-t", "%1", "-Z"],
+    ] as const) {
+      const translation = translate([...argv], LAYOUT_OPTS);
+
+      expect(translation.kind).toBe("passthrough");
+      expect(translation.argv).toEqual(["-L", "ns", ...argv]);
+      expect(translation.followUps).toEqual([]);
+    }
+  });
+
+  test("only the two resize verbs are suppressed: a `-x` elsewhere is none of this module's business", () => {
+    // `new-session -x 120 -y 40` (CONTRACT.md 3.5) carries `-x`, and it must not
+    // be caught by a rule that only looked for the flag.
+    const translation = translate(["new-session", "-d", "-s", "omo-iso-4711", "-x", "120", "-y", "40"], LAYOUT_OPTS);
+
+    expect(translation.kind).toBe("passthrough");
+    expect(translation.argv).toContain("120");
+    expect(translation.argv).toContain("40");
+    expect(translation.followUps).toEqual([]);
+  });
+
+  test("the suppression survives a payload-shaped tail element, which is still pass-through", () => {
+    // The grammar calls this pass-through (a right verb with the wrong payload),
+    // and the layout rules run on the pass-through branch — so the rule sees it.
+    const translation = translate(["resize-pane", "-t", "%1", "-x", "99", PH_PLAIN], LAYOUT_OPTS);
+
+    expect(classify(["resize-pane", "-t", "%1", "-x", "99", PH_PLAIN]).kind).toBe("pass-through");
+    expect(translation.kind).toBe("suppressed");
+  });
+});
+
+describe("the layout rules leave every other path untouched", () => {
+  test("`followUps` is empty on a plain pass-through, with and without leading globals", () => {
+    for (const options of [OPTS, LAYOUT_OPTS]) {
+      const translation = translate(["send-keys", "-t", "%1", "C-c"], options);
+
+      expect(translation.followUps).toEqual([]);
+      expect(translation.kind).toBe("passthrough");
+    }
+  });
+
+  test("`followUps` is empty on the helper path", () => {
+    const translation = translate(["split-window", "-h", "-d", "-P", "-F", "#{pane_id}", PH_PLAIN], OPTS);
+
+    expect(translation.kind).toBe("helper");
+    expect(translation.followUps).toEqual([]);
+    // A helper translation's argv is untouched by all of this.
+    expect(translation.argv.slice(0, 6)).toEqual([
+      "split-window",
+      "-h",
+      "-d",
+      "-P",
+      "-F",
+      "#{pane_id}",
+    ]);
+  });
+
+  test("translating the whole layout trio yields one corrected command, one follow-up and one suppression", () => {
+    // The end-to-end shape of the fix, as three separate shim invocations, which
+    // is exactly how OmO emits them. `test/cli.test.ts` drives the same three
+    // through `main` and asserts what actually reached the backend.
+    const layout = translate(["select-layout", "main-vertical"], LAYOUT_OPTS);
+    const sizing = translate(["set-window-option", "main-pane-width", "50%"], LAYOUT_OPTS);
+    const resize = translate(["resize-pane", "-t", "%1", "-x", "99"], LAYOUT_OPTS);
+
+    expect(layout.kind).toBe("passthrough");
+    expect(sizing.kind).toBe("passthrough");
+    expect(resize.kind).toBe("suppressed");
+    // Four psmux invocations replace OmO's three: layout, sizing, the re-applied
+    // layout, and nothing for the resize.
+    expect([layout, sizing, resize].flatMap((t) => [t, ...t.followUps])).toHaveLength(4);
+    expect(sizing.followUps[0]?.argv).toEqual(["-L", "ns", "select-layout", "main-vertical"]);
   });
 });
