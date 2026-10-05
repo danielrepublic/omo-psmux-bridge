@@ -8,3 +8,9 @@ omo-psmux-bridge.md
 .DS_Store
 Thumbs.db
 *.swp
+
+# Build output
+dist/
+
+# Dependencies
+node_modules/
