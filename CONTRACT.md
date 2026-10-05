@@ -41,11 +41,11 @@ The OmO bundle citations are checked against the pin in section 0.1 with:
 
 ```bash
 sed -n 'NNNNp' \
-  /home/daniel/.cache/opencode/packages/oh-my-openagent@5.1.18/node_modules/oh-my-openagent/dist/index.js
+  $HOME/.cache/opencode/packages/oh-my-openagent@5.1.18/node_modules/oh-my-openagent/dist/index.js
 ```
 
 If that exact tree is not on disk, resolve the number against whatever
-`ls -d /home/daniel/.cache/opencode/packages/oh-my-openagent@*` returns instead,
+`ls -d $HOME/.cache/opencode/packages/oh-my-openagent@*` returns instead,
 and treat every bundle number as suspect until it has been re-checked. The pin is
 the validity condition (section 14), so an absent pin is not a licence to read
 the nearest version.
@@ -67,7 +67,7 @@ The file is referred to as `index.js` throughout, but its real path is
 The bundle this document is pinned to is **oh-my-openagent 5.1.18**:
 
 ```
-/home/daniel/.cache/opencode/packages/oh-my-openagent@5.1.18/node_modules/oh-my-openagent/dist/index.js
+$HOME/.cache/opencode/packages/oh-my-openagent@5.1.18/node_modules/oh-my-openagent/dist/index.js
 ```
 
 **Discrepancy on the record.** The work plan (todo 3 and todo 4 reference blocks)
@@ -82,7 +82,7 @@ never be cited.**
 **Second discrepancy, recorded later.** The pin above is still 5.1.18 and every
 bundle citation in this document was resolved against 5.1.18. The package cache
 on this host no longer holds that tree, though: `ls -d
-/home/daniel/.cache/opencode/packages/oh-my-openagent@*` now returns
+$HOME/.cache/opencode/packages/oh-my-openagent@*` now returns
 `oh-my-openagent@5.1.19` and nothing else. Re-resolving all 74 bundle citations
 in this document against 5.1.19 finds every one of them on the same line with the
 same text, so the numbers here are not wrong — but that is a fact about an
