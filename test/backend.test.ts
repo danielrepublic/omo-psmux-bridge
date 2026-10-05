@@ -123,7 +123,11 @@ function sandbox(): Sandbox {
     dir,
     pscript: (body: string): string => {
       const path = join(dir, `fake-${Math.random().toString(36).slice(2)}.bin`);
-      writeFileSync(path, `#!/usr/bin/env bun\n${body}\n`, { mode: 0o755 });
+      // Absolute `process.execPath`, not `#!/usr/bin/env bun`: these stand-ins are
+      // spawned with a replaced environment and so have no PATH, and `/usr/bin/env`
+      // then falls back to `/bin:/usr/bin` — which finds a system bun and misses one
+      // installed under a user's home. See the same note in test/cli.test.ts.
+      writeFileSync(path, `#!${process.execPath}\n${body}\n`, { mode: 0o755 });
       return path;
     },
     cleanup: () => rmSync(dir, { recursive: true, force: true }),
@@ -564,7 +568,7 @@ describe("path identity", () => {
     const box = sandbox();
     try {
       const other = join(box.dir, "other.exe");
-      writeFileSync(other, "#!/usr/bin/env bun\n", { mode: 0o755 });
+      writeFileSync(other, `#!${process.execPath}\n`, { mode: 0o755 });
       // Two different spellings of ONE file on this host must compare equal
       // through the realpath seam rather than by string shape alone.
       expect(sameFile(other, join(box.dir, ".", "other.exe"))).toBe(true);
@@ -880,7 +884,7 @@ describe("no hardcoded machine path", () => {
 
   test("the real environment override is honoured when it is set", () => {
     const box = sandbox();
-    writeFileSync(join(box.dir, "tmux.exe"), "#!/usr/bin/env bun\n", { mode: 0o755 });
+    writeFileSync(join(box.dir, "tmux.exe"), `#!${process.execPath}\n`, { mode: 0o755 });
     const previous = process.env["OMO_PSMUX_INSTALL_DIR"];
     process.env["OMO_PSMUX_INSTALL_DIR"] = `${box.dir}${sep}`;
     try {

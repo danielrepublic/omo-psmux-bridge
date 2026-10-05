@@ -106,7 +106,17 @@ beforeEach(() => {
   writeFileSync(
     join(installDir, "psmux.exe"),
     [
-      "#!/usr/bin/env bun",
+      // The ABSOLUTE path of the bun that is running these tests, not
+      // `#!/usr/bin/env bun`. The stand-ins below are spawned by `runBackend`
+      // with a REPLACED environment (`buildEnv` returns only the keys it is
+      // given, by design — see the `backendEnv` note in src/cli.ts), so the child
+      // has no PATH at all. `/usr/bin/env` then falls back to confstr(_CS_PATH),
+      // which is `/bin:/usr/bin` on most hosts: that finds a system-installed
+      // `bun` at /usr/bin/bun and silently works, and finds nothing when bun
+      // lives anywhere else. That is how this passed on the machine that wrote it
+      // and failed on a runner with bun under ~/.bun/bin with exit 127. Writing
+      // the absolute path removes the dependency on where bun happens to be.
+      `#!${process.execPath}`,
       'import { appendFileSync } from "node:fs";',
       `const callsPath = ${JSON.stringify(callsPath)};`,
       "const argv = process.argv.slice(2);",
