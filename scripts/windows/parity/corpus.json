@@ -1,0 +1,766 @@
+{
+  "corpus_version": 1,
+  "generated_for": "plan todo 14 — parity sweep, rebuilt shim vs real psmux 3.3.8",
+  "pins": {
+    "shim_relative_to_env": "Temp\\omo-t14\\bin\\tmux.exe",
+    "shim_expected_bytes": 86126592,
+    "shim_expected_sha256": "48e4044ea6d7f144ac59e347559bdce3d7208e089339239c73220b8fca08f757",
+    "real_relative_to_env": "psmux\\tmux.exe",
+    "psmux_control_relative_to_env": "psmux\\psmux.exe",
+    "launcher_relative_to_env": "opencode-psmux-bridge\\bin\\psmux.cmd",
+    "version_two_line_stdout_bytes": 44,
+    "version_two_line_stdout_sha256": "3038810cad2c36912875ba34d09e47bfaa4f8f73e9230c790a8da9230b97e0b8"
+  },
+
+  "payloads": {
+    "placeholder": "/bin/sh -c \"printf '%s\\\\n%s\\\\n' \\\\\"OMO subagent pane ready: t14 probe\\\\\" \\\\\"Focus this pane to attach.\\\\\"; while :; do sleep 86400; done\"",
+    "attach": "/bin/sh -c \"opencode attach 'http://127.0.0.1:4096/s/abc' --session 'ses_t14' --dir 'C:\\\\Users\\\\Daniel'\"",
+    "missing_session": "omo_t14_no_such_session_zzz",
+    "unicode_session": "\u30bb\u30c3\u30b7\u30e7\u30f3",
+    "unicode_verb": "\u30bb\u30c3\u30c9"
+  },
+
+  "seed_default": [
+    ["new-session", "-d", "-s", "t14", "-n", "w0"],
+    ["new-window", "-d", "-t", "t14", "-n", "w1"],
+    ["split-window", "-d", "-t", "t14"]
+  ],
+
+  "cleanup_default": [
+    ["kill-session", "-t", "t14"],
+    ["kill-session", "-t", "t14n"],
+    ["kill-session", "-t", "t14q"],
+    ["kill-server"]
+  ],
+
+  "divergence_contracts": {
+    "help-branding": {
+      "kind": "wire-bytes",
+      "description": "The shim resolves its backend to psmux.exe, so psmux 3.3.8 prints its own program name where the tmux.exe control prints 'tmux'. exit code is identical (0); only stdout differs.",
+      "verify": [
+        "exit codes MUST be equal",
+        "shim stdout MUST NOT equal real stdout",
+        "shim stdout MUST be byte-identical to psmux.exe -h",
+        "real stdout MUST NOT be byte-identical to psmux.exe -h",
+        "line counts MUST be equal",
+        "shim stdout with every 'psmux' replaced by 'tmux' MUST equal real stdout byte-for-byte",
+        "the set of differing line indices MUST be identical when compared against the psmux.exe control (i.e. the shim adds no divergence of its own)"
+      ]
+    },
+    "exec-boundary-translation": {
+      "kind": "exec-boundary-fields",
+      "description": "A recognised payload shape. Observable process behaviour (exit code, stdout, stderr) is byte-identical to real psmux; the divergence is at the EXEC BOUNDARY and is proven from PARSED fields of the shim's own call log, never from its bytes. A wire byte difference here would be a defect, so its ABSENCE is asserted too.",
+      "verify": [
+        "exit code, stdout bytes and stderr bytes MUST all be identical to the real psmux side",
+        "the shim's call-log record for this invocation MUST have classification equal to the declared kind",
+        "kind MUST equal 'helper'",
+        "rewritten MUST be true",
+        "the recorded argv length MUST equal (input argv length minus 2) for a split/new-window/new-session shape, or (input argv length minus 1) for a respawn-pane shape, because the -e pair is removed and -- is inserted",
+        "dashDashInserted MUST equal the declared value",
+        "the final recorded argv element MUST NOT contain '/bin/sh' and MUST NOT contain 'sleep 86400'",
+        "the final recorded argv element MUST contain '--payload' and '--command' and '--env-slots'",
+        "the base64url value of --payload MUST decode to the byte-exact payload body of the input argv's final element",
+        "the decoded --command MUST be a JSON array whose first element is 'opencode' for the attach template, or 'powershell' for the placeholder template",
+        "the recorded argv MUST NOT contain the literal string '/bin/sh -c'"
+      ]
+    },
+    "exec-boundary-env-strip": {
+      "kind": "exec-boundary-fields",
+      "description": "A recognised payload shape carrying a well-formed -e NAME=VALUE pair. Observable behaviour is byte-identical; the divergence is that the -e pair is REMOVED from the argv the shim hands to psmux and addressed to the helper as --env-slots instead (src/translate.ts, the deliberate hardening of CONTRACT.md 7.2). The credential value must not appear in the recorded argv.",
+      "verify": [
+        "exit code, stdout bytes and stderr bytes MUST be identical to the real psmux side",
+        "the recorded argv MUST NOT contain any element equal to '-e'",
+        "the recorded argv MUST NOT contain any element containing the sentinel NAME=VALUE text",
+        "envSlotCount MUST equal 1",
+        "envSlotNames MUST contain the sentinel variable name"
+      ]
+    },
+    "launcher-metachar-loss": {
+      "kind": "cross-route",
+      "description": "An invocation whose argument contains a shell metacharacter. Executed through scripts/windows/psmux.cmd under cmd.exe, BOTH sides lose the metacharacter identically, so the shim-vs-real comparison is still parity; the divergence is against the EXE route and is attributed to the .cmd launcher, not to the shim. These cases are NOT counted in the sweep's expected-translated total because they are not a shim-vs-real divergence.",
+      "verify": [
+        "shim-via-launcher output MUST be byte-identical to real-via-launcher output",
+        "launcher-route output MUST NOT equal exe-route output, proving the loss happens in the launcher",
+        "for the '%' metacharacter the launcher route MAY be byte-identical to the exe route; that is recorded as survives=true, not as a failure"
+      ]
+    },
+    "clock-field-mask": {
+      "kind": "declared-mask",
+      "description": "psmux's plain list-sessions format embeds the session creation wall-clock time, so two processes cannot agree byte-for-byte on it. The bytes are compared after replacing the '(created <text>)' group with a fixed token. The raw, unmasked mismatch is reported alongside.",
+      "verify": [
+        "raw stdout MUST differ between the two sides OR be equal; either is recorded",
+        "stdout with the '(created ...)' group masked MUST be byte-identical between the two sides",
+        "stdout length MUST be equal on both sides",
+        "the mask MUST match exactly once on each side"
+      ]
+    }
+  },
+
+  "cases": [
+    {
+      "id": "a-version",
+      "plan_item": "-V must be byte-identical",
+      "kind": "pass-through",
+      "namespaced": false,
+      "argv": ["-V"],
+      "streams": ["stdout"],
+      "expect_stdout_bytes": 44,
+      "expect_stdout_sha256": "3038810cad2c36912875ba34d09e47bfaa4f8f73e9230c790a8da9230b97e0b8",
+      "note": "CONTRACT.md 4.4: -V must exit 0 or OmO's getTmuxPath() returns null and every pane silently no-ops."
+    },
+    {
+      "id": "a-help",
+      "plan_item": "-h: the ONE known accepted divergence",
+      "kind": "pass-through",
+      "namespaced": false,
+      "argv": ["-h"],
+      "streams": ["stdout"],
+      "expected_divergence": "help-branding",
+      "control_argv": ["-h"],
+      "note": "Must be asserted and NAMED in the output, never silently skipped."
+    },
+    {
+      "id": "a-unknown-verb",
+      "plan_item": "error path: unknown verb",
+      "kind": "error-path",
+      "namespaced": false,
+      "argv": ["--totally-unknown-verb", "x", "y", "z"],
+      "streams": ["stderr"],
+      "expect_stderr_text": "psmux: unknown command: x\nRun 'psmux --help' for usage information.\npsmux: unknown command: x\n",
+      "expect_stderr_bytes": 94,
+      "note": "MUST DO 6: psmux 3.3.8 strips the leading --, names argv[1] not argv[0], and emits the message TWICE. Encoded as the two-line string it really is."
+    },
+    {
+      "id": "a-unknown-verb-bare",
+      "plan_item": "error path: unknown verb, one operand",
+      "kind": "error-path",
+      "namespaced": false,
+      "argv": ["--totally-unknown-verb"],
+      "streams": ["stdout", "stderr"],
+      "note": "psmux falls through to the interactive attach path and the non-TTY client gets a window-mode dance. Both sides identical."
+    },
+    {
+      "id": "a-bad-flag",
+      "plan_item": "error path: bad flag",
+      "kind": "error-path",
+      "namespaced": false,
+      "argv": ["list-sessions", "--no-such-flag"],
+      "streams": ["stderr"],
+      "expect_stderr_bytes": 54
+    },
+    {
+      "id": "a-missing-session",
+      "plan_item": "error path: missing session",
+      "kind": "error-path",
+      "namespaced": false,
+      "argv": ["list-panes", "-t", "@MISSING_SESSION@"],
+      "streams": ["stderr"]
+    },
+    {
+      "id": "a-missing-pane",
+      "plan_item": "error path: missing pane",
+      "kind": "error-path",
+      "namespaced": false,
+      "argv": ["kill-pane", "-t", "%99"],
+      "streams": ["stderr"],
+      "expect_stderr_bytes": 28,
+      "note": "CONTRACT.md 3.8 makes this exact wording load-bearing: OmO treats kill-pane as success when stderr matches /can't find pane/i."
+    },
+    {
+      "id": "a-missing-window",
+      "plan_item": "error path: missing window",
+      "kind": "error-path",
+      "namespaced": false,
+      "argv": ["kill-window", "-t", "t14:wNopeNoServer"],
+      "streams": ["stderr"]
+    },
+    {
+      "id": "a-unicode-target",
+      "plan_item": "error path: unicode target",
+      "kind": "error-path",
+      "namespaced": false,
+      "argv": ["list-panes", "-t", "@UNICODE_SESSION@"],
+      "streams": ["stderr"],
+      "note": "Error path: the session does not exist, so the target's UTF-8 bytes are echoed back by psmux. Proves argv survived the UTF-16 CreateProcess boundary intact."
+    },
+    {
+      "id": "a-unicode-verb",
+      "plan_item": "error path: unicode verb",
+      "kind": "error-path",
+      "namespaced": false,
+      "argv": ["@UNICODE_VERB@", "x"],
+      "streams": ["stderr"]
+    },
+    {
+      "id": "a-empty-string-arg",
+      "plan_item": "error path: empty-string argument",
+      "kind": "error-path",
+      "namespaced": true,
+      "seed": "default",
+      "argv": ["list-sessions", ""],
+      "observe": [["list-sessions", "-F", "#{session_name}"]],
+      "streams": ["stdout"],
+      "note": "Namespaced on purpose: without -L this lists the DEFAULT namespace, which belongs to another lane. The empty-string argument is a real argv element, not an absent one."
+    },
+    {
+      "id": "a-format-string-with-spaces",
+      "plan_item": "error path: format string containing spaces",
+      "kind": "error-path",
+      "namespaced": false,
+      "argv": ["display-message", "-p", "hello world 123"],
+      "streams": ["stdout"],
+      "expect_stdout_bytes": 16
+    },
+    {
+      "id": "a-option-looking-value",
+      "plan_item": "error path: an option-looking value",
+      "kind": "error-path",
+      "namespaced": false,
+      "argv": ["display-message", "-p", "-t"],
+      "streams": ["stdout"]
+    },
+    {
+      "id": "a-option-looking-value-2",
+      "plan_item": "error path: an option-looking value as a target",
+      "kind": "error-path",
+      "namespaced": false,
+      "argv": ["capture-pane", "-t", "-x"],
+      "streams": ["stderr"]
+    },
+    {
+      "id": "a-bare-verb-split-window",
+      "plan_item": "census verb split-window, argv too short to carry a payload",
+      "kind": "pass-through",
+      "namespaced": false,
+      "argv": ["split-window"],
+      "streams": [],
+      "note": "src/grammar.ts returns pass-through on the argv.length < 2 rule. psmux prints nothing; the only observable is the exit code, so the case declares no stream and the vacuity guard cannot fire on it."
+    },
+    {
+      "id": "a-big-argument-30000",
+      "plan_item": "~30000-character legal argument",
+      "kind": "error-path",
+      "namespaced": false,
+      "argv": ["list-panes", "-t", "@BIG30000@"],
+      "streams": ["stderr"],
+      "assert_argument_integrity": true,
+      "note": "30000 chars, under the 32767 CreateProcess cap. psmux echoes the target back in its error, so counting occurrences of the sentinel in the child's OWN stderr proves the argument survived whole. No NUL byte and no 64 KB attempt."
+    },
+
+    {
+      "id": "m-ampersand",
+      "plan_item": "argv carrying shell metacharacter &",
+      "kind": "pass-through",
+      "namespaced": false,
+      "argv": ["list-panes", "-t", "a&b"],
+      "streams": ["stderr"]
+    },
+    {
+      "id": "m-pipe",
+      "plan_item": "argv carrying shell metacharacter |",
+      "kind": "pass-through",
+      "namespaced": false,
+      "argv": ["list-panes", "-t", "x|y"],
+      "streams": ["stderr"]
+    },
+    {
+      "id": "m-caret",
+      "plan_item": "argv carrying shell metacharacter ^",
+      "kind": "pass-through",
+      "namespaced": false,
+      "argv": ["list-panes", "-t", "c^d"],
+      "streams": ["stderr"]
+    },
+    {
+      "id": "m-percent",
+      "plan_item": "argv carrying shell metacharacter %",
+      "kind": "pass-through",
+      "namespaced": false,
+      "argv": ["list-panes", "-t", "p%q"],
+      "streams": ["stderr"]
+    },
+    {
+      "id": "m-redirect-out",
+      "plan_item": "argv carrying shell metacharacter >",
+      "kind": "pass-through",
+      "namespaced": false,
+      "argv": ["list-panes", "-t", "r>s"],
+      "streams": ["stderr"]
+    },
+    {
+      "id": "m-redirect-in",
+      "plan_item": "argv carrying shell metacharacter <",
+      "kind": "pass-through",
+      "namespaced": false,
+      "argv": ["list-panes", "-t", "t<u"],
+      "streams": ["stderr"]
+    },
+    {
+      "id": "m-metachar-mix",
+      "plan_item": "argv carrying several metacharacters at once",
+      "kind": "pass-through",
+      "namespaced": false,
+      "argv": ["list-panes", "-t", "a&b|c^d%q"],
+      "streams": ["stderr"]
+    },
+    {
+      "id": "m-space",
+      "plan_item": "argv carrying a space",
+      "kind": "pass-through",
+      "namespaced": false,
+      "argv": ["list-panes", "-t", "a b c"],
+      "streams": ["stderr"]
+    },
+    {
+      "id": "m-double-quote",
+      "plan_item": "argv carrying a double quote",
+      "kind": "pass-through",
+      "namespaced": false,
+      "argv": ["list-panes", "-t", "a\"b"],
+      "streams": ["stderr"]
+    },
+
+    {
+      "id": "l-ampersand",
+      "plan_item": "metacharacter & through the psmux.cmd launcher route",
+      "kind": "launcher-route",
+      "namespaced": false,
+      "argv": ["list-panes", "-t", "a&b"],
+      "streams": ["stderr"],
+      "expected_divergence": "launcher-metachar-loss",
+      "exe_route_argv": ["list-panes", "-t", "a&b"]
+    },
+    {
+      "id": "l-pipe",
+      "plan_item": "metacharacter | through the psmux.cmd launcher route",
+      "kind": "launcher-route",
+      "namespaced": false,
+      "argv": ["list-panes", "-t", "x|y"],
+      "streams": ["stderr"],
+      "expected_divergence": "launcher-metachar-loss",
+      "exe_route_argv": ["list-panes", "-t", "x|y"]
+    },
+    {
+      "id": "l-caret",
+      "plan_item": "metacharacter ^ through the psmux.cmd launcher route",
+      "kind": "launcher-route",
+      "namespaced": false,
+      "argv": ["list-panes", "-t", "c^d"],
+      "streams": ["stderr"],
+      "expected_divergence": "launcher-metachar-loss",
+      "exe_route_argv": ["list-panes", "-t", "c^d"]
+    },
+    {
+      "id": "l-percent",
+      "plan_item": "metacharacter % through the psmux.cmd launcher route",
+      "kind": "launcher-route",
+      "namespaced": false,
+      "argv": ["list-panes", "-t", "p%q"],
+      "streams": ["stderr"],
+      "expected_divergence": "launcher-metachar-loss",
+      "exe_route_argv": ["list-panes", "-t", "p%q"]
+    },
+    {
+      "id": "l-redirect-out",
+      "plan_item": "metacharacter > through the psmux.cmd launcher route",
+      "kind": "launcher-route",
+      "namespaced": false,
+      "argv": ["list-panes", "-t", "r>s"],
+      "streams": ["stderr"],
+      "expected_divergence": "launcher-metachar-loss",
+      "exe_route_argv": ["list-panes", "-t", "r>s"]
+    },
+    {
+      "id": "l-redirect-in",
+      "plan_item": "metacharacter < through the psmux.cmd launcher route",
+      "kind": "launcher-route",
+      "namespaced": false,
+      "argv": ["list-panes", "-t", "t<u"],
+      "streams": ["stderr"],
+      "expected_divergence": "launcher-metachar-loss",
+      "exe_route_argv": ["list-panes", "-t", "t<u"]
+    },
+    {
+      "id": "l-space",
+      "plan_item": "a space through the psmux.cmd launcher route",
+      "kind": "launcher-route",
+      "namespaced": false,
+      "argv": ["list-panes", "-t", "a b c"],
+      "streams": ["stderr"],
+      "expected_divergence": "launcher-metachar-loss",
+      "exe_route_argv": ["list-panes", "-t", "a b c"]
+    },
+    {
+      "id": "l-double-quote",
+      "plan_item": "a double quote through the psmux.cmd launcher route",
+      "kind": "launcher-route",
+      "namespaced": false,
+      "argv": ["list-panes", "-t", "a\"b"],
+      "streams": ["stderr"],
+      "expected_divergence": "launcher-metachar-loss",
+      "exe_route_argv": ["list-panes", "-t", "a\"b"]
+    },
+
+    {
+      "id": "c-list-sessions",
+      "plan_item": "census verb list-sessions",
+      "kind": "pass-through",
+      "namespaced": true,
+      "seed": "default",
+      "argv": ["list-sessions"],
+      "observe": [["list-sessions", "-F", "#{session_name}"]],
+      "streams": ["stdout"]
+    },
+    {
+      "id": "c-list-sessions-raw",
+      "plan_item": "census verb list-sessions, default (clock-bearing) format",
+      "kind": "pass-through",
+      "namespaced": true,
+      "seed": "default",
+      "argv": ["list-sessions"],
+      "observe": [["list-sessions"]],
+      "streams": ["stdout"],
+      "expected_divergence": "clock-field-mask",
+      "mask_created_at": true
+    },
+    {
+      "id": "c-list-panes",
+      "plan_item": "census verb list-panes",
+      "kind": "pass-through",
+      "namespaced": true,
+      "seed": "default",
+      "argv": ["list-panes", "-a"],
+      "observe": [["list-panes", "-a"]],
+      "streams": ["stdout"]
+    },
+    {
+      "id": "c-list-windows",
+      "plan_item": "census verb list-windows",
+      "kind": "pass-through",
+      "namespaced": true,
+      "seed": "default",
+      "argv": ["list-windows"],
+      "observe": [["list-windows"]],
+      "streams": ["stdout"]
+    },
+    {
+      "id": "c-display-message",
+      "plan_item": "census verb display-message",
+      "kind": "pass-through",
+      "namespaced": true,
+      "seed": "default",
+      "argv": ["display-message", "-p", "#{session_name}/#{window_index}/#{pane_index}"],
+      "observe": [["display-message", "-p", "#{session_name}/#{window_index}/#{pane_index}"]],
+      "streams": ["stdout"]
+    },
+    {
+      "id": "c-select-layout-no-target",
+      "plan_item": "census verb select-layout, with no -t exactly as OmO emits it",
+      "kind": "pass-through",
+      "namespaced": true,
+      "seed": "default",
+      "argv": ["select-layout", "main-vertical"],
+      "observe": [["display-message", "-p", "#{window_layout}"]],
+      "streams": ["stdout"],
+      "note": "Settles CONTRACT.md Q-CONTRACT-1: the observable is the resulting window_layout, not the silent exit code. Option A (pass through unchanged) is what the shim does and it demonstrably applies a layout."
+    },
+    {
+      "id": "c-select-pane",
+      "plan_item": "census verb select-pane, the trailing title call OmO always emits",
+      "kind": "pass-through",
+      "namespaced": true,
+      "seed": "default",
+      "argv": ["select-pane", "-t", "t14:w0.1", "-T", "omo-subagent-t14 probe"],
+      "observe": [["display-message", "-p", "-t", "t14:w0.1", "#{pane_title}"]],
+      "streams": ["stdout"]
+    },
+    {
+      "id": "c-select-window",
+      "plan_item": "census verb select-window",
+      "kind": "pass-through",
+      "namespaced": true,
+      "seed": "default",
+      "argv": ["select-window", "-t", "t14:w1"],
+      "observe": [["display-message", "-p", "#{window_index}"]],
+      "streams": ["stdout"]
+    },
+    {
+      "id": "c-send-keys",
+      "plan_item": "census verb send-keys",
+      "kind": "pass-through",
+      "namespaced": true,
+      "seed": "default",
+      "argv": ["send-keys", "-t", "t14:w0.0", "Enter"],
+      "observe": [["display-message", "-p", "-t", "t14:w0.0", "#{pane_dead}"]],
+      "streams": ["stdout"],
+      "note": "SCOPE LIMIT: send-keys prints nothing, so a second invocation supplies the observable. capture-pane content is deliberately NOT compared because it races with the pane's shell readiness on this host (measured: 20 bytes on one side against 73 on the other for the same command)."
+    },
+    {
+      "id": "c-capture-pane",
+      "plan_item": "census verb capture-pane",
+      "kind": "pass-through",
+      "namespaced": true,
+      "seed": "default",
+      "argv": ["capture-pane", "-p", "-t", "t14:w0.0"],
+      "observe": [["capture-pane", "-p", "-t", "t14:w0.0"]],
+      "streams": [],
+      "note": "Exit code only. capture-pane prints nothing into a non-TTY-created pane; declaring no stream is how this case stays honest instead of claiming a vacuous match."
+    },
+    {
+      "id": "c-resize-pane",
+      "plan_item": "census verb resize-pane",
+      "kind": "pass-through",
+      "namespaced": true,
+      "seed": "default",
+      "argv": ["resize-pane", "-t", "t14:w0.0", "-x", "77", "-y", "33"],
+      "observe": [["display-message", "-p", "-t", "t14:w0.0", "#{pane_width}x#{pane_height}"]],
+      "streams": ["stdout"]
+    },
+    {
+      "id": "c-has-session",
+      "plan_item": "census verb has-session",
+      "kind": "pass-through",
+      "namespaced": true,
+      "seed": "default",
+      "argv": ["has-session", "-t", "t14"],
+      "observe": [["has-session", "-t", "t14zz-no-such"]],
+      "streams": [],
+      "note": "Two invocations, exit codes only: 0 for the seeded session and 1 for the absent one, identically on both sides. has-session prints nothing either way."
+    },
+    {
+      "id": "c-new-session",
+      "plan_item": "census verb new-session, no payload",
+      "kind": "pass-through",
+      "namespaced": true,
+      "seed": "default",
+      "argv": ["new-session", "-d", "-s", "t14n", "-P", "-F", "#{pane_id}"],
+      "observe": [["list-sessions", "-F", "#{session_name}"]],
+      "streams": ["stdout"]
+    },
+    {
+      "id": "c-new-window",
+      "plan_item": "census verb new-window, no payload",
+      "kind": "pass-through",
+      "namespaced": true,
+      "seed": "default",
+      "argv": ["new-window", "-d", "-t", "t14", "-P", "-F", "#{pane_id}"],
+      "observe": [["list-windows", "-F", "#{window_name}"]],
+      "streams": ["stdout"]
+    },
+    {
+      "id": "c-split-window",
+      "plan_item": "census verb split-window, no payload",
+      "kind": "pass-through",
+      "namespaced": true,
+      "seed": "default",
+      "argv": ["split-window", "-d", "-t", "t14", "-P", "-F", "#{pane_id}"],
+      "observe": [["list-panes", "-a", "-F", "#{pane_id}"]],
+      "streams": ["stdout"]
+    },
+    {
+      "id": "c-respawn-pane",
+      "plan_item": "census verb respawn-pane, no payload",
+      "kind": "pass-through",
+      "namespaced": true,
+      "seed": "default",
+      "argv": ["respawn-pane", "-k", "-t", "t14:w0.1"],
+      "observe": [["list-panes", "-a", "-F", "#{pane_id}"]],
+      "streams": ["stdout"]
+    },
+    {
+      "id": "c-respawn-window",
+      "plan_item": "census verb respawn-window (CONTRACT.md 7.3, off-path, arguments dropped by psmux)",
+      "kind": "pass-through",
+      "namespaced": true,
+      "seed": "default",
+      "argv": ["respawn-window", "-t", "t14:w1"],
+      "observe": [["list-windows", "-F", "#{window_name}"]],
+      "streams": ["stdout"],
+      "note": "The observable proves the defect: window w1 is still listed afterwards, i.e. psmux dropped the target entirely. Both sides agree."
+    },
+    {
+      "id": "c-kill-pane",
+      "plan_item": "census verb kill-pane",
+      "kind": "pass-through",
+      "namespaced": true,
+      "seed": "default",
+      "argv": ["kill-pane", "-t", "t14:w0.1"],
+      "observe": [["list-panes", "-a", "-F", "#{pane_id}"]],
+      "streams": ["stdout"]
+    },
+    {
+      "id": "c-kill-window",
+      "plan_item": "census verb kill-window",
+      "kind": "pass-through",
+      "namespaced": true,
+      "seed": "default",
+      "argv": ["kill-window", "-t", "t14:w1"],
+      "observe": [["list-windows", "-F", "#{window_name}"]],
+      "streams": ["stdout"]
+    },
+    {
+      "id": "c-kill-server",
+      "plan_item": "census verb kill-server",
+      "kind": "pass-through",
+      "namespaced": true,
+      "seed": "default",
+      "argv": ["kill-server"],
+      "observe": [["list-sessions", "-F", "#{session_name}"]],
+      "streams": [],
+      "note": "kill-server prints nothing. Exit code only, plus the follow-up list-sessions exit code; declaring no stream keeps the vacuity guard honest."
+    },
+    {
+      "id": "c-kill-window-missing",
+      "plan_item": "error path: kill-window naming an absent window inside a live session",
+      "kind": "error-path",
+      "namespaced": true,
+      "seed": "default",
+      "argv": ["kill-window", "-t", "t14:wNope"],
+      "observe": [],
+      "streams": ["stderr"],
+      "expect_stderr_bytes": 32
+    },
+    {
+      "id": "c-kill-pane-missing",
+      "plan_item": "error path: kill-pane naming an absent pane inside a live session",
+      "kind": "error-path",
+      "namespaced": true,
+      "seed": "default",
+      "argv": ["kill-pane", "-t", "%99"],
+      "observe": [],
+      "streams": ["stderr"],
+      "note": "No namespace echo in this message, so the two sides stay byte-comparable while the namespaces stay separate. That is the whole point of choosing these shapes."
+    },
+
+    {
+      "id": "e-split-placeholder",
+      "plan_item": "translated payload shape 1 of 2: placeholder on split-window (placeholder-split)",
+      "kind": "translated",
+      "namespaced": true,
+      "seed": "default",
+      "argv": ["split-window", "-d", "-t", "t14", "-P", "-F", "#{pane_id}", "@PAYLOAD_PLACEHOLDER@"],
+      "observe": [["list-panes", "-a", "-F", "#{pane_id}"]],
+      "streams": ["stdout"],
+      "expected_divergence": "exec-boundary-translation",
+      "declared_kind": "placeholder-split",
+      "declared_dash_dash": false,
+      "declared_env_slots": 0
+    },
+    {
+      "id": "e-new-window-placeholder",
+      "plan_item": "translated payload shape: placeholder on new-window (placeholder-newwindow)",
+      "kind": "translated",
+      "namespaced": true,
+      "seed": "default",
+      "argv": ["new-window", "-d", "-t", "t14", "-P", "-F", "#{pane_id}", "@PAYLOAD_PLACEHOLDER@"],
+      "observe": [["list-panes", "-a", "-F", "#{pane_id}"]],
+      "streams": ["stdout"],
+      "expected_divergence": "exec-boundary-translation",
+      "declared_kind": "placeholder-newwindow",
+      "declared_dash_dash": false,
+      "declared_env_slots": 0
+    },
+    {
+      "id": "e-new-session-placeholder",
+      "plan_item": "translated payload shape: placeholder on new-session (placeholder-newsession)",
+      "kind": "translated",
+      "namespaced": true,
+      "seed": "default",
+      "argv": ["new-session", "-d", "-s", "t14q", "-P", "-F", "#{pane_id}", "@PAYLOAD_PLACEHOLDER@"],
+      "observe": [["list-sessions", "-F", "#{session_name}"]],
+      "streams": ["stdout"],
+      "expected_divergence": "exec-boundary-translation",
+      "declared_kind": "placeholder-newsession",
+      "declared_dash_dash": false,
+      "declared_env_slots": 0
+    },
+    {
+      "id": "e-respawn-pane-placeholder",
+      "plan_item": "translated payload shape: placeholder on respawn-pane, -- insertion required (placeholder-respawn)",
+      "kind": "translated",
+      "namespaced": true,
+      "seed": "default",
+      "argv": ["respawn-pane", "-k", "-t", "t14:w0.0", "@PAYLOAD_PLACEHOLDER@"],
+      "observe": [["display-message", "-p", "-t", "t14:w0.0", "#{pane_dead}"]],
+      "streams": ["stdout"],
+      "expected_divergence": "exec-boundary-translation",
+      "declared_kind": "placeholder-respawn",
+      "declared_dash_dash": true,
+      "declared_env_slots": 0
+    },
+    {
+      "id": "e-respawn-pane-attach",
+      "plan_item": "translated payload shape 2 of 2: attach template on respawn-pane (attach-respawn)",
+      "kind": "translated",
+      "namespaced": false,
+      "argv": ["respawn-pane", "-k", "-t", "%99", "@PAYLOAD_ATTACH@"],
+      "observe": [],
+      "streams": ["stderr"],
+      "expected_divergence": "exec-boundary-translation",
+      "declared_kind": "attach-respawn",
+      "declared_dash_dash": true,
+      "declared_env_slots": 0,
+      "note": "Targets a pane that cannot exist, so psmux's non-empty error is the observable and no session, pane or process is created. The grammar still recognises and translates it, proven from the call-log fields."
+    },
+    {
+      "id": "e-placeholder-missing-session",
+      "plan_item": "translated payload shape against a session that cannot exist (side-effect-free probe)",
+      "kind": "translated",
+      "namespaced": false,
+      "argv": ["split-window", "-t", "@MISSING_SESSION@", "-P", "-F", "#{pane_id}", "@PAYLOAD_PLACEHOLDER@"],
+      "observe": [],
+      "streams": ["stderr"],
+      "expected_divergence": "exec-boundary-translation",
+      "declared_kind": "placeholder-split",
+      "declared_dash_dash": false,
+      "declared_env_slots": 0
+    },
+    {
+      "id": "e-env-pair-valid",
+      "plan_item": "translated payload shape carrying a well-formed -e NAME=VALUE pair",
+      "kind": "translated",
+      "namespaced": false,
+      "argv": ["split-window", "-t", "@MISSING_SESSION@", "-P", "-F", "#{pane_id}", "-e", "OMO_T14_SENTINEL_9f2c=secret", "@PAYLOAD_PLACEHOLDER@"],
+      "observe": [],
+      "streams": ["stderr"],
+      "expected_divergence": "exec-boundary-env-strip",
+      "declared_kind": "placeholder-split",
+      "declared_env_slot_name": "OMO_T14_SENTINEL_9f2c"
+    },
+    {
+      "id": "e-env-pair-malformed",
+      "plan_item": "-e pair with no '=' must send the whole argv to pass-through",
+      "kind": "pass-through",
+      "namespaced": false,
+      "argv": ["split-window", "-t", "@MISSING_SESSION@", "-P", "-F", "#{pane_id}", "-e", "NOEQUALSIGN", "@PAYLOAD_PLACEHOLDER@"],
+      "observe": [],
+      "streams": ["stderr"],
+      "expect_pass_through_in_log": true
+    },
+    {
+      "id": "e-env-dangling",
+      "plan_item": "a trailing -e with no value must send the whole argv to pass-through",
+      "kind": "pass-through",
+      "namespaced": false,
+      "argv": ["split-window", "-t", "@MISSING_SESSION@", "-P", "-F", "#{pane_id}", "-e", "@PAYLOAD_PLACEHOLDER@"],
+      "observe": [],
+      "streams": ["stderr"],
+      "expect_pass_through_in_log": true
+    }
+  ],
+
+  "not_covered": [
+    {
+      "invocation": "[] (no arguments)",
+      "reason": "Bare `psmux` on 3.3.8 starts or attaches to a session in the DEFAULT namespace. MUST DO 11 forbids touching a session this lane does not own, and MUST DO 2 forbids sharing a namespace, so the only safe way to run it is inside a throwaway namespace where it would create state that then needs teardown. It is therefore recorded as not covered rather than run against shared state. It is also not in the 19-invocation census."
+    },
+    {
+      "invocation": "respawn-window with no arguments, default namespace",
+      "reason": "psmux 3.3.8 drops every argument to respawn-window (CONTRACT.md 7.3), so the bare form would act on the DEFAULT namespace's current window, i.e. another lane's session. Covered instead by c-respawn-window inside a throwaway namespace with an explicit -t."
+    },
+    {
+      "invocation": "kill-pane / kill-window / kill-server against the DEFAULT namespace",
+      "reason": "Same as above: these verbs mutate. Every stateful case in this corpus runs inside its own -L namespace and is torn down inside that same namespace."
+    }
+  ]
+}

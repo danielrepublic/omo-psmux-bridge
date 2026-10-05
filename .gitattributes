@@ -1,0 +1,12 @@
+# Windows-side bridge scripts are byte artifacts: they are deployed to
+%LOCALAPPDATA%\opencode-psmux-bridge and must stay byte-identical to the
+# installed copy, or the repo stops being a faithful mirror of what runs.
+#
+# Without this, git will normalise CRLF to LF on commit on some machines and
+# the next deploy will not match the tracked bytes. Observed exactly that
+# drift in scripts/windows/bin/psmux.cmd before this file existed.
+#
+# -text: never convert line endings, in either direction.
+# binary is deliberately NOT used, so git diff still produces a usable
+# line-oriented diff for a text file.
+scripts/windows/** -text
