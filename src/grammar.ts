@@ -126,6 +126,54 @@ const ATTACH_DIR_SEP = " --dir ";
 // Public entry point
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Leading psmux globals
+// ---------------------------------------------------------------------------
+
+/** The value-taking globals psmux 3.3.8 accepts BEFORE the verb.
+ *
+ *  Measured on the host, not read from a manual: `psmux -L ns -V`,
+ *  `psmux -S sock -V` and `psmux -f cfg -V` all exit 0 and print the version,
+ *  so all three are parsed as leading options. tmux spells them the same way.
+ *  `psmux list-sessions -L ns` fails with "unknown option '-L'", so they are
+ *  only globals while they precede the verb.
+ *
+ *  OmO never emits any of them -- it resolves the bare name `tmux` and calls a
+ *  verb. They matter because a throwaway-namespace invocation does, and this
+ *  plan mandates that shape for todos 14, 15, 16, 18, 19 and 20. Without this
+ *  the leading pair made `argv[0]` a flag, every one of the five real payload
+ *  shapes degraded to `pass-through`, and the bridge silently stopped
+ *  translating while still returning the backend's exit code. */
+const LEADING_VALUE_GLOBALS: ReadonlySet<string> = new Set(["-L", "-S", "-f"]);
+
+export interface SplitGlobals {
+  /** The leading `-L <ns>` / `-S <socket>` / `-f <config>` pairs, verbatim and
+   *  in order. Never rewritten: psmux still needs them. */
+  readonly globals: readonly string[];
+  /** Everything after them, which is what the grammar is defined over. */
+  readonly rest: readonly string[];
+}
+
+/** Split the leading psmux globals off the front of an argv.
+ *
+ *  Total, like `classifyArgv`: an argv it does not recognise comes back with
+ *  `globals: []` and `rest` equal to the input. A global with no value after it
+ *  is NOT consumed, because taking the verb as its value would swallow the
+ *  command; forwarding it untouched lets psmux produce its own error. */
+export function splitLeadingGlobals(argv: readonly string[]): SplitGlobals {
+  const globals: string[] = [];
+  let i = 0;
+  while (i + 1 < argv.length) {
+    const flag = argv[i];
+    if (flag === undefined || !LEADING_VALUE_GLOBALS.has(flag)) break;
+    const value = argv[i + 1];
+    if (value === undefined) break;
+    globals.push(flag, value);
+    i += 2;
+  }
+  return { globals, rest: argv.slice(i) };
+}
+
 /**
  * Classify one argv array. Total: never throws, never rejects, never returns an
  * error object. Anything unrecognised is `pass-through`.

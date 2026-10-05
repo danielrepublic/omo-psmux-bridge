@@ -20,7 +20,9 @@
 // body is the substring between the outer double quotes of that last element.
 
 import { describe, expect, test } from "bun:test";
-import { classifyArgv } from "../src/grammar";
+import { classifyArgv, splitLeadingGlobals, type RecognisedKind,
+} from "../src/grammar";
+import { translateArgv } from "../src/translate";
 
 // ---------------------------------------------------------------------------
 // Fixtures (byte-exact, captured from the bundle's own template functions)
@@ -464,5 +466,124 @@ describe("purity", () => {
     if (result.kind !== "pass-through") throw new Error("unreachable");
     expect(result.argv).not.toBe(argv);
     expect(result.argv).toEqual(argv);
+  });
+});
+// ---------------------------------------------------------------------------
+// Leading psmux globals
+//
+// Measured on psmux 3.3.8: `-L <ns>`, `-S <socket>` and `-f <config>` are
+// accepted BEFORE the verb, and `-L <ns>` must come first (`psmux list-sessions
+// -L ns` fails with "unknown option '-L'"). OmO never emits them, but every
+// throwaway-namespace invocation does, and the plan mandates that shape for
+// todos 14, 15, 16, 18, 19 and 20.
+//
+// Before splitLeadingGlobals existed, `classifyArgv(["-L","ns","split-window",
+// ...,payload])` returned pass-through, because argv[0] was "-L". The shim then
+// forwarded the payload untouched and the bridge silently stopped translating.
+// Observed on the Windows host, with the shim's own call log as the proof:
+//   no -L   -> classification "placeholder-split", argv rewritten to
+//              ["split-window", ..., "<helper-invocation>"]
+//   with -L -> classification "pass-through", argv forwarded verbatim
+// ---------------------------------------------------------------------------
+
+describe("splitLeadingGlobals", () => {
+  test("a bare -L namespace pair is split off and reported verbatim", () => {
+    const argv = ["-L", "omo_ns", "list-sessions"];
+
+    expect(splitLeadingGlobals(argv)).toEqual({
+      globals: ["-L", "omo_ns"],
+      rest: ["list-sessions"],
+    });
+  });
+
+  test("-S and -f are recognised on the same footing as -L", () => {
+    expect(splitLeadingGlobals(["-S", "sock", "-V"]).globals).toEqual(["-S", "sock"]);
+    expect(splitLeadingGlobals(["-f", "cfg.toml", "-V"]).globals).toEqual(["-f", "cfg.toml"]);
+  });
+
+  test("several globals combine, in the order given", () => {
+    const argv = ["-L", "ns", "-S", "sock", "-f", "cfg", "new-session", "-d", "-s", "x"];
+
+    expect(splitLeadingGlobals(argv)).toEqual({
+      globals: ["-L", "ns", "-S", "sock", "-f", "cfg"],
+      rest: ["new-session", "-d", "-s", "x"],
+    });
+  });
+
+  test("a dangling global with no value is left alone rather than guessed at", () => {
+    // `-L` at the end, or `-L` with nothing after it, is not a namespace pair.
+    // Forwarding it untouched is the only safe answer: a missing value would
+    // otherwise swallow the verb.
+    expect(splitLeadingGlobals(["list-sessions", "-L"])).toEqual({
+      globals: [],
+      rest: ["list-sessions", "-L"],
+    });
+    expect(splitLeadingGlobals(["-L"])).toEqual({ globals: [], rest: ["-L"] });
+  });
+
+  test("a value that looks like a verb is still consumed as the value", () => {
+    // psmux takes the next element verbatim as the value, so `-L kill-server`
+    // names a namespace called "kill-server" and must NOT be read as a verb.
+    expect(splitLeadingGlobals(["-L", "kill-server", "list-sessions"])).toEqual({
+      globals: ["-L", "kill-server"],
+      rest: ["list-sessions"],
+    });
+  });
+
+  test("no globals means an untouched argv", () => {
+    const argv = ["split-window", "-d", "-t", "s", "-P", "-F", "#{pane_id}", PH_PLAIN];
+
+    expect(splitLeadingGlobals(argv)).toEqual({ globals: [], rest: argv });
+  });
+
+  test("a global is only a global before the verb: -t later in the line is not one", () => {
+    expect(splitLeadingGlobals(["list-panes", "-t", "-L", "x"]).globals).toEqual([]);
+  });
+});
+
+describe("a leading -L namespace does not defeat classification", () => {
+  const SHAPES: ReadonlyArray<
+    readonly [string, readonly string[], RecognisedKind | "pass-through"]
+  > = [
+    ["placeholder-split", ["split-window", "-d", "-t", "s", "-P", "-F", "#{pane_id}", PH_PLAIN], "placeholder-split"],
+    ["placeholder-newwindow", ["new-window", "-d", "-t", "s", "-P", "-F", "#{pane_id}", PH_PLAIN], "placeholder-newwindow"],
+    ["placeholder-newsession", ["new-session", "-d", "-s", "s", "-P", "-F", "#{pane_id}", PH_PLAIN], "placeholder-newsession"],
+    ["placeholder-respawn", ["respawn-pane", "-k", "-t", "%9", "-c", "#{pane_id}", PH_PLAIN], "placeholder-respawn"],
+    ["attach-respawn", ["respawn-pane", "-k", "-t", "%9", "-c", "#{pane_id}", AT_PLAIN], "attach-respawn"],
+  ];
+
+  for (const [name, shape, expected] of SHAPES) {
+    test(name + " survives a leading -L", () => {
+      const { globals, rest } = splitLeadingGlobals(["-L", "omo_ns"].concat(shape));
+
+      expect(globals).toEqual(["-L", "omo_ns"]);
+      expect(classifyArgv(rest).kind).toBe(expected);
+    });
+  }
+
+  test("the emitted argv keeps the namespace in front of the rewritten shape", () => {
+    // The namespace is not consumed by the bridge: psmux still needs it, so it has
+    // to come back out in front of everything the translator produced.
+    const { globals, rest } = splitLeadingGlobals([
+      "-L",
+      "omo_ns",
+      "split-window",
+      "-d",
+      "-t",
+      "s",
+      "-P",
+      "-F",
+      "#{pane_id}",
+      PH_PLAIN,
+    ]);
+    const translation = translateArgv(classifyArgv(rest), {
+      psmuxPath: "C:\\psmux.exe",
+      helperPath: "C:\\helper.ps1",
+      leadingGlobals: globals,
+    });
+
+    expect(translation.argv.slice(0, 2)).toEqual(["-L", "omo_ns"]);
+    expect(translation.argv[2]).toBe("split-window");
+    expect(translation.rewritten).toBe(true);
   });
 });

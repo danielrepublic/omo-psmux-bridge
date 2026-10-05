@@ -178,6 +178,12 @@ export interface TranslateOptions {
   readonly cwd?: string;
   /** Emitted as `--correlation` when present; otherwise omitted. */
   readonly correlationId?: string;
+  /** Leading psmux globals (`-L <ns>`, `-S <socket>`, `-f <config>`) that the
+   *  caller split off with `splitLeadingGlobals`. Re-emitted in front of
+   *  everything this translator produced, unchanged and in order: they select
+   *  which psmux server to talk to, so dropping them would silently retarget
+   *  the call, and moving them behind the verb would make psmux reject them. */
+  readonly leadingGlobals?: readonly string[];
 }
 
 /** ONE `-e NAME=VALUE` pair, addressed to the helper by position.
@@ -255,7 +261,13 @@ export function translateArgv(classified: Classified, options: TranslateOptions)
   const envSlots = buildEnvSlots(classified.envArgs);
 
   return {
-    argv: [verb, ...classified.flags, ...(dashDash ? ["--"] : []), commandLine],
+    argv: [
+      ...(options.leadingGlobals ?? []),
+      verb,
+      ...classified.flags,
+      ...(dashDash ? ["--"] : []),
+      commandLine,
+    ],
     kind: "helper",
     rewritten: true,
     dashDashInserted: dashDash,
@@ -274,7 +286,7 @@ export function translate(argv: readonly string[], options: TranslateOptions): T
 
 function passthrough(argv: readonly string[], options: TranslateOptions): Translation {
   return {
-    argv: [...argv],
+    argv: [...(options.leadingGlobals ?? []), ...argv],
     kind: "passthrough",
     rewritten: false,
     dashDashInserted: false,

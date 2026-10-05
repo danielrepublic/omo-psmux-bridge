@@ -68,7 +68,7 @@ import { closeSync, fsyncSync, mkdirSync, openSync, writeFileSync, writeSync } f
 import { dirname, isAbsolute, resolve as resolvePath } from "node:path";
 import { randomBytes } from "node:crypto";
 
-import { classifyArgv } from "./grammar";
+import { classifyArgv, splitLeadingGlobals } from "./grammar";
 import type { Classified } from "./grammar";
 import { HELPER_CONTRACT, parseHelperCommandLine, translateArgv } from "./translate";
 import type { Translation } from "./translate";
@@ -537,7 +537,15 @@ export function planInvocation(argv: readonly string[], deps: MainDeps = {}): In
   // line is joinable with everything else from the same invocation.
   const correlationId = newCorrelationId(now(), nonce());
 
-  const classification: Classified = classifyArgv(argv);
+  // A leading `-L <ns>` / `-S <socket>` / `-f <config>` belongs to psmux, not to
+  // the grammar. It is split off first so `argv[0]` is the verb the grammar is
+  // defined over, and handed to the translator so it comes back out in front of
+  // the rewritten shape. Verified on the host: without this, `tmux -L ns
+  // split-window ... <payload>` classified as pass-through and the payload was
+  // forwarded untranslated with the backend's own exit code, so the failure was
+  // silent. See splitLeadingGlobals in ./grammar.
+  const { globals: leadingGlobals, rest: argvAfterGlobals } = splitLeadingGlobals(argv);
+  const classification: Classified = classifyArgv(argvAfterGlobals);
 
   const resolveOptions: ResolveOptions = {
     readEnv: env,
@@ -559,10 +567,13 @@ export function planInvocation(argv: readonly string[], deps: MainDeps = {}): In
     psmuxPath: resolution.kind === "resolved" ? resolution.backendPath : "",
     helperPath: deps.helperPath ?? resolveHelperPath(shimPath),
     correlationId,
+    leadingGlobals,
   });
 
   return {
-    verb: argv[0] ?? "",
+    // The verb is what follows any leading globals, so the log line names
+    // `split-window` rather than `-L`.
+    verb: argvAfterGlobals[0] ?? "",
     classification: classification.kind,
     translation,
     resolution,
