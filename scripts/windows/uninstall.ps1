@@ -28,7 +28,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string] $BinDir = $PSScriptRoot
+    [string] $BinDir
 )
 
 Set-StrictMode -Version 2.0
@@ -165,7 +165,30 @@ function Test-DirectoryDeletable {
 
 # --------------------------------------------------------------------------- main
 
-$target = [System.IO.Path]::GetFullPath($BinDir).TrimEnd('\')
+# Resolve the bin directory HERE, in the body.  Do NOT default $BinDir to
+# $PSScriptRoot in the param block: when this script is invoked via
+# Start-Process -File with a pre-quoted array ArgumentList, PowerShell
+# evaluates the param default $PSScriptRoot to an empty string even though
+# $PSScriptRoot is correctly set in the body.  Resolving here avoids that
+# quirk and keeps GetFullPath from being handed an empty string.
+if ([string]::IsNullOrEmpty($BinDir)) {
+    $BinDir = $PSScriptRoot
+}
+if ([string]::IsNullOrEmpty($BinDir) -and -not [string]::IsNullOrEmpty($MyInvocation.MyCommand.Path)) {
+    $BinDir = [System.IO.Path]::GetDirectoryName($MyInvocation.MyCommand.Path)
+}
+if ([string]::IsNullOrEmpty($BinDir)) {
+    Write-Line '[uninstall] RESULT=FAILED'
+    Write-Line '[uninstall] reason=bindir_unavailable'
+    exit 1
+}
+try {
+    $target = [System.IO.Path]::GetFullPath($BinDir).TrimEnd('\')
+} catch {
+    Write-Line '[uninstall] RESULT=FAILED'
+    Write-Line ('[uninstall] reason=bindir_invalid: ' + $_.Exception.Message)
+    exit 1
+}
 
 Write-Line ('[uninstall] bin_dir=' + $target)
 
