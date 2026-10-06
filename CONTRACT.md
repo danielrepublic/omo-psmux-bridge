@@ -1870,95 +1870,91 @@ a time. Not covered: more than two windows, or any layout other than
 `main-horizontal` / `main-vertical` / `even-horizontal`. Concurrent clients are
 covered next, in 9.5.
 
-### 9.5 Concurrent clients collide, and this one is a real risk to the bridge
+### 9.5 Two clients that each set the pointer collide — deterministically, not in a race
 
 Measured 2026-10-07. Evidence `.omo/evidence/ci-concurrent-clients.json` from
 `scripts/windows/parity/concurrent-clients.cjs`; run id and commit under test in
-`.omo/evidence/README-parity-ci.md`. This is the last claim 9.3 left INFERRED and
-9.4 explicitly declared uncovered.
+`.omo/evidence/README-parity-ci.md`.
 
-Two clients, each naming a **different** window, then each applying an untargeted
-layout the other window is not already in. Both phases are pairs of overlapping
-psmux processes:
+**Everything this section previously reported was unsound, and is withdrawn.** It
+carried a table — serialised landing in 1 run of 3, concurrent "nothing changed" in
+all 3 — plus a "this is a race, not reproducible on demand" correction on top. All of
+it was measured by a probe with two faults, each of which makes a result unable to
+come out the other way:
 
-| trial | result |
-|---|---|
-| serialised (2.5 s between phases) | **window 0 changed** (`7f70` → `7890`) — **in 1 run of 3** |
-| concurrent (0.7 s between phases) | **nothing changed**, in all 3 runs |
-| `concurrency_changed_the_outcome` | `true` once, `false` twice |
+- Client B applied `tiled` to a window reset to `even-horizontal`. `#{window_layout}`
+  returns the **serialised layout tree**, not the layout name, and `tiled` and
+  `even-horizontal` produce the same tree at two panes — `collision-tolerance.cjs`
+  records byte-identical strings either side of a `tiled` apply,
+  `aliased_with_reset: true`. So B's apply was invisible whether it landed or not.
+- `repair_succeeded` read its reference layout strings from the live server *after*
+  the repair, so `wantedLayouts` was a re-read of `recovered` and the comparison
+  could not fail. It was vacuously `true`, and it was the only thing bounding the
+  risk claim.
 
-**Corrected 2026-10-07: this paragraph first reported the serialised trial as a
-settled result and drew a conclusion from it. It is a race, and the conclusion was
-overstated.** Re-running the identical probe three times gave `serialised_landed`
-of `[0]`, then `[]`, then `[]`. Every invocation exited 0 in all three runs, so
-the clients genuinely believe they succeeded; what varies is which window the
-layout lands on, and sometimes neither window changes at all.
+Neither fault changes the geometry in the artifacts. Both change what the probe was
+entitled to conclude from it.
 
-What survives the correction: the pointer is global server state — `active_idx` at
-`src/layout.rs:1070`, and 9.3 and 9.4 already measured that behaviour
-single-threaded. What does **not** survive is any claim that a collision is
-reproducible on demand, or that the serialised case reliably collides. One sample
-in three is a race observed, not a mechanism characterised.
+**What the repaired probe measures.** Client A names w0 and applies `main-horizontal`;
+client B names w1 and applies `even-vertical`. w0 resets to `main-vertical`, w1 to
+`even-horizontal`, so every window starts in a state neither client's layout can
+reproduce.
 
-All eight invocations exited 0. The probe refuses to compute any verdict key
-unless they all did, because its first run reported an empty result for both
-trials — every invocation had exited 1 on a `cmd.exe` quoting error — and an empty
-result from a probe that never ran is indistinguishable in the artifact from an
-empty result that means something.
+| trial | pause | windows that changed |
+|---|---|---|
+| distinct targets, concurrent | 0.7 s | `[1]` |
+| distinct targets, long pause | 2.5 s | `[1]` |
+| collision, before recovery | 2.5 s | `[1]` |
 
-**What it shows.** Every invocation exited 0 in all three runs, so the clients
-genuinely believe they succeeded whatever happened to the geometry. The pointer is
-**global server state, not per-client** — `active_idx` at `src/layout.rs:1070`, one
-value for the session, which 9.3 flagged as the reason the claim could not be
-asserted and 9.1 made un-targetable, since psmux strips `-t` before dispatch. When
-two clients overlap, the window one of them named is not reliably the window that
-receives its layout, and neither can tell.
+`concurrency_changed_the_outcome: false`. All eight invocations exited 0.
 
-**And a collision is recoverable.** The same probe's repair step deliberately
-collides, then gives each window a correct targeted layout and compares the result
-against the layouts requested:
+**w0 never received a layout.** A's apply would have moved w0 off `main-vertical` and
+been plainly visible; w0's line is byte-identical before and after. Only w1 changed,
+landing on B's layout (`42b2`, a stacked tree). So both clients' untargeted applies
+resolved to the pointer's final value, and one client's work was discarded while every
+invocation reported success.
+
+**This is structural, and the 2.5 s pause is what proves it.** The earlier text called
+this a race. It is not. The pointer is global server state — `active_idx` at
+`src/layout.rs:1070`, one value for the session, and psmux strips `-t` before dispatch
+(§9.1). Two clients that each set the pointer and then apply untargeted layouts will
+both apply to whichever window wrote last, **however far apart they are**. A quarter of
+a second, or two and a half seconds, makes no difference, because there is no window in
+which the two layouts race — the loser's layout is simply computed against a pointer
+the winner has already moved.
+
+**And a collision is recoverable.** The repair step now captures its reference layout
+strings *before* the collision, so the comparison is independent of the state it
+judges, and it is genuinely non-vacuous: `after_collision` leaves w0 at `7f70` while
+the reference is `b7ad`, and only the targeted repair brings w0 to `b7ad`.
 
 ```
-recovered : b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2] // 7899,120x30,0,0{59x30,...}
-wanted    : b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2] // 7899,120x30,0,0{59x30,...}
-repair_succeeded : true
+after_collision      : 0|7f70,…{71x30,…}   1|42b2,…[120x14,120x15]
+wanted_layouts       : b7ad,…[120x17,120x12]   42b2,…[120x14,120x15]
+after_targeted_repair: b7ad,…[120x17,120x12]   42b2,…[120x14,120x15]
+repair_succeeded     : true
 ```
 
-Both windows hold exactly the layout they were asked for. So the failure mode is
-a **wrong frame that the next layout call repairs**, not a session left mislaid out
-with no way back. That bounds the defect considerably: it converts "concurrent
-injections corrupt the layout" into "concurrent injections may briefly produce the
-wrong layout, and OmO's next layout call fixes it".
+So the failure mode is a **wrong frame that the next correctly-targeted layout call
+repairs**, not a session left mislaid out with no way back.
 
-**This repair check was itself wrong on its first run and reported
-`repair_succeeded: false` while the geometry in the same artifact was visibly
-correct.** `list-windows -t` does not filter — both targeted calls return every
-window — so the check compared a two-line list against a per-window reference and
-could not have matched for any input. The `invocations_all_succeeded` guard added
-after the concurrency probe's false negative does not catch this class: those
-commands exited 0 and returned the wrong *shape*. It is recorded because a reader
-comparing the two verdicts should know which one to trust.
+**Why this matters here.** Team mode creates several agents laying out at the same
+time, and rules 1b and 1e each inject an untargeted `select-layout`. Two overlapping
+injections therefore land on one window and one agent's layout is silently dropped.
+**This is the one measured defect in this document the bridge cannot work around**:
+rule 1a retires when psmux parses a percentage, 1b when the option is read outside
+`apply_layout`, 1c when `sizes` stops being proportions — but there is no bridge-side
+fix for a global current-window pointer, because the only handle psmux offers (`-t`)
+is discarded before dispatch. The mitigation available is the one measured above: a
+later targeted call repairs it, so the exposure is a dropped layout for one frame, not
+a permanently mislaid-out session.
 
-**Why this matters here and not merely as trivia.** Team mode creates several
-agents laying out at the same time, and rules 1b and 1e each inject an untargeted
-`select-layout`. Two overlapping injections therefore either collide on one window
-(what the serialised trial shows) or both do nothing (what the concurrent trial
-shows). In both cases the layout lands somewhere the caller did not name, and every
-invocation reports success. **This is the one measured defect in this document that
-the bridge cannot work around**: rule 1a can be dropped when psmux learns to parse
-a percentage, rule 1b when the option is read outside `apply_layout`, rule 1c when
-`sizes` stops being proportions — but there is no bridge-side fix for a global
-current-window pointer, because the only handle psmux offers (`-t`) is discarded
-before dispatch.
+**Not established.** Whether A's layout landed briefly on w1 before B overwrote it is
+not observable here — the probe samples before and after, so "discarded" and "never
+computed" look identical, the same limitation the tolerance sweep has. More than two
+clients, more than two windows, and a real OmO team-mode sequence remain uncovered.
 
-INFERRED, explicitly untested: whether this bites in practice depends on how often
-two injections overlap, which this run does not measure — it forced overlap in
-both trials. A real team-mode session may rarely collide. That is the difference
-between a defect that is certain and one that is merely possible, and this
-document does not have the data to say which.
-
-**Scope.** One session, two windows, two clients, v3.3.8. Not covered: more than
-two clients, more than two windows, or a real OmO team-mode sequence.
+**Scope.** One session, two windows, two clients, v3.3.8.
 
 ---
 

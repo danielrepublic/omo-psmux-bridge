@@ -12,7 +12,7 @@
       },
       "client_b": {
         "target": "race:1",
-        "layout": "tiled"
+        "layout": "even-vertical"
       },
       "invocations": [
         {
@@ -44,15 +44,21 @@
         {
           "args": [
             "select-layout",
-            "tiled"
+            "even-vertical"
           ],
           "exit": 0,
           "stderr": ""
         }
       ],
       "before": "0|7f70,120x30,0,0{71x30,0,0,1,48x30,72,0,2}|2p\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}|2p",
-      "after": "0|7f70,120x30,0,0{71x30,0,0,1,48x30,72,0,2}|2p\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}|2p",
-      "changed_windows": []
+      "after": "0|7f70,120x30,0,0{71x30,0,0,1,48x30,72,0,2}|2p\n1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]|2p",
+      "changed_windows": [
+        {
+          "window": 1,
+          "before": "1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}|2p",
+          "after": "1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]|2p"
+        }
+      ]
     },
     {
       "tag": "two clients, distinct targets, long pause",
@@ -63,7 +69,7 @@
       },
       "client_b": {
         "target": "race:1",
-        "layout": "tiled"
+        "layout": "even-vertical"
       },
       "invocations": [
         {
@@ -95,15 +101,21 @@
         {
           "args": [
             "select-layout",
-            "tiled"
+            "even-vertical"
           ],
           "exit": 0,
           "stderr": ""
         }
       ],
       "before": "0|7f70,120x30,0,0{71x30,0,0,1,48x30,72,0,2}|2p\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}|2p",
-      "after": "0|7f70,120x30,0,0{71x30,0,0,1,48x30,72,0,2}|2p\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}|2p",
-      "changed_windows": []
+      "after": "0|7f70,120x30,0,0{71x30,0,0,1,48x30,72,0,2}|2p\n1|b7b2,120x30,0,0[120x17,0,0,3,120x12,0,18,4]|2p",
+      "changed_windows": [
+        {
+          "window": 1,
+          "before": "1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}|2p",
+          "after": "1|b7b2,120x30,0,0[120x17,0,0,3,120x12,0,18,4]|2p"
+        }
+      ]
     },
     {
       "tag": "collision, before recovery",
@@ -114,7 +126,7 @@
       },
       "client_b": {
         "target": "race:1",
-        "layout": "tiled"
+        "layout": "even-vertical"
       },
       "invocations": [
         {
@@ -146,37 +158,47 @@
         {
           "args": [
             "select-layout",
-            "tiled"
+            "even-vertical"
           ],
           "exit": 0,
           "stderr": ""
         }
       ],
       "before": "0|7f70,120x30,0,0{71x30,0,0,1,48x30,72,0,2}|2p\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}|2p",
-      "after": "0|7f70,120x30,0,0{71x30,0,0,1,48x30,72,0,2}|2p\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}|2p",
-      "changed_windows": []
+      "after": "0|7f70,120x30,0,0{71x30,0,0,1,48x30,72,0,2}|2p\n1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]|2p",
+      "changed_windows": [
+        {
+          "window": 1,
+          "before": "1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}|2p",
+          "after": "1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]|2p"
+        }
+      ]
     }
   ],
   "recovery": {
-    "after_collision": "0|7f70,120x30,0,0{71x30,0,0,1,48x30,72,0,2}|2p\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}|2p",
-    "after_targeted_repair": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]|2p\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}|2p",
+    "after_collision": "0|7f70,120x30,0,0{71x30,0,0,1,48x30,72,0,2}|2p\n1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]|2p",
+    "after_targeted_repair": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]|2p\n1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]|2p",
     "wanted_layouts": [
       "b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]",
-      "7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}"
+      "42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]"
     ],
     "recovered_layouts": [
       "b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]",
-      "7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}"
+      "42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]"
     ],
     "repair_succeeded": true
   },
   "verdict": {
     "invocations_all_succeeded": true,
     "failed_invocations": [],
-    "concurrent_landed": [],
-    "serialised_landed": [],
+    "concurrent_landed": [
+      1
+    ],
+    "serialised_landed": [
+      1
+    ],
     "both_got_their_own_window": false,
-    "collided_on_one_window": false,
+    "collided_on_one_window": true,
     "concurrency_changed_the_outcome": false
   },
   "after_teardown": ""
