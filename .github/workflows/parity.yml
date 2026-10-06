@@ -1,0 +1,169 @@
+# Run the psmux parity probes on a Windows host, and publish their output.
+#
+# WHY THIS EXISTS
+# CONTRACT.md is only true of a specific psmux build, and several of its claims
+# are marked "unrecorded, not measured" because no probe output was ever
+# committed. Section 3.9's geometry tables are the worst case: rules 1a and 1b
+# decide how every subagent pane is sized, and rule 1b in particular rests on
+# `apply_layout` — which has ZERO test coverage in psmux itself, so there is no
+# upstream assertion to fall back on. Reading the source is inference, and the
+# document says so.
+#
+# A Linux box cannot run these probes: psmux is a Windows terminal multiplexer and
+# the probes drive it over ConPTY. Windows GitHub runners can, which is why this
+# exists rather than a note asking a human to remember.
+#
+# WHY IT IS NOT PART OF contract.yml
+# contract.yml gates every push and must stay fast and boring. This job installs
+# a multiplexer, cross-compiles a binary and starts real servers; it is slower,
+# it is inherently more fragile, and a flake here must never be able to block a
+# commit. So: separate workflow, manual or weekly, never on every push.
+#
+# WHAT IT DOES NOT DO
+# It does not commit anything. It publishes the probe JSON as an artifact. Making
+# a human or a follow-up change commit the output is deliberate: CONTRACT.md
+# admits a measurement as evidence only when the artifact is under version
+# control, and an automated commit straight into that tree would let a probe
+# result rewrite the specification without anyone reading it.
+name: parity
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Weekly, Sunday 03:17 UTC. Off the hour on purpose: the top of the hour is
+    # when every scheduled workflow on the platform fires at once.
+    - cron: '17 3 * * 0'
+
+# Read-only. This job needs the repository and psmux's public releases, nothing
+# else, and a probe should never be able to publish a release.
+permissions:
+  contents: read
+
+concurrency:
+  group: parity
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: pwsh
+
+env:
+  # Must match release.yml and scripts/contract/pins.json. The whole point of
+  # pinning is that a floating Bun would make a probe result depend on which
+  # Bun happened to ship that week.
+  BUN_VERSION: '1.4.2'
+
+jobs:
+  layout-probes:
+    name: Layout probes (rules 1a, 1b, and the no -t question)
+    runs-on: windows-latest
+    # Generous, because a multiplexer that cannot attach can sit there rather
+    # than fail. A hung psmux is the expected failure mode here, not a
+    # hypothetical one, and the timeout is what turns that into a red build
+    # instead of a stuck one.
+    timeout-minutes: 25
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Install Bun ${{ env.BUN_VERSION }}
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      # The tag lives in pins.json, which is the single source of truth for what
+      # this repository is allowed to make claims about. Hardcoding "3.3.8" here
+      # would create a second place to update on every psmux bump, and this file
+      # is exactly the kind of copy that silently goes stale.
+      - name: Read the pinned psmux tag
+        id: pin
+        run: |
+          $pin = Get-Content scripts/contract/pins.json -Raw | ConvertFrom-Json
+          "tag=$($pin.psmux.tag)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "commit=$($pin.psmux.commit)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "pinned psmux: $($pin.psmux.tag) ($($pin.psmux.commit))"
+
+      - name: Install psmux where the probes expect it
+        # The probes hardcode `$env:LOCALAPPDATA\psmux\tmux.exe`, and the release
+        # zip has psmux.exe / pmux.exe / tmux.exe at its ROOT, so extracting into
+        # that directory lands tmux.exe exactly on the path they look for. They
+        # hardcode it because they must probe the real binary, not a shim.
+        run: |
+          $ErrorActionPreference = 'stop'
+          $zip = 'psmux.zip'
+          Invoke-WebRequest -Uri "https://github.com/psmux/psmux/releases/download/${{ steps.pin.outputs.tag }}/psmux-${{ steps.pin.outputs.tag }}-windows-x64.zip" -OutFile $zip
+          $dest = Join-Path $env:LOCALAPPDATA 'psmux'
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          Expand-Archive -Path $zip -DestinationPath $dest -Force
+          Write-Host "extracted into $dest"
+          Get-ChildItem $dest | Format-Table Name, Length
+          if (-not (Test-Path (Join-Path $dest 'tmux.exe'))) {
+            throw "tmux.exe is not at $dest\tmux.exe; the probes hardcode that path and would silently probe nothing"
+          }
+
+      - name: Cross-compile the shim where the probes expect it
+        # Same reasoning: the probes hardcode `$env:TEMP\omo-t14\bin\tmux.exe`.
+        # A shim at any other path would make the probe report the REAL psmux's
+        # behaviour and label it "through the shim", which is the one failure
+        # mode that would produce evidence rather than an error.
+        run: |
+          $ErrorActionPreference = 'stop'
+          $bin = Join-Path $env:TEMP 'omo-t14\bin'
+          New-Item -ItemType Directory -Force -Path $bin | Out-Null
+          $out = Join-Path $bin 'tmux.exe'
+          bun build --compile src/cli.ts --outfile $out --target=bun-windows-x64
+          if (-not (Test-Path $out)) { throw "cross-compile produced nothing at $out" }
+          # Prove it is a Windows PE and not a Linux binary that happens to be
+          # named .exe. A wrong-target build would run and report nonsense.
+          $bytes = [System.IO.File]::ReadAllBytes($out)[0..1]
+          if (-not ($bytes[0] -eq 0x4D -and $bytes[1] -eq 0x5A)) {
+            throw "cross-compiled binary does not start with MZ; --target=bun-windows-x64 did not take effect"
+          }
+          Write-Host "shim staged at $out (MZ header verified)"
+
+      - name: Reject a drifted tree before probing
+        # The contract is only true of the pinned commit. If .contract/psmux is
+        # present at another commit, the probe would measure a different psmux
+        # and the artifact would be filed under this contract anyway.
+        run: bun run contract:fetch
+
+      - name: Run the layout probe (which window does an untargeted select-layout act on?)
+        # CONTRACT.md section 9. Its own conclusion is that neither option is
+        # settled and that exit 0 settles nothing, because psmux cannot fail this
+        # command. So this step is expected to be inconclusive; it is run anyway
+        # because a committed inconclusive is worth more than an absent one.
+        run: bun scripts/windows/parity/layout-probe.cjs
+        continue-on-error: true
+
+      - name: Run the which-window probe
+        run: bun scripts/windows/parity/layout-which-window.cjs
+        continue-on-error: true
+
+      - name: Publish whatever the probes produced
+        # continue-on-error above means a probe failure must not discard the other
+        # probe's output. A run where one probe worked and one did not is still
+        # evidence, and uploading unconditionally is what makes that visible.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: parity-probe-output
+          path: ${{ env.TEMP }}\omo-t14\*.json
+          if-no-files-found: warn
+
+      - name: Summarise
+        # The artifact is a JSON blob; nobody reads a 2000-line probe dump in a
+        # CI log. Surface the exit codes and the geometry rows, which are the
+        # two things a reader actually needs.
+        if: always()
+        run: |
+          $dir = Join-Path $env:TEMP 'omo-t14'
+          Get-ChildItem $dir -Filter *.json -ErrorAction SilentlyContinue | ForEach-Object {
+            Write-Host "--- $($_.Name) ($($_.Length) bytes) ---"
+            $json = Get-Content $_.FullName -Raw | ConvertFrom-Json
+            if ($json.probes) {
+              foreach ($p in $json.probes) {
+                Write-Host ("  {0,-28} status={1} stdout={2}" -f $p.tag, $p.status, ($p.stdout -replace "`r?`n", ' | '))
+              }
+            }
+          }
