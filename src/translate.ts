@@ -754,10 +754,12 @@ function translatePassThrough(argv: readonly string[], options: TranslateOptions
   if (isSuppressedPaneOption(argv)) {
     return suppressed(argv, options, "psmux-refuses-pane-scoped-options");
   }
-  // Rule 1e BEFORE rule 1c: `isTeamResize` is the narrow gate that lets exactly
-  // the team's percentage shape through; every other `-x`/`-y` falls to 1c.
-  if (isTeamResize(argv)) return teamResize(argv, options);
-  if (carriesDestructiveResize(argv)) {
+  // Rules 1c and 1e share one classification, so their precedence cannot drift:
+  // `team` is the narrow shape and is handled first, everything else that carries
+  // an axis falls to 1c.
+  const resize = classifyResize(argv);
+  if (resize.kind === "team") return teamResize(resize.width, options);
+  if (resize.kind === "destructive") {
     return suppressed(argv, options, "resize-cell-count-is-not-a-percentage");
   }
   return stripPercentAndReapplyLayout(argv, options);
@@ -805,24 +807,62 @@ function firstNonFlagArgument(argv: readonly string[]): string | undefined {
   return undefined;
 }
 
-/**
- * Rule 1e: is this the team resize, `resize-pane -t <pane> -x "<n>%"`?
+/** What a resize argv is, decided ONCE for rules 1c and 1e together.
  *
- * Exactly the shape OmO emits (`index.js:19672`): a resize verb, no `-Z`, no
+ *  These two rules used to be two independent predicates over the same argv, each
+ *  re-deriving the verb check, the `-Z` precedence and the position of `-x`. They
+ *  could not disagree today only because the call site checked 1e first — an
+ *  ordering held in place by a comment. One classification makes the ordering a
+ *  property of the code instead of of the reader's memory. */
+type ResizeShape =
+  /** Not a resize verb, or a resize with no axis: none of 1c/1e applies. */
+  | { readonly kind: "none" }
+  /** `-Z` present. A zoom to psmux; forwarded byte-identically. */
+  | { readonly kind: "zoom" }
+  /** `resize-pane -t <pane> -x "<n>%"` — the team shape, rule 1e. `width` is the
+   *  digits before the `%`, already stripped. */
+  | { readonly kind: "team"; readonly width: string }
+  /** A bare `-x` / `-y` that is not the team shape — rule 1c suppresses it. */
+  | { readonly kind: "destructive" };
+
+/**
+ * Classify a resize argv for rules 1c and 1e.
+ *
+ * Rule 1e's shape is OmO's own (`index.js:19672`): a resize verb, no `-Z`, no
  * `-y`, exactly one bare `-x`, and a non-zero percentage right after it. Every
- * other resize shape is left to rule 1c, which suppresses it — so this predicate
- * is the ONLY gate that lets a `-x` through, and it is deliberately the narrowest
- * one that matches the team's argv.
+ * other resize shape is left to rule 1c — so the team arm is the ONLY path that
+ * lets a `-x` through, and it is deliberately the narrowest one that matches the
+ * team's argv.
+ *
+ * Axis detection is element equality, not a prefix test, and that is not a
+ * shortcut: `src/server/connection.rs:1767-1778` looks for a bare `-x` / `-y`
+ * token with `args.windows(2).find(|w| w[0] == "-x")`, so a combined `-x99`
+ * element is not even read as a resize request and is harmless. Only the bare
+ * form can do damage, so only the bare form is suppressed.
+ *
+ * `-Z` is checked FIRST and returns `zoom`, which is the precedence psmux itself
+ * applies. `-Z` is dispatched at `src/server/connection.rs:1236`, an arm of the
+ * same `match cmd` that opens at 1061 and closes after 3632, and it carries the
+ * guard `args.iter().any(|a| *a == "-Z")`. So `resize-pane -Z -x 99` is a ZOOM to
+ * psmux and the `-x 99` beside it is never read. Suppressing that argv would
+ * suppress a zoom the user asked for, on the strength of a flag psmux ignores —
+ * so the check has to come before the axis tests, not be a note in a comment.
  */
-function isTeamResize(argv: readonly string[]): boolean {
+function classifyResize(argv: readonly string[]): ResizeShape {
   const verb = argv[0];
-  if (verb === undefined || !RESIZE_VERBS.has(verb)) return false;
-  if (argv.includes("-Z")) return false;
-  if (argv.includes("-y")) return false;
-  if (argv.filter((element) => element === "-x").length !== 1) return false;
-  const index = argv.indexOf("-x");
-  const value = argv[index + 1];
-  return value !== undefined && TEAM_RESIZE_PERCENT.test(value);
+  if (verb === undefined || !RESIZE_VERBS.has(verb)) return { kind: "none" };
+  if (argv.includes("-Z")) return { kind: "zoom" };
+
+  const xIndex = argv.indexOf("-x");
+  const hasY = argv.includes("-y");
+  if (xIndex !== -1 && !hasY && argv.filter((element) => element === "-x").length === 1) {
+    const value = argv[xIndex + 1];
+    if (value !== undefined && TEAM_RESIZE_PERCENT.test(value)) {
+      return { kind: "team", width: value.slice(0, -1) };
+    }
+  }
+  if (xIndex !== -1 || hasY) return { kind: "destructive" };
+  return { kind: "none" };
 }
 
 /**
@@ -835,17 +875,14 @@ function isTeamResize(argv: readonly string[]): boolean {
  * un-targeted for the same reason rule 1b's is (CONTRACT.md 9, Option A). Both
  * carry the primary's leading globals so both reach the same server.
  *
- * The probe-gated assumption and the fallback are argued in the file header;
- * this function is the whole rule, so refuting it is a change here and nowhere
- * else.
+ * `width` comes from `classifyResize`, which already matched it against the
+ * percentage regex, so there is no second `-x` lookup here to disagree with the
+ * gate. The probe-gated assumption and the fallback are argued in the file
+ * header; this function is the whole rule, so refuting it is a change here and
+ * nowhere else.
  */
-function teamResize(argv: readonly string[], options: TranslateOptions): Translation {
+function teamResize(width: string, options: TranslateOptions): Translation {
   const leadingGlobals = options.leadingGlobals ?? [];
-  const index = argv.indexOf("-x");
-  const value = argv[index + 1] ?? "";
-  // `isTeamResize` established the shape, so the slice is the digits before the
-  // one trailing `%`.
-  const width = value.slice(0, -1);
 
   return {
     argv: [...leadingGlobals, "set-option", "main-pane-width", width],
@@ -866,30 +903,6 @@ function teamResize(argv: readonly string[], options: TranslateOptions): Transla
     helperCommandLine: undefined,
     correlationId: undefined,
   };
-}
-
-/**
- * Does this argv carry a `resize-pane -x` / `-y`?
- *
- * Element equality, not a prefix test, and that is not a shortcut:
- * `src/server/connection.rs:1767-1778` looks for a bare `-x` / `-y` token with
- * `args.windows(2).find(|w| w[0] == "-x")`, so a combined `-x99` element is not
- * even read as a resize request and is harmless. Only the bare form can do
- * damage, so only the bare form is suppressed.
- *
- * `-Z` is checked FIRST and returns false, which is the precedence psmux itself
- * applies. `-Z` is dispatched at `src/server/connection.rs:1236`, an arm of the
- * same `match cmd` that opens at 1061 and closes after 3632, and it carries the
- * guard `args.iter().any(|a| *a == "-Z")`. So `resize-pane -Z -x 99` is a ZOOM to
- * psmux and the `-x 99` beside it is never read. Suppressing that argv would
- * suppress a zoom the user asked for, on the strength of a flag psmux ignores --
- * so the check has to be an early return, not a note in a comment.
- */
-function carriesDestructiveResize(argv: readonly string[]): boolean {
-  const verb = argv[0];
-  if (verb === undefined || !RESIZE_VERBS.has(verb)) return false;
-  if (argv.includes("-Z")) return false;
-  return argv.includes("-x") || argv.includes("-y");
 }
 
 /** A command the bridge refuses to forward (rules 1c and 1d).
