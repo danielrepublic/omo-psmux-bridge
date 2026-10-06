@@ -63,6 +63,19 @@ jobs:
     # instead of a stuck one.
     timeout-minutes: 25
 
+    # TEMP/TMP live at JOB level, not workflow level, and that placement is the
+    # whole point. The probes write to `process.env.TEMP`, a Windows shell
+    # variable with no GitHub Actions context, so `${{ env.TEMP }}` expands to
+    # nothing and the artifact glob silently degrades to `\omo-t14\*.json` —
+    # which uploads nothing while the job still reports success. Overriding TEMP
+    # to `runner.temp` makes the probe's own path and the upload path the same
+    # directory. Workflow-level `env` cannot do this: the `runner` context is not
+    # available there, so the identical expression would expand to empty one
+    # level up and reintroduce the bug in a place that reads as correct.
+    env:
+      TEMP: ${{ runner.temp }}
+      TMP: ${{ runner.temp }}
+
     steps:
       - name: Check out
         uses: actions/checkout@v4
@@ -148,22 +161,56 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: parity-probe-output
-          path: ${{ env.TEMP }}\omo-t14\*.json
+          # runner.temp, not env.TEMP — see the job-level env block. A glob that
+          # silently matches nothing makes the whole job look successful while
+          # discarding the only thing it produced.
+          path: ${{ runner.temp }}\omo-t14\*.json
           if-no-files-found: warn
 
       - name: Summarise
         # The artifact is a JSON blob; nobody reads a 2000-line probe dump in a
-        # CI log. Surface the exit codes and the geometry rows, which are the
-        # two things a reader actually needs.
+        # CI log. The question a reader actually has is "did the geometry move",
+        # so surface exactly that, plus the exit codes — per the section 9
+        # argument, an exit code of 0 from `select-layout` is NOT evidence that
+        # anything was applied, which is why the before/after pairs are printed
+        # next to it rather than instead of it.
+        #
+        # Field names are walked rather than assumed: an earlier version of this
+        # step guessed `probes[].tag/status/stdout` and printed four empty lines,
+        # because the probes record `windows_before`/`before`/`after` instead.
+        # Guessing a shape is how a summary reports nothing while passing.
         if: always()
         run: |
           $dir = Join-Path $env:TEMP 'omo-t14'
-          Get-ChildItem $dir -Filter *.json -ErrorAction SilentlyContinue | ForEach-Object {
-            Write-Host "--- $($_.Name) ($($_.Length) bytes) ---"
-            $json = Get-Content $_.FullName -Raw | ConvertFrom-Json
-            if ($json.probes) {
-              foreach ($p in $json.probes) {
-                Write-Host ("  {0,-28} status={1} stdout={2}" -f $p.tag, $p.status, ($p.stdout -replace "`r?`n", ' | '))
+          $files = Get-ChildItem $dir -Filter *.json -ErrorAction SilentlyContinue
+          if (-not $files) { Write-Host "no probe output in $dir"; exit 0 }
+          foreach ($f in $files) {
+            Write-Host "--- $($f.Name) ($($f.Length) bytes) ---"
+            $json = Get-Content $f.FullName -Raw | ConvertFrom-Json
+            foreach ($prop in $json.PSObject.Properties) {
+              if ($null -eq $prop.Value) { continue }
+              if ($prop.Value -is [string]) {
+                if ($prop.Value.Trim()) { Write-Host "  $($prop.Name): $($prop.Value.Trim() -replace "`r?`n", ' | ')" }
+                continue
               }
+              if ($prop.Value -is [System.Collections.IEnumerable] -and $prop.Value -isnot [string]) {
+                $i = 0
+                foreach ($item in $prop.Value) {
+                  $label = $item.tag; if (-not $label) { $label = $item.invocation -join ' ' }
+                  $before = $item.before; $after = $item.after
+                  if ($before -or $after) {
+                    $moved = if ("$before" -eq "$after") { 'UNCHANGED' } else { 'CHANGED' }
+                    Write-Host "  $($prop.Name)[$i] $($label -replace "`r?`n",' ') -> $moved"
+                    Write-Host "      before: $("$before" -replace "`r?`n", ' | ')"
+                    Write-Host "      after : $("$after" -replace "`r?`n", ' | ')"
+                  } else {
+                    Write-Host "  $($prop.Name)[$i] $($label -replace "`r?`n",' ') exit=$($item.exit) note=$($item.note)"
+                  }
+                  $i++
+                }
+                continue
+              }
+              $subs = @($prop.Value.PSObject.Properties | ForEach-Object { "$($_.Name)=$("$($_.Value)" -replace "`r?`n", ' | ')" })
+              if ($subs) { Write-Host "  $($prop.Name): $($subs -join '  '  )" }
             }
           }
