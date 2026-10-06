@@ -849,9 +849,28 @@ jobs:
           # A tag push with no release and no gh-visible repo access is a
           # different failure from "release exists", and must not be reported as
           # if the gate simply passed.
-          if ! gh api "repos/${{ github.repository }}" --jq '.permissions.push' 2>/dev/null | grep -qx 'true'; then
-            echo "::error title=release permissions::cannot determine push permission on ${{ github.repository }}. The workflow declares 'permissions: contents: write'; if GH_TOKEN is empty or the repository is not writable, the release cannot be created and must not be skipped silently."
+          #
+          # The permission probe is deliberately three-valued, because the probe
+          # itself is not reliable with this job's token. `GH_TOKEN` here is
+          # `${{ github.token }}` -- an App INSTALLATION token -- and
+          # `GET /repos/{owner}/{repo}` does not populate `permissions` for one,
+          # so `.permissions.push` comes back empty and a two-valued test reports
+          # "no push permission" for a token that can in fact create the release.
+          # A user token does return the field, which is what made the two-valued
+          # version look correct while it was being written.
+          #
+          # So: an explicit `false` is a real refusal and stops the build; anything
+          # we cannot read is reported and deferred to `gh release create`, which
+          # either succeeds or fails loudly on its own. Nothing is skipped silently
+          # either way -- the create step is the authority on whether this token can
+          # write, and its failure names itself.
+          PUSH_PERMISSION=$(gh api "repos/${{ github.repository }}" --jq '.permissions.push' 2>/dev/null | head -n 1 || true)
+          if [ "$PUSH_PERMISSION" = "false" ]; then
+            echo "::error title=release permissions::the workflow token reports push=false on ${{ github.repository }}, so the release cannot be created. Check that 'permissions: contents: write' is still declared and that the repository has not changed its workflow-permission policy."
             exit 1
+          fi
+          if [ "$PUSH_PERMISSION" != "true" ]; then
+            echo "[gate] note=could not read '.permissions.push' (got: '${PUSH_PERMISSION:-<empty>}'). Expected for an installation token and NOT treated as a failure; 'gh release create' below is the authority on write access and fails loudly if it lacks it."
           fi
 
           echo "[gate] no existing release for $TAG; publishing"
