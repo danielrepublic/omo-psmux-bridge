@@ -193,6 +193,18 @@ jobs:
         run: bun scripts/windows/parity/concurrent-clients.cjs
         continue-on-error: true
 
+      - name: Run the resize-pane cells probe (rule 1c)
+        # Rule 1c is the last layout rule with no probe, on the stated reasoning
+        # that a probe would measure the layout rather than the parser. That
+        # reasoning was wrong: rule 1c's claim is that a CELL COUNT arrives as a
+        # PERCENTAGE, and that is answerable by applying a number whose two
+        # readings cannot coincide and looking at which one lands.
+        env:
+          TEMP: ${{ runner.temp }}
+          TMP: ${{ runner.temp }}
+        run: bun scripts/windows/parity/resize-pane-cells-probe.cjs
+        continue-on-error: true
+
       - name: Publish whatever the probes produced
         # continue-on-error above means a probe failure must not discard the other
         # probe's output. A run where one probe worked and one did not is still
