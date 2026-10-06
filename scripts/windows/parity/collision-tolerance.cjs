@@ -227,9 +227,15 @@ async function trial(gapMs) {
     changed_windows: changed,
     // Void unless the sample demonstrably differs from the end state. A sample equal to
     // `after` cannot separate A's layout from B's, so nothing derived from it counts.
+    //
+    // There are deliberately no `a_landed` / `a_landed_on` fields here. The first
+    // version of this had them, gated to null when the sample was unusable — and the
+    // gate fired often enough that a null-gated field whose name reads like a finding is
+    // a trap for whoever reads the artifact next. A field that is usually null and
+    // looks like an answer is worse than no field. The poller is the only source for
+    // whether A's layout landed; this key records only whether the in-process sample
+    // was usable, which is what makes the poller necessary.
     sample_was_midflight: sample_was_midflight,
-    a_landed_on: sample_was_midflight ? classify(before, mid).changed : null,
-    a_landed: sample_was_midflight && classify(before, mid).changed.length > 0,
     invocations_ok: results.every((r) => r.exit === 0),
     before,
     mid,
@@ -339,7 +345,13 @@ if (process.argv[2] === '--poll') {
     // Replace the in-process sample, which was never mid-flight, with what the
     // concurrent observer actually saw.
     t.mid = null;
-    t.mid_source = 'in-process sample was never mid-flight (equal to `after` at every gap); see poller';
+    // Stated as unreliability, not impossibility. An earlier version of this string
+    // said the sample "was never mid-flight (equal to `after` at every gap)", which was
+    // true of the run that prompted it and false in general —
+    // `in_process_sample_ever_midflight` is true on some runs, because the sample is
+    // sometimes caught before B lands. An observer that is usually blind is a different
+    // thing from one that is always blind, and only the first claim is defensible.
+    t.mid_source = 'in-process sample is not a trustworthy mid-flight observer (spawnSync blocks, so it usually returns the end state); see poller';
   }
 
   out.poller = {
@@ -371,8 +383,11 @@ if (process.argv[2] === '--poll') {
     ])),
     a_observed_at_every_gap: ok.length > 0 && out.poller.usable
       && ok.every((t) => (t.poller || {}).a_layout_observed_count > 0),
-    // Evidence for the retraction above, kept as a verdict key so the artifact carries
-    // the reason its own `a_landed` fields are null rather than merely omitting them.
+    // Evidence for the retraction above, kept as a verdict key so the artifact records
+    // whether the in-process sample was ever usable rather than quietly omitting it.
+    // It is also what corrects an overstatement in this file's own comment history: the
+    // sample was described as never mid-flight on the strength of one run, and this key
+    // is true on some runs. Unreliable is not the same as impossible.
     in_process_sample_ever_midflight: ok.some((t) => t.sample_was_midflight),
   };
 

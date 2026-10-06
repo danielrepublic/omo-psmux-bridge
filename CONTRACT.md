@@ -1897,6 +1897,13 @@ claim that survives is the weaker and correct one: the in-process sample is not 
 trustworthy mid-flight observer, which is why the poller exists. `mid` is `null` in every
 trial and `mid_source` says why.
 
+The per-trial `a_landed` / `a_landed_on` fields are **removed, not nulled**. They were
+first written gated to `null` whenever the sample was unusable, and the gate fired often
+enough that a field that is usually null and named like a finding is a trap for whoever
+reads the artifact next. `sample_was_midflight` is the only thing the in-process sample
+contributes, and the poller is the only source for whether A's layout landed. Artifacts
+from runs before this change carry the old fields; they are not comparable on that key.
+
 **The rule, learned twice.** A probe that concludes "nothing happened" from an
 unchanged end state must be able to prove the operation *could* have changed that
 state — and the baseline must be a state the operation cannot reproduce. Twice here,
