@@ -1371,10 +1371,21 @@ the two workarounds retire independently. A release that ships `c20016c` but not
 
 ---
 
-## 9. OPEN QUESTION: does `select-layout` work with no `-t`?
+## 9. `select-layout` with no `-t`: MEASURED, and Option A is correct
 
-**This is open. It is not decided here, and nothing downstream may treat either
-option as chosen.**
+**Status as of 2026-10-07: settled by measurement.** Option A holds — an
+untargeted `select-layout <name>` **does** apply, and it applies to **the window
+that client most recently made current**. The evidence is
+`.omo/evidence/ci-layout-which-window.json`, produced by an automated
+`windows-latest` run of `layout-which-window.cjs`; its provenance is recorded in
+`.omo/evidence/README-parity-ci.md`. Section 9.3 reads the run out in full. What
+follows is the reasoning that led there, kept because 9.3's conclusion is only
+legible against it, and because one claim in it has since been **refuted by the
+run** and is corrected in place.
+
+Nothing downstream may inject a `-t` onto `select-layout`. That was already
+settled on source (9.1) and the measurement confirms it: an injected `-t` is
+stripped before dispatch, so it cannot retarget anything.
 
 OmO applies the layout with no target at all:
 
@@ -1458,13 +1469,46 @@ this revision neither has settled anything:
 
 What to read out of them, per the preamble: the exit code, the stderr, and
 `list-panes -a -F '#{pane_left},#{pane_width}'` on both sides of the call. Exit 0
-alone settles nothing, because psmux cannot fail this command — an unrecognised
-layout name lands in the catch-all arm and quietly falls back to
-`even-horizontal`:
+alone settles nothing, because psmux cannot fail this command.
+
+**Corrected 2026-10-07 — this paragraph previously went further and was wrong.**
+It claimed that an unrecognised layout name "lands in the catch-all arm and
+quietly falls back to `even-horizontal`", citing:
 
 - `src/layout.rs:1173` → `_ => {`
 - `src/layout.rs:1174` → `// Unknown layout name — try to parse as tmux layout string`
 - `src/layout.rs:1180` → `let sizes = equal_sizes(pane_count);`
+
+The cited lines are real and still say what they say. The **conclusion drawn from
+them is not what psmux does.** Measured on a `windows-latest` runner against
+v3.3.8, `select-layout no-such-layout-anywhere` returned exit 0 with empty stderr
+and left **both windows byte-identical**:
+
+```
+before: 0|7f70,120x30,0,0{71x30,0,0,1,48x30,72,0,2}|2p   1|7899,...
+after : 0|7f70,120x30,0,0{71x30,0,0,1,48x30,72,0,2}|2p   1|7899,...
+```
+
+(`ci-layout-which-window.json`, `invalid_layout_name`.) An unknown name is a
+**silent no-op**. It does not re-lay-out at all, so it does not fall back to
+`even-horizontal` and it does not fall back to `equal_sizes` either — had the
+catch-all fired, the 71/48 split would have become an even 59/60.
+
+This makes the surrounding advice sharper rather than obsolete, and it is worth
+being precise about why: an unknown name now differs from a **known** name in
+something observable — geometry moves or it does not — where before this
+document's account said the two were indistinguishable at the geometry level. So
+"exit 0 settles nothing" remains true, but "before and after are identical too"
+no longer implies the name was unknown. The geometry comparison is the only
+discriminator, which is why 9.3 reads the artifact for `before`/`after` and not
+for exit codes.
+
+INFERRED, and not measured: the catch-all arm is probably not reached at all —
+`src/layout.rs:1174` parses the name as a tmux layout string, and
+`no-such-layout-anywhere` is not a valid layout string, so some later branch
+declines to touch the tree. Which branch does that is a question about psmux's
+source that this document does not answer, and it is left open rather than
+guessed.
 
 **Contributing evidence, not a decision:** the bridge's parity posture argues
 that untested rewriting is the more dangerous choice, since a wrong `-t` would
@@ -1483,8 +1527,9 @@ lives in the gitignored `.omo/` scratch tree and is therefore not part of this
 repository's evidence: it reports the untargeted call exiting 0, silent, and
 re-laying-out the active window in a single-window namespace. That is consistent
 with section 9.1 and settles nothing beyond the single-window case, which is
-precisely what the second probe exists to widen. Until a run's output is
-committed here, both options stay open.
+precisely what the second probe exists to widen. That capture has now been
+superseded by a committed measurement — see 9.3 — and unlike it, the measurement
+is in a two-window namespace.
 
 **Contributing evidence, not a decision.** The team-mode after-run applies a
 TARGETED `select-layout` and the geometry moves: `select-layout -t probe:0
@@ -1501,9 +1546,66 @@ with the focus request itself dispatched at:
 
 INFERRED: the targeted form therefore has both a mechanism (temporary focus
 resolves the window before the command runs) and a measured application, which
-is more than the untargeted form has. This does NOT close the no-`-t`
-question: Option A and Option B above remain open for the untargeted form,
-and nothing here decides which window an untargeted `select-layout` acts on.
+is more than the untargeted form had at the time this was written. 9.3 now
+supplies the untargeted form's measurement, and it is the two-window case this
+argument said was missing.
+
+### 9.3 The measurement
+
+Source: `.omo/evidence/ci-layout-which-window.json`, produced by an automated
+`windows-latest` run of `layout-which-window.cjs` against psmux `v3.3.8`
+(`66cf6135`). Run id, commit under test, runner image and Bun version are in
+`.omo/evidence/README-parity-ci.md`. Both windows carried two panes and
+**different** layouts before any call, so a change on either is attributable:
+
+```
+window 0: 7f70  {71x30,0,0,1,48x30,72,0,2}   main on the left, 71/48
+window 1: 7899  {59x30,0,0,3,60x30,60,0,4}   even, 59/60
+```
+
+| trial | window made current | applied, no `-t` | window 0 | window 1 |
+|---|---|---|---|---|
+| 0 | `lay2:0` | `even-horizontal` | `7f70` → **`7890`** (71/48 → 59/60) | `7899` unchanged |
+| 1 | `lay2:1` | `main-vertical` | `7f70` unchanged | `7899` → **`7f79`** (59/60 → 71/48) |
+
+Both calls: exit 0, stderr empty. Each changed **only** the window that trial had
+made current, and neither touched the other.
+
+**What this settles.** The untargeted call is not a silent no-op. It applies, and
+it applies to the client's current window — `select-window` moves the target that
+the next untargeted `select-layout` lands on. Option A is therefore correct:
+pass OmO's `select-layout <layout>` through unchanged. That is what the bridge
+does today, so **no code change follows from this measurement**; what changes is
+that the rule stops being an assumption.
+
+**What it does not settle, stated so it is not over-read.**
+
+- One client, sequential trials. Two clients attached at once is a different
+  question and this run says nothing about it. INFERRED and explicitly untested:
+  each client probably carries its own current-window pointer, in which case two
+  agents laying out concurrently would each hit their own window — but psmux's
+  `active_idx` is server state (`src/layout.rs:1070`), so this cannot be asserted
+  from what was measured.
+- Rule 1b's and rule 1e's injected `select-layout main-vertical` inherits this
+  behaviour, including its risk: if the current window is not the window OmO
+  meant, the layout lands on the wrong one and reports success. The measurement
+  shows the mechanism exists; it does not show the bridge's injections always
+  have the intended window current. That remains the open part of this section,
+  narrowed from "does it work at all" to "is the current window the right one".
+- Nothing here bears on rules 1a/1b's `main-pane-width` geometry, which is still
+  unmeasured. This run applied named layouts to existing pane sets; it never set
+  `main-pane-width`.
+
+**A defect in the probe that was supposed to answer this.** The companion
+artifact `ci-layout-probe.json` also carries a `which_window` control, and it is
+**inconclusive by construction**: `layout-probe.cjs:94` applies
+`even-horizontal` to each window in turn, but by that point window 0 is already
+`f890`, which *is* the even split (59/60). Re-applying the layout already in
+effect is correctly a no-op, so its "unchanged" rows say nothing about which
+window is current. `layout-which-window.cjs` avoids this by starting the windows
+in *different* layouts and varying the requested name so a change is possible.
+Recorded rather than quietly dropped, because the two artifacts disagree on their
+face and a reader deserves to know which one to believe.
 
 ---
 
@@ -1637,7 +1739,7 @@ the plan's todo 3 and todo 4 reference blocks, which are correct for 5.1.18.
 
 | # | Question | Settled by |
 |---|---|---|
-| Q-CONTRACT-1 | Does `select-layout <layout>` with no `-t` work against psmux 3.3.8, and which window does it act on? Section 9 states both options and stays open. | todo 5 sub-probe (f), todo 19, and the two probes named in section 9.2, whose output must be committed here to count |
+| Q-CONTRACT-1 | Does `select-layout <layout>` with no `-t` work against psmux 3.3.8, and which window does it act on? | **SETTLED 2026-10-07.** Measured on a `windows-latest` runner: it applies, and applies to the client's current window. Option A confirmed, no code change required. Section 9.3, evidence `ci-layout-which-window.json`. Residual, not closed: whether the current window is always the one OmO meant, and the two-concurrent-clients case. |
 | Q-CONTRACT-2 | What is psmux 3.3.8's exact stderr text and exit code for `kill-pane` against a dead pane? Section 3.8 makes `/can't find pane/i` load-bearing. | todo 5 sub-probe (i) |
 | Q-CONTRACT-3 | Does psmux 3.3.8 deliver `-e` to a `respawn-pane` pane when the bridge supplies it by its own route? Section 7.2 is source-read only. | todo 5 sub-probe (h) |
 | Q-CONTRACT-4 | Which release will first contain `c20016c` and `4addc0a`? Section 8.2 is seeded `null` deliberately. | upgrade check, section 8.1 rule |

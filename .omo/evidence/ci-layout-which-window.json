@@ -1,0 +1,49 @@
+{
+  "namespace": "omo_t19b",
+  "session": "lay2",
+  "baseline": "0|7f70,120x30,0,0{71x30,0,0,1,48x30,72,0,2}|2p\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}|2p",
+  "trials": [
+    {
+      "made_current": "lay2:0",
+      "applied_untargeted": "even-horizontal",
+      "exit": 0,
+      "stderr": "",
+      "before": "0|7f70,120x30,0,0{71x30,0,0,1,48x30,72,0,2}|2p\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}|2p",
+      "after": "0|7890,120x30,0,0{59x30,0,0,1,60x30,60,0,2}|2p\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}|2p",
+      "changed_windows": [
+        {
+          "window": 0,
+          "before": "0|7f70,120x30,0,0{71x30,0,0,1,48x30,72,0,2}|2p",
+          "after": "0|7890,120x30,0,0{59x30,0,0,1,60x30,60,0,2}|2p"
+        }
+      ]
+    },
+    {
+      "made_current": "lay2:1",
+      "applied_untargeted": "main-vertical",
+      "exit": 0,
+      "stderr": "",
+      "before": "0|7f70,120x30,0,0{71x30,0,0,1,48x30,72,0,2}|2p\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}|2p",
+      "after": "0|7f70,120x30,0,0{71x30,0,0,1,48x30,72,0,2}|2p\n1|7f79,120x30,0,0{71x30,0,0,3,48x30,72,0,4}|2p",
+      "changed_windows": [
+        {
+          "window": 1,
+          "before": "1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}|2p",
+          "after": "1|7f79,120x30,0,0{71x30,0,0,3,48x30,72,0,4}|2p"
+        }
+      ]
+    }
+  ],
+  "invalid_layout_name": {
+    "invocation": [
+      "select-layout",
+      "no-such-layout-anywhere"
+    ],
+    "exit": 0,
+    "stderr": "",
+    "before": "0|7f70,120x30,0,0{71x30,0,0,1,48x30,72,0,2}|2p\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}|2p",
+    "after": "0|7f70,120x30,0,0{71x30,0,0,1,48x30,72,0,2}|2p\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}|2p",
+    "note": "a name psmux does not know, applied untargeted"
+  },
+  "after_teardown": ""
+}

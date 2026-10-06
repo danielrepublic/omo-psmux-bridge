@@ -1,0 +1,106 @@
+{
+  "namespace": "omo_t19",
+  "session": "lay",
+  "probes": [
+    {
+      "invocation": [
+        "select-layout",
+        "main-vertical"
+      ],
+      "targeted": false,
+      "exit": 0,
+      "stderr": "",
+      "windows_before": "0|120x30|f890,120x30,0,0{59x30,0,0,1,60x30,60,0,3}|2p\n1|120x30|a8ff,120x30,0,0,2|1p",
+      "windows_after": "0|120x30|ff70,120x30,0,0{71x30,0,0,1,48x30,72,0,3}|2p\n1|120x30|a8ff,120x30,0,0,2|1p",
+      "panes_after": "0.0|%1|71x30|0,0\n0.1|%3|48x30|72,0\n1.0|%2|120x30|0,0"
+    },
+    {
+      "invocation": [
+        "select-layout",
+        "tiled"
+      ],
+      "targeted": false,
+      "exit": 0,
+      "stderr": "",
+      "windows_before": "0|120x30|ff70,120x30,0,0{71x30,0,0,1,48x30,72,0,3}|2p\n1|120x30|a8ff,120x30,0,0,2|1p",
+      "windows_after": "0|120x30|f890,120x30,0,0{59x30,0,0,1,60x30,60,0,3}|2p\n1|120x30|a8ff,120x30,0,0,2|1p",
+      "panes_after": "0.0|%1|59x30|0,0\n0.1|%3|60x30|60,0\n1.0|%2|120x30|0,0"
+    },
+    {
+      "invocation": [
+        "select-layout",
+        "even-horizontal"
+      ],
+      "targeted": false,
+      "exit": 0,
+      "stderr": "",
+      "windows_before": "0|120x30|f890,120x30,0,0{59x30,0,0,1,60x30,60,0,3}|2p\n1|120x30|a8ff,120x30,0,0,2|1p",
+      "windows_after": "0|120x30|f890,120x30,0,0{59x30,0,0,1,60x30,60,0,3}|2p\n1|120x30|a8ff,120x30,0,0,2|1p",
+      "panes_after": "0.0|%1|59x30|0,0\n0.1|%3|60x30|60,0\n1.0|%2|120x30|0,0"
+    },
+    {
+      "invocation": [
+        "select-layout",
+        "this-layout-does-not-exist"
+      ],
+      "targeted": false,
+      "exit": 0,
+      "stderr": "",
+      "windows_before": "0|120x30|f890,120x30,0,0{59x30,0,0,1,60x30,60,0,3}|2p\n1|120x30|a8ff,120x30,0,0,2|1p",
+      "windows_after": "0|120x30|f890,120x30,0,0{59x30,0,0,1,60x30,60,0,3}|2p\n1|120x30|a8ff,120x30,0,0,2|1p",
+      "panes_after": "0.0|%1|59x30|0,0\n0.1|%3|60x30|60,0\n1.0|%2|120x30|0,0"
+    }
+  ],
+  "before": {
+    "tag": "after this-layout-does-not-exist",
+    "sessions": "lay: 2 windows (created Tue Oct  6 19:14:34 2026)",
+    "windows": "0|120x30|f890,120x30,0,0{59x30,0,0,1,60x30,60,0,3}|2p\n1|120x30|a8ff,120x30,0,0,2|1p",
+    "panes": "0.0|%1|59x30|0,0\n0.1|%3|60x30|60,0\n1.0|%2|120x30|0,0"
+  },
+  "targeted_control": {
+    "invocation": [
+      "select-layout",
+      "-t",
+      "lay:1",
+      "main-horizontal"
+    ],
+    "exit": 0,
+    "stderr": "",
+    "windows_after": "0|f890,120x30,0,0{59x30,0,0,1,60x30,60,0,3}\n1|a8ff,120x30,0,0,2"
+  },
+  "which_window": [
+    {
+      "made_current": "lay:0",
+      "before": "0|f890,120x30,0,0{59x30,0,0,1,60x30,60,0,3}\n1|a8ff,120x30,0,0,2",
+      "untargeted_exit": 0,
+      "after": "0|f890,120x30,0,0{59x30,0,0,1,60x30,60,0,3}\n1|a8ff,120x30,0,0,2"
+    },
+    {
+      "made_current": "lay:1",
+      "before": "0|f890,120x30,0,0{59x30,0,0,1,60x30,60,0,3}\n1|a8ff,120x30,0,0,2",
+      "untargeted_exit": 0,
+      "after": "0|f890,120x30,0,0{59x30,0,0,1,60x30,60,0,3}\n1|a8ff,120x30,0,0,2"
+    }
+  ],
+  "negative_reference_no_such_session": {
+    "invocation": [
+      "select-layout",
+      "-t",
+      "omo_no_such_session_zzz",
+      "main-vertical"
+    ],
+    "exit": 1,
+    "stderr": "psmux: no server running on session 'omo_t19__omo_no_such_session_zzz'"
+  },
+  "through_shim": {
+    "invocation": [
+      "select-layout",
+      "main-vertical"
+    ],
+    "exit": 0,
+    "stderr": ""
+  },
+  "after_teardown": {
+    "sessions": ""
+  }
+}
