@@ -37,6 +37,53 @@
 // Retiring the sweep rather than fixing it in place: a correct version needs a
 // session state where a layout reliably applies first, and establishing that is
 // the open question in 9.4, not a prerequisite this probe can assume away.
+//
+// REOPENED 2026-10-07, commit 83c3420. The paragraph above is now false. Section
+// 9.4's open question was answered: the current-window pointer DOES survive the
+// connection (R1 set w0 from an earlier process and the untargeted layout landed
+// on w0; R2 set w1 and it landed on w1). So there is no missing session state and
+// nothing to establish first.
+//
+// That leaves the likelier cause, which is embarrassingly local: the layout names.
+// psmux v3.3.8 has a small layout set, and `select-layout` on a name it does not
+// know exits 0 and does nothing. A and B are not psmux names — `tiled` is tmux's,
+// not psmux's. If BOTH are invalid then every trial applies nothing at every gap
+// and returns NONE, which is precisely what was observed, and no amount of session
+// state would change it.
+//
+// HYPOTHESIS FALSIFIED 2026-10-07. Both names are valid psmux layouts:
+// `tests-rs/test_layout.rs:159` lists them — "even-horizontal", "even-vertical",
+// "main-horizontal", "main-vertical", "tiled" — and `test_commands_audit.rs:710`
+// asserts `select-layout tiled` applies. So the silence is not a bad name, and the
+// cause is still unknown. The control below is now the instrument for finding it:
+// it separates "the name is refused" from "the name is accepted but this state
+// refuses to apply it", which are indistinguishable from NONE alone.
+//
+// So the generalisable shape of the fix, which survives the falsification: for an
+// untargeted command, prove the invocation is capable of doing something before
+// concluding that it did nothing.
+async function control() {
+  const named = {};
+  for (const name of [A, B]) {
+    p(['select-layout', '-t', S + ':1', 'even-horizontal']);
+    sleep(700);
+    const before = layouts();
+    p(['select-layout', '-t', S + ':1', name]);
+    sleep(700);
+    named[name] = before !== layouts();
+  }
+
+  p(['select-layout', '-t', S + ':1', 'even-horizontal']);
+  sleep(700);
+  const before = layouts();
+  await spawnP(['select-window', '-t', S + ':1']);
+  await spawnP(['select-layout', A]);
+  sleep(1000);
+  return {
+    layout_names_accepted: named,
+    untargeted_applies_with_pointer_on_w1: before !== layouts(),
+  };
+}
 
 const { spawn, spawnSync } = require('child_process');
 const path = require('path');
@@ -118,12 +165,26 @@ async function trial(gapMs) {
   const GAPS = [0, 50, 150, 400, 1000, 2500];
   const out = { namespace: NS, session: S, layouts: { A, B }, trials: [] };
 
+  // The control runs first, in the same session state the sweep will use. If an
+  // untargeted layout cannot apply here, NONE is uninterpretable and the sweep is
+  // void regardless of what the trials say.
+  out.control = await control();
+  out.verdict_void_reason = null;
+  if (!Object.values(out.control.layout_names_accepted).every(Boolean)) {
+    out.verdict_void_reason = 'a layout name in the sweep is not accepted by psmux';
+  } else if (!out.control.untargeted_applies_with_pointer_on_w1) {
+    out.verdict_void_reason =
+      'an untargeted layout did not apply even in the control trial, so NONE cannot be ' +
+      'read as "no interference" — it is indistinguishable from "nothing applied"';
+  }
+
   for (const gap of GAPS) {
     out.trials.push(await trial(gap));
   }
 
   const ok = out.trials.filter((t) => t.invocations_ok);
   out.verdict = {
+    control_passed: out.verdict_void_reason === null,
     invocations_all_succeeded: ok.length === out.trials.length,
     outcomes_by_gap: Object.fromEntries(out.trials.map((t) => [t.gap_ms, t.outcome])),
     // The tolerance, stated as the smallest gap at which no trial was disturbed.
