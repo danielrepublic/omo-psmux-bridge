@@ -1,0 +1,100 @@
+{
+  "namespace": "omo_t24",
+  "session": "gap",
+  "layouts": {
+    "A": "main-vertical",
+    "B": "even-vertical"
+  },
+  "trials": [
+    {
+      "gap_ms": 0,
+      "outcome": "CHANGED_ONE",
+      "changed_windows": [
+        1
+      ],
+      "invocations_ok": true,
+      "before": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}",
+      "after": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]\n1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]"
+    },
+    {
+      "gap_ms": 50,
+      "outcome": "CHANGED_ONE",
+      "changed_windows": [
+        1
+      ],
+      "invocations_ok": true,
+      "before": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}",
+      "after": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]\n1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]"
+    },
+    {
+      "gap_ms": 150,
+      "outcome": "CHANGED_ONE",
+      "changed_windows": [
+        1
+      ],
+      "invocations_ok": true,
+      "before": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}",
+      "after": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]\n1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]"
+    },
+    {
+      "gap_ms": 400,
+      "outcome": "CHANGED_ONE",
+      "changed_windows": [
+        1
+      ],
+      "invocations_ok": true,
+      "before": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}",
+      "after": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]\n1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]"
+    },
+    {
+      "gap_ms": 1000,
+      "outcome": "CHANGED_ONE",
+      "changed_windows": [
+        1
+      ],
+      "invocations_ok": true,
+      "before": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}",
+      "after": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]\n1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]"
+    },
+    {
+      "gap_ms": 2500,
+      "outcome": "CHANGED_ONE",
+      "changed_windows": [
+        1
+      ],
+      "invocations_ok": true,
+      "before": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}",
+      "after": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]\n1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]"
+    }
+  ],
+  "control": {
+    "layout_names_accepted": {
+      "main-vertical": {
+        "baseline": "even-horizontal",
+        "applied": true
+      },
+      "even-vertical": {
+        "baseline": "main-vertical",
+        "applied": true
+      }
+    },
+    "untargeted_applies_with_pointer_on_w1": true
+  },
+  "verdict_void_reason": null,
+  "verdict": {
+    "control_passed": true,
+    "invocations_all_succeeded": true,
+    "outcomes_by_gap": {
+      "0": "CHANGED_ONE",
+      "50": "CHANGED_ONE",
+      "150": "CHANGED_ONE",
+      "400": "CHANGED_ONE",
+      "1000": "CHANGED_ONE",
+      "2500": "CHANGED_ONE"
+    },
+    "smallest_undisturbed_gap_ms": 0,
+    "clean_outcomes": 6,
+    "disturbed_outcomes": 0
+  },
+  "after_teardown": ""
+}

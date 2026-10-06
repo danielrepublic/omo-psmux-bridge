@@ -1798,39 +1798,72 @@ one it does not emit:
 does not disarm the remedy, and the risk this section raised does not apply to the
 sequence the bridge emits.
 
-**What is still not explained, and is not papered over.** R1/R2 and step E disagree
-about what happens after an exited `select-window`: in R1/R2 an untargeted layout
-changed nothing, in E one applied and moved the geometry. The difference between
-the two probes is that E sets a sizing option immediately beforehand. A plausible
-reading is that `apply_layout` did run in R1/R2 but had nothing to change, which
-would make them consistent — but that is a guess about psmux's internals, it is not
-measured, and this document does not record guesses as findings. So the narrow
-question 9.4 was left with is now answered in the direction that matters (the
-bridge's own sequence works) while the general question (when is a bare untargeted
-layout inert, and why) stays open.
+**Superseded — this "disagreement" was between a void reading and a real one.** This
+paragraph originally reported that R1/R2 and step E disagreed about what happens after
+an exited `select-window`, and left the general question open.
 
-**A sweep that tried to measure the tolerance, and could not.**
-`collision-tolerance.cjs` varies the delay between two clients' untargeted
-layouts — 0, 50, 150, 400, 1000, 2500 ms — to find how close they must be before
-they interfere. It reports "nothing changed" at **every** gap, up to two and a half
-seconds. That is not a tolerance of zero and it is not a tolerance at all. Both
-layouts in that sweep differ from the reset layouts, so at least one should have
-landed; none did, because the sweep reproduces the R1/R2 behaviour above rather
-than measuring interference between two layouts. The gap is irrelevant when neither
-layout applies.
+There was no disagreement. **R1 and R2 never issued the layout call at all** — see the
+retraction above — so they were not evidence of inertness, and the tension was an
+artifact of a probe that skipped a step. With the corrected readings, R1 and R2 both
+applied their layout and landed on the window their earlier process had selected, and
+the tolerance sweep below finds layouts applying at every gap from 0 ms upward. So the
+question this left open — *when is a bare untargeted layout inert, and why* — is
+**answered: it is not inert after an exited `select-window`**, and the apparent
+inertness was a baseline collision in the measurement, twice over.
 
-**The guard could not see it, and that is the sharper finding.** The probe checks
-`invocations_all_succeeded`, which is an exit-code check — and psmux cannot fail an
-untargeted `select-layout`: it exits 0 whether it applied the layout or ignored it
-entirely. That is this section's first measurement. So the guard is blind to
-exactly the failure it was added for, and the three guards added earlier this week
-did not prevent it because all of them watched the same signal.
+The bridge's own sequence therefore rests on firmer ground than this section claimed:
+its untargeted follow-up applies, and it applies to the window the caller's earlier
+command selected.
 
-The lesson generalises past this probe: **"nothing changed" must never be
-reportable without a same-trial demonstration that something could have changed.**
-Any probe measuring an untargeted psmux call needs a control invocation in the
-same session state, and voids its own trial when the control fails. Every probe
-written after this one should carry one.
+**The tolerance sweep, after two wrong turns of its own.** `collision-tolerance.cjs`
+varies the delay between two clients' untargeted layouts — 0, 50, 150, 400, 1000,
+2500 ms — to find how close they must be before they interfere. It ran for a while
+reporting "nothing changed" at every gap. **That result was the probe's fault, twice
+over, and both times the same fault: a baseline the operation could reproduce.**
+
+First the control checked `tiled` from an `even-horizontal` baseline, but `tiled` on a
+two-pane window *is* a balanced split, so a perfectly successful apply scored as
+"not applied" — contradicting `test_layout.rs:159`, which lists `tiled` as accepted.
+Then, once the control passed, the trial still reset w1 to `even-horizontal` and
+ended with `tiled`, so
+
+```
+even-horizontal --A(main-vertical)--> main-vertical --B(tiled)--> even-horizontal
+```
+
+returned the window to exactly its starting state. A sweep in which **both layouts
+applied perfectly** was scored `NONE` at every gap.
+
+With the baselines fixed and the control passing, the sweep reports:
+
+| gap (ms) | 0 | 50 | 150 | 400 | 1000 | 2500 |
+|---|---|---|---|---|---|---|
+| outcome | `CHANGED_ONE` (w1) | `CHANGED_ONE` | `CHANGED_ONE` | `CHANGED_ONE` | `CHANGED_ONE` | `CHANGED_ONE` |
+
+**No disturbed outcome at any separation up to 2500 ms** — neither the `NONE` nor the
+`BOTH_ON_ONE` that 9.5 calls a collision. Read narrowly, that is a result: no
+separation in this range produced a collision.
+
+**And the big one: the sweep is what refuted 9.4's own claim.** It was built on the
+theory that an untargeted layout goes inert once a process has issued `select-window`
+and exited, which is why `NONE` was expected at every gap. That expectation was
+built on a baseline collision. Once the baseline stopped being reproducible, layouts
+applied at every gap including zero. There was no inertness to find.
+
+**What this sweep still cannot tell you.** It samples only before and after, so it
+cannot distinguish "A applied, then B applied" from "only B applied" — A's effect is
+overwritten either way, and both produce `CHANGED_ONE` on w1. So it shows the
+outcome is *deterministic and clean*, not that both clients' calls did their job. A
+mid-flight sample between the two calls would settle it, and is the obvious next
+probe.
+
+**The rule, learned twice.** A probe that concludes "nothing happened" from an
+unchanged end state must be able to prove the operation *could* have changed that
+state — and the baseline must be a state the operation cannot reproduce. Twice here,
+a successful apply was invisible because the baseline was a state the apply could
+land on. This is the same failure as the R1/R2 omission above, and the same one the
+§9.3 unknown-layout guard ran into: psmux exits 0 whether it acted or not, so no
+exit-code guard can substitute for demonstrating that something was possible.
 
 **Scope.** One session, one window each of two, sequential, v3.3.8, one client at
 a time. Not covered: more than two windows, or any layout other than

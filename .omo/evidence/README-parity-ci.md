@@ -20,7 +20,7 @@ other claim of theirs is checkable; this file is what makes them checkable.
 
 | File | Bytes | Produced by |
 |---|---|---|
-| `ci-collision-tolerance-VOID.json` | 2455 | `scripts/windows/parity/collision-tolerance.cjs`, namespace `omo_t24`, session `gap`. **VOID — do not read as a result.** Reports "nothing changed" at every gap up to 2500 ms because neither layout applies, not because interference is absent. |
+| `ci-collision-tolerance.json` | 3038 | `scripts/windows/parity/collision-tolerance.cjs`, namespace `omo_t24`, session `gap`. Carries a **control** that proves each layout applies and that an untargeted layout applies before any trial is trusted. `CHANGED_ONE` on w1 at every gap 0-2500 ms: no disturbed outcome in that range. Cannot distinguish "both applied" from "only the last applied" — no mid-flight sample. |
 | `ci-resize-pane-cells-probe.json` | 1268 | `scripts/windows/parity/resize-pane-cells-probe.cjs`, namespace `omo_t23`, session `rc`. Run 37523398790, commit `2e9885e`. Measures CONTRACT.md rule 1c: a bare `-x 99` lands as ~98% of the window, not 99 columns, and the bridge suppresses it. |
 | `ci-concurrent-clients.json` | 3057 | `scripts/windows/parity/concurrent-clients.cjs`, namespace `omo_t22`, session `race`. Run [37521411814](https://github.com/danielrepublic/omo-psmux-bridge/actions/runs/37521411814), commit `4536eb2`. Settles CONTRACT.md section 9.5. |
 | `ci-current-window-survival.json` | 3443 | `scripts/windows/parity/current-window-survival.cjs`, namespace `omo_t21`, session `cur`. Run [37520072031](https://github.com/danielrepublic/omo-psmux-bridge/actions/runs/37520072031), latest run 37524781796, commit `19984d0`. Settles CONTRACT.md section 9.4 — and REFUTES the claim 9.4 originally made: the current-window pointer does survive the connection. |
@@ -87,9 +87,14 @@ read as proof of rule 1a when it was psmux's 60% default.
 It says nothing about a session with several windows, and nothing about two
 clients at once.
 
-## VOID artifacts
+## The VOID artifact that is no longer void
 
-`ci-collision-tolerance-VOID.json` is a failed experiment kept on purpose. It is named VOID in its filename, in the workflow step, and in its own header, because an empty result from a probe that cannot detect its own failure is indistinguishable from a finding. CONTRACT.md section 9.5 records why, and what a working version would need.
+`ci-collision-tolerance.json` was published for several runs as
+`ci-collision-tolerance-VOID.json`, reporting "nothing changed" at every gap. That was
+the probe's fault, not psmux's: it reset the window to `even-horizontal` and ended with
+`tiled`, which on a two-pane window is the same split, so a sweep in which both layouts
+applied perfectly scored as silence. Its control had the identical fault one step
+earlier. CONTRACT.md section 9.4 records both.
 
 ## Reading these artifacts safely
 
