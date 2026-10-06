@@ -389,6 +389,8 @@ describe("the layout rules reach the backend as a corrected command plus a follo
     expect(record?.kind).toBe("suppressed");
     expect(record?.outcome).toBe("suppressed");
     expect(record?.exitCode).toBe(0);
+    // The machine-readable reason distinguishes rule 1c's drop from rule 1d's.
+    expect(record?.suppressionReason).toBe("resize-cell-count-is-not-a-percentage");
     // The dropped command is still on the record, which is what makes the
     // suppression auditable instead of invisible.
     expect(record?.argv).toEqual(["resize-pane", "-t", "%1", "-x", "99"]);
@@ -401,6 +403,8 @@ describe("the layout rules reach the backend as a corrected command plus a follo
     const record = callRecords()[0];
     expect(record?.kind).toBe("passthrough");
     expect(record?.outcome).toBe("forwarded");
+    // A forwarded command is not suppressed, so the reason is explicitly null.
+    expect(record?.suppressionReason).toBeNull();
     expect(record?.argv).toEqual(["set-window-option", "main-pane-width", "50"]);
     expect(record?.followUps).toEqual([
       {
@@ -488,6 +492,83 @@ describe("the layout rules reach the backend as a corrected command plus a follo
 });
 
 // ---------------------------------------------------------------------------
+// 2a. The team-mode rules, end to end (issue #1)
+// ---------------------------------------------------------------------------
+//
+// D1 must reach the backend ZERO times and exit 0; D2 must reach it as the
+// sizing option plus the re-applied layout. Both are driven through the same
+// real `psmux.exe` stand-in as section 2, so "zero backend calls" is a fact
+// about a real child rather than about a stub.
+
+describe("the team-mode rules reach the backend as a suppression and a rewrite", () => {
+  test("D1: a pane-scoped `@omo_attach_*` option runs NO backend, exits 0, and logs the reason", async () => {
+    const exitCode = await main(
+      ["set-option", "-p", "-t", "%5", "@omo_attach_server_url", "http://127.0.0.1:7805"],
+      deps(),
+    );
+
+    expect(exitCode).toBe(0);
+    expect(box.calls()).toHaveLength(0);
+
+    const record = callRecords()[0];
+    expect(record?.kind).toBe("suppressed");
+    expect(record?.outcome).toBe("suppressed");
+    expect(record?.suppressionReason).toBe("psmux-refuses-pane-scoped-options");
+    expect(record?.argv).toEqual([
+      "set-option",
+      "-p",
+      "-t",
+      "%5",
+      "@omo_attach_server_url",
+      "http://127.0.0.1:7805",
+    ]);
+    expect(record?.followUps).toEqual([]);
+  });
+
+  test("D1: the session-id form is suppressed the same way", async () => {
+    const exitCode = await main(
+      ["set-option", "-p", "-t", "%5", "@omo_attach_session_id", "ses_abc"],
+      deps(),
+    );
+
+    expect(exitCode).toBe(0);
+    expect(box.calls()).toHaveLength(0);
+    expect(callRecords()[0]?.suppressionReason).toBe("psmux-refuses-pane-scoped-options");
+  });
+
+  test("D2: the team resize runs `set-option main-pane-width 30` then `select-layout main-vertical`", async () => {
+    const exitCode = await main(["resize-pane", "-t", "%5", "-x", "30%"], deps());
+
+    expect(exitCode).toBe(0);
+    expect(box.calls().map((c) => c.argv)).toEqual([
+      ["set-option", "main-pane-width", "30"],
+      ["select-layout", "main-vertical"],
+    ]);
+
+    const record = callRecords()[0];
+    expect(record?.kind).toBe("passthrough");
+    expect(record?.outcome).toBe("forwarded");
+    expect(record?.suppressionReason).toBeNull();
+    expect(record?.argv).toEqual(["set-option", "main-pane-width", "30"]);
+    expect(record?.followUps).toEqual([
+      {
+        reason: "psmux-reads-main-pane-size-only-inside-apply-layout",
+        argv: ["select-layout", "main-vertical"],
+      },
+    ]);
+  });
+
+  test("D2: leading globals reach both the sizing command and its follow-up", async () => {
+    await main(["-L", "ns", "resize-pane", "-t", "%5", "-x", "30%"], deps());
+
+    expect(box.calls().map((c) => c.argv)).toEqual([
+      ["-L", "ns", "set-option", "main-pane-width", "30"],
+      ["-L", "ns", "select-layout", "main-vertical"],
+    ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // 2b. The record schema, pinned
 // ---------------------------------------------------------------------------
 //
@@ -499,10 +580,12 @@ describe("the layout rules reach the backend as a corrected command plus a follo
 // silently either.
 
 describe("the record schema", () => {
-  test("recordVersion is 2, because `followUps` and `outcome: \"suppressed\"` are both new", () => {
+  test("recordVersion is 3, because `suppressionReason` is a new required key", () => {
     // Changing this value is a breaking change to every consumer of both logs and
-    // must be made loudly, not folded into a feature commit.
-    expect(CLI_CONTRACT.recordVersion).toBe(2);
+    // must be made loudly, not folded into a feature commit. 1 -> 2 was
+    // `followUps` + `outcome: "suppressed"`; 2 -> 3 is the required
+    // `suppressionReason` key, which a strict v2 validator rejects.
+    expect(CLI_CONTRACT.recordVersion).toBe(3);
   });
 
   test("buildCallRecord emits exactly the documented key set, and no more", async () => {
@@ -534,7 +617,9 @@ describe("the record schema", () => {
       "outcome",
       "pid",
       "resolution",
+      "rewriteReason",
       "rewritten",
+      "suppressionReason",
       "v",
       "verb",
     ]);
@@ -575,8 +660,38 @@ describe("the record schema", () => {
     expect(record?.v).toBe(CLI_CONTRACT.recordVersion);
     expect(record?.outcome).toBe("suppressed");
     expect(record?.kind).toBe("suppressed");
+    expect(record?.suppressionReason).toBe("resize-cell-count-is-not-a-percentage");
     expect(record?.argv).toEqual(["resize-pane", "-t", "%1", "-x", "99"]);
     expect(record?.followUps).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 2c. The rewrite reason on the record (rule D0, issue #1)
+// ---------------------------------------------------------------------------
+
+describe("the rewrite reason on the record", () => {
+  test("a D0 rewrite records the slug and a null suppressionReason", async () => {
+    const exitCode = await main(["display", "-p", "-F", "#{session_id}", "-t", "%1"], deps());
+
+    expect(exitCode).toBe(0);
+    // The rewritten argv reached the backend: the `-F` element is gone.
+    expect(box.calls().map((c) => c.argv)).toEqual([
+      ["display", "-p", "#{session_id}", "-t", "%1"],
+    ]);
+
+    const record = callRecords()[0];
+    expect(record?.rewriteReason).toBe("psmux-client-treats-display-F-as-message-text");
+    expect(record?.suppressionReason).toBeNull();
+    expect(record?.rewritten).toBe(true);
+  });
+
+  test("a forwarded record with no hidden rewrite has rewriteReason null", async () => {
+    await main(["-V"], deps());
+
+    const record = callRecords()[0];
+    expect(record?.rewriteReason).toBeNull();
+    expect(record?.suppressionReason).toBeNull();
   });
 });
 
@@ -615,14 +730,16 @@ describe("the trace hook", () => {
     expect(box.lines(box.tracePath)).toHaveLength(2);
 
     const first = JSON.parse(box.lines(box.tracePath)[0] ?? "{}") as Record<string, unknown>;
-    // BEHAVIOUR CHANGE: was `toBe(1)`, and is now asserted against the constant
-    // rather than against a literal. `recordVersion` moved 1 -> 2 because
-    // `ShimCallRecord` gained the required key `followUps` and `ShimOutcome` gained
-    // `"suppressed"` — two changes a v1 reader cannot detect from the line, which is
-    // the one thing the field is for. Reading it from the constant is what stops
-    // the next bump from silently invalidating this assertion.
+    // BEHAVIOUR CHANGE: was `toBe(1)`, then `toBe(2)`, and is now asserted against
+    // the constant rather than against a literal. `recordVersion` moved 1 -> 2
+    // because `ShimCallRecord` gained the required key `followUps` and
+    // `ShimOutcome` gained `"suppressed"`, and 2 -> 3 because `ShimTraceRecord`
+    // gained the required key `suppressionReason` — each a change an older reader
+    // cannot detect from the line, which is the one thing the field is for.
+    // Reading it from the constant is what stops the next bump from silently
+    // invalidating this assertion.
     expect(first["v"]).toBe(CLI_CONTRACT.recordVersion);
-    expect(first["v"]).toBe(2);
+    expect(first["v"]).toBe(3);
     expect(first["verb"]).toBe("-V");
     expect(first["classification"]).toBe("pass-through");
     expect(first["outcome"]).toBe("forwarded");

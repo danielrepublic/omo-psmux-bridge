@@ -1,0 +1,173 @@
+TASK 3 EVIDENCE — argv grammar module (omo-psmux-windows-parity)
+Host: Linux. Worktree: /home/daniel/omo-psmux-bridge-wt/windows-parity
+Bundle read: oh-my-openagent@5.1.18 dist/index.js
+bun 1.4.2
+
+=== 1. SOURCE LINES READ (all verified present at the cited lines) ===
+8318-8319  shellQuoteForNestedCommand      (Q: single-quote wrap, then \\ $ ` ")
+8321-8325  buildTmuxAttachCommand          (Template A)
+8327-8329  buildTmuxPlaceholderCommand     (Template B)
+8331-8341  buildPaneAuthEnvironmentArgs    ([] when no password)
+8343       TMUX_COMMAND_SHELL = "/bin/sh"
+4715-4716  shellEscapeForDoubleQuotedCommand (E)  [plan prose did not cite this]
+8402-8411  split-window call site
+8501       respawn-pane + placeholder
+8548-8555  respawn-pane + attach
+8617-8626  new-window call site
+8727-8747  new-session / new-window-existing call site
+8647       ISOLATED_WINDOW_NAME = "omo-agents"
+
+NO PLAN LINE NUMBER WAS STALE. Every line number in the task brief verified.
+FINDING: the brief's section-4 list omits shellEscapeForDoubleQuotedCommand,
+         which lives at index.js:4715-4716 and is REQUIRED to derive Template B
+         fixtures. Added as a citation.
+
+=== 2. TDD RED RUN #1 — test file written before ANY implementation ===
+$ bun test test/grammar.test.ts
+
+=== 3. TDD RED RUN #1 (captured verbatim during this task) ===
+Command: bun test test/grammar.test.ts
+State:   test/grammar.test.ts written; src/grammar.ts still the todo-2 stub.
+NOTE:    two earlier attempts failed on a SyntaxError in MY OWN test literal
+         (a stray \\\\ before an apostrophe). Fixed the literal; the run below is
+         the first run with a syntactically valid suite.
+
+bun test v1.4.2 (744846f84)
+
+test/grammar.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+SyntaxError: Export named 'classifyArgv' not found in module '/home/daniel/omo-psmux-bridge-wt/windows-parity/src/grammar.ts'.
+-------------------------------
+
+ 0 pass
+ 1 fail
+ 1 error
+Ran 1 test across 1 file. [6.00ms]
+EXIT=1
+
+=== 4. TDD RED RUN #2 — deliberately-wrong stub, to prove the suite DISCRIMINATES ===
+src/grammar.ts was temporarily a stub whose classifyArgv always returned
+pass-through. If the suite could not fail for the right reason, this run would
+have been green. It was not.
+
+Command: bun test test/grammar.test.ts
+  (tail of output)
+
+Expected: "placeholder-newwindow"
+Received: "pass-through"
+
+      at .../test/grammar.test.ts:427:25
+(fail) hostile quoting > an empty -e value is preserved as an empty string [0.11ms]
+...
+error: expect(received).toBe(expected)
+
+Expected: "placeholder-split"
+Received: "pass-through"
+
+      at .../test/grammar.test.ts:451:37
+(fail) purity > classifying a frozen argv array does not throw [2.12ms]
+
+ 18 pass
+ 17 fail
+ 50 expect() calls
+Ran 35 tests across 1 file. [12.00ms]
+EXIT=1
+
+Reading: all 17 failures are the recognised-classification cases; the 18 passes
+are exactly the pass-through cases, which an always-pass-through stub satisfies
+by construction. The stub was then replaced with the real implementation.
+
+=== 5. TDD GREEN (captured verbatim) ===
+Command: bun test test/grammar.test.ts
+
+bun test v1.4.2 (744846f84)
+
+test/grammar.test.ts:
+
+ 35 pass
+ 0 fail
+ 94 expect() calls
+Ran 35 tests across 1 file. [16.00ms]
+EXIT=0
+
+=== 6. FAILURE-MODE QA, real regression cases in the suite ===
+Command: bun test test/grammar.test.ts -t "truncated"
+  2 pass / 0 fail / 5 expect() calls        EXIT=0
+Command: bun test test/grammar.test.ts -t "pass-through — unrecognised verbs"
+  4 pass / 0 fail / 7 expect() calls        EXIT=0
+
+Out-of-suite demonstration (scratch script in /tmp, not in the worktree):
+
+### FAILURE CASE 1: truncated payload (no closing double quote)
+input argv: ["split-window","-h","-d","-P","-F","#{pane_id}","/bin/sh -c \"printf 'x"]
+result    : {"kind":"pass-through","argv":["split-window","-h","-d","-P","-F","#{pane_id}","/bin/sh -c \"printf 'x"]}
+kind      : pass-through
+threw?     : no
+has payload field? false
+
+### FAILURE CASE 2: unknown argv, returned unchanged
+input : ["send-keys","-t","%3","C-c"]
+kind  : pass-through
+argv  : ["send-keys","-t","%3","C-c"]
+deep-equal to input? true
+input : ["display","-p","-t","%1","#{window_width}"]
+kind  : pass-through
+argv  : ["display","-p","-t","%1","#{window_width}"]
+deep-equal to input? true
+
+### hostile quoting byte-identity
+kind       : placeholder-respawn
+description: "it's a \\$HOME \\`cmd\\` with \\\"quotes\\\" and \\\\backslash\\\\"
+byte-identical to E(description)? true
+
+=== 7. CLASSIFICATION TABLE (argv shape -> classification name) ===
+argv shape (verb + flags + payload)            | classification         | desc
+-----------------------------------------------+------------------------+-------
+split-window ... <Template B>                  | placeholder-split      | pass
+new-window -d -n omo-agents ... <B>            | placeholder-newwindow  | pass
+new-window -t <sess> ... <B> (:8727)           | placeholder-newwindow  | pass
+new-session -d -s <n> ... <B> (:8736)          | placeholder-newsession | pass
+respawn-pane -k ... <B> (:8501)                | placeholder-respawn    | pass
+respawn-pane -k ... <A> (:8548)                | attach-respawn         | pass
+ANY other verb (send-keys/display/...)         | pass-through           | pass
+any verb + truncated/unclosed payload          | pass-through           | pass
+any verb + unterminated/malformed -e           | pass-through           | pass
+empty argv / verb-only argv                    | pass-through           | pass
+split-window + <Template A> (:8401)            | pass-through           | pass
+
+The last row is a deliberate decision: :8401 picks Template A under
+cmux-compat, which is FALSE under psmux, and none of the five names covers a
+split-window carrying an attach payload. Encoded as a test.
+
+=== 8. VERIFICATION COMMAND EXIT CODES ===
+$ bun test test/grammar.test.ts   -> 0   (35 pass, 0 fail, 94 expect() calls)
+$ bun x tsc --noEmit             -> 0   (strict + noUncheckedIndexedAccess + exactOptionalPropertyTypes)
+$ bun test                      -> 1   (35 pass, 1 fail, 95 expect() calls)
+    the ONLY failure is test/cli.test.ts, the INTENTIONAL red smoke test
+    asserting src/cli.ts exports main; todo 12 owns it. Not a regression.
+$ git status --porcelain
+ M src/grammar.ts
+ M test/grammar.test.ts
+    (.omo/ is gitignored, so the evidence file does not appear.)
+
+=== 9. FILES WRITTEN (only these three) ===
+  src/grammar.ts                             (implementation)
+  test/grammar.test.ts                       (35 tests, 94 assertions)
+  .omo/evidence/task-3-omo-psmux-windows-parity.txt
+
+=== 10. PURITY ===
+  src/grammar.ts contains no process, fs, spawn, env or Date access.
+  It is a pure function over argv. Asserted by the purity describe block:
+  no input mutation, frozen-argv safe, deterministic, pass-through is a copy.
+
+=== 11. RISKS / HANDOFF FOR TODO 9 ===
+  - serverUrlQuoted / sessionIdQuoted / directoryQuoted / description are the
+    byte-exact SHELL-QUOTED text. Reversing Q's and E's escaping is deliberately
+    NOT done here; todo 9 owns it. If todo 9 needs logical (unescaped) values it
+    must unescape, not assume.
+  - flags preserves every non -e, non-payload element in order and is the
+    intended source for verbatim re-emission.
+  - split-window + Template A classifies pass-through by design (see table).
+  - envArgs values are credentials (CONTRACT.md 2.2): never log them.

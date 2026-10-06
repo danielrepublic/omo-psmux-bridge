@@ -1,0 +1,37 @@
+{
+    "session":  "e2eprobe06234052",
+    "project":  "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-e2e-probe3",
+    "artifacts":  "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-team-probe\\e2e3",
+    "started":  "2026-10-06T23:40:53.0323521+08:00",
+    "callLogBefore":  34,
+    "serversBefore":  3,
+    "stagedShim":  "C:\\Users\\Daniel\\AppData\\Local\\opencode-psmux-bridge\\staging\\team-mode\\bin\\tmux.exe",
+    "pane":  "%1",
+    "paneReady":  true,
+    "tuiUp":  true,
+    "promptSent":  true,
+    "teamFound":  true,
+    "teamPanes":  [
+                      "%2 1 omo-team-probe-member 66 154"
+                  ],
+    "captures":  [
+                     {
+                         "index":  "0",
+                         "pane":  "%1"
+                     },
+                     {
+                         "index":  "1",
+                         "pane":  "%2"
+                     }
+                 ],
+    "geometry":  [
+                     "%1 0 WINDOWS-DANIEL 0 65",
+                     "%2 1 omo-team-probe-member 66 154"
+                 ],
+    "callLogNew":  12,
+    "killSessionExit":  0,
+    "cleanup":  "clean",
+    "serversAfter":  3,
+    "error":  null,
+    "finished":  "2026-10-06T23:41:56.2773291+08:00"
+}

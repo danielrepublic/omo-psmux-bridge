@@ -1,0 +1,2173 @@
+{
+  "probe": "team-layout-probe",
+  "issue": "#1",
+  "deliverable": "D3",
+  "started_utc": "2026-10-06T14:11:32.824Z",
+  "finished_utc": "2026-10-06T14:11:46.696Z",
+  "host": {
+    "platform": "win32",
+    "node": "v24.19.0",
+    "temp": "C:\\Users\\Daniel\\AppData\\Local\\Temp",
+    "cwd": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-team-probe"
+  },
+  "options": {
+    "psmux": "C:\\Users\\Daniel\\AppData\\Local\\psmux\\psmux.exe",
+    "shim": "C:\\Users\\Daniel\\AppData\\Local\\opencode-psmux-bridge\\bin\\tmux.exe",
+    "namespace": "tbase1",
+    "out": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-team-probe\\team-layout-probe-before.json",
+    "keep": false
+  },
+  "binaries": {
+    "psmux": "C:\\Users\\Daniel\\AppData\\Local\\psmux\\psmux.exe",
+    "shim": "C:\\Users\\Daniel\\AppData\\Local\\opencode-psmux-bridge\\bin\\tmux.exe"
+  },
+  "namespaces": {
+    "direct": "tbase1",
+    "shim": "tbase1_shim"
+  },
+  "arms": {
+    "direct": {
+      "label": "direct",
+      "binary": "C:\\Users\\Daniel\\AppData\\Local\\psmux\\psmux.exe",
+      "namespace": "tbase1",
+      "started_utc": "2026-10-06T14:11:32.825Z",
+      "finished_utc": "2026-10-06T14:11:38.736Z",
+      "aborted": false,
+      "abort_reason": null,
+      "invocations": [
+        {
+          "argv": [
+            "-L",
+            "tbase1",
+            "new-session",
+            "-d",
+            "-s",
+            "probe",
+            "-x",
+            "200",
+            "-y",
+            "50",
+            "-P",
+            "-F",
+            "#{pane_id}"
+          ],
+          "exit": 0,
+          "stdout": "%1",
+          "stderr": "",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 170,
+          "step": "new-session"
+        },
+        {
+          "argv": [
+            "-L",
+            "tbase1",
+            "display",
+            "-p",
+            "-F",
+            "#{session_id}",
+            "-t",
+            "%1"
+          ],
+          "exit": 0,
+          "stdout": "-F $1299",
+          "stderr": "",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 51,
+          "step": "display-session-id"
+        },
+        {
+          "argv": [
+            "-L",
+            "tbase1",
+            "display",
+            "-p",
+            "-F",
+            "#{session_name}:#{window_index}",
+            "-t",
+            "%1"
+          ],
+          "exit": 0,
+          "stdout": "-F probe:0",
+          "stderr": "",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 59,
+          "step": "display-window-target"
+        },
+        {
+          "argv": [
+            "-L",
+            "tbase1",
+            "list-panes",
+            "-t",
+            "-F probe:0",
+            "-F",
+            "#{pane_id}"
+          ],
+          "exit": 1,
+          "stdout": "",
+          "stderr": "psmux: no server running on session 'tbase1__-F probe'",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 48,
+          "step": "list-panes"
+        },
+        {
+          "argv": [
+            "-L",
+            "tbase1",
+            "split-window",
+            "-t",
+            "%1",
+            "-h",
+            "-d",
+            "-l",
+            "70%",
+            "-P",
+            "-F",
+            "#{pane_id}",
+            "-c",
+            "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-team-probe"
+          ],
+          "exit": 0,
+          "stdout": "%2",
+          "stderr": "",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 50,
+          "step": "split-window-a"
+        },
+        {
+          "argv": [
+            "-L",
+            "tbase1",
+            "select-pane",
+            "-t",
+            "%2",
+            "-T",
+            "omo-team-probe-a"
+          ],
+          "exit": 0,
+          "stdout": "",
+          "stderr": "",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 49,
+          "step": "select-pane-a"
+        },
+        {
+          "argv": [
+            "-L",
+            "tbase1",
+            "set-option",
+            "-p",
+            "-t",
+            "%2",
+            "@omo_attach_server_url",
+            "http://127.0.0.1:59999"
+          ],
+          "exit": 1,
+          "stdout": "",
+          "stderr": "psmux: pane-scoped option '@omo_attach_server_url' is not supported (supported: remain-on-exit)",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 52,
+          "step": "set-option-url-a"
+        },
+        {
+          "argv": [
+            "-L",
+            "tbase1",
+            "set-option",
+            "-p",
+            "-t",
+            "%2",
+            "@omo_attach_session_id",
+            "ses_probe_a"
+          ],
+          "exit": 1,
+          "stdout": "",
+          "stderr": "psmux: pane-scoped option '@omo_attach_session_id' is not supported (supported: remain-on-exit)",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 61,
+          "step": "set-option-session-a"
+        },
+        {
+          "argv": [
+            "-L",
+            "tbase1",
+            "send-keys",
+            "-t",
+            "%2",
+            "echo TEAM_PROBE_MARKER_A",
+            "Enter"
+          ],
+          "exit": 0,
+          "stdout": "",
+          "stderr": "",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 59,
+          "step": "send-keys-a"
+        },
+        {
+          "argv": [
+            "-L",
+            "tbase1",
+            "capture-pane",
+            "-p",
+            "-t",
+            "%2"
+          ],
+          "exit": 0,
+          "stdout": "PS C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-team-probe> echo TEAM_PROBE_MARKER_A\nTEAM_PROBE_MARKER_A\nPS C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-team-probe>",
+          "stderr": "",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 39,
+          "step": "capture-pane"
+        },
+        {
+          "argv": [
+            "-L",
+            "tbase1",
+            "split-window",
+            "-t",
+            "%2",
+            "-v",
+            "-d",
+            "-P",
+            "-F",
+            "#{pane_id}",
+            "-c",
+            "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-team-probe"
+          ],
+          "exit": 0,
+          "stdout": "%3",
+          "stderr": "",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 36,
+          "step": "split-window-b"
+        },
+        {
+          "argv": [
+            "-L",
+            "tbase1",
+            "select-pane",
+            "-t",
+            "%3",
+            "-T",
+            "omo-team-probe-b"
+          ],
+          "exit": 0,
+          "stdout": "",
+          "stderr": "",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 45,
+          "step": "select-pane-b"
+        },
+        {
+          "argv": [
+            "-L",
+            "tbase1",
+            "set-option",
+            "-p",
+            "-t",
+            "%3",
+            "@omo_attach_server_url",
+            "http://127.0.0.1:59999"
+          ],
+          "exit": 1,
+          "stdout": "",
+          "stderr": "psmux: pane-scoped option '@omo_attach_server_url' is not supported (supported: remain-on-exit)",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 39,
+          "step": "set-option-url-b"
+        },
+        {
+          "argv": [
+            "-L",
+            "tbase1",
+            "set-option",
+            "-p",
+            "-t",
+            "%3",
+            "@omo_attach_session_id",
+            "ses_probe_b"
+          ],
+          "exit": 1,
+          "stdout": "",
+          "stderr": "psmux: pane-scoped option '@omo_attach_session_id' is not supported (supported: remain-on-exit)",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 33,
+          "step": "set-option-session-b"
+        },
+        {
+          "argv": [
+            "-L",
+            "tbase1",
+            "send-keys",
+            "-t",
+            "%3",
+            "echo TEAM_PROBE_MARKER_B",
+            "Enter"
+          ],
+          "exit": 0,
+          "stdout": "",
+          "stderr": "",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 30,
+          "step": "send-keys-b"
+        },
+        {
+          "argv": [
+            "-L",
+            "tbase1",
+            "capture-pane",
+            "-p",
+            "-t",
+            "%3"
+          ],
+          "exit": 0,
+          "stdout": "PS C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-team-probe> echo TEAM_PROBE_MARKER_B\nTEAM_PROBE_MARKER_B\nPS C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-team-probe>",
+          "stderr": "",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 37,
+          "step": "capture-pane"
+        },
+        {
+          "argv": [
+            "-L",
+            "tbase1",
+            "list-panes",
+            "-a",
+            "-F",
+            "#{pane_id} #{pane_left} #{pane_width}"
+          ],
+          "exit": 0,
+          "stdout": "%1 0 59\n%2 60 140\n%3 60 140",
+          "stderr": "",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 27,
+          "step": "geometry-before-layout"
+        },
+        {
+          "argv": [
+            "-L",
+            "tbase1",
+            "select-layout",
+            "-t",
+            "-F probe:0",
+            "main-vertical"
+          ],
+          "exit": 1,
+          "stdout": "",
+          "stderr": "psmux: no server running on session 'tbase1__-F probe'",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 29,
+          "step": "select-layout"
+        },
+        {
+          "argv": [
+            "-L",
+            "tbase1",
+            "list-panes",
+            "-a",
+            "-F",
+            "#{pane_id} #{pane_left} #{pane_width}"
+          ],
+          "exit": 0,
+          "stdout": "%1 0 59\n%2 60 140\n%3 60 140",
+          "stderr": "",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 27,
+          "step": "geometry-after-layout"
+        },
+        {
+          "argv": [
+            "-L",
+            "tbase1",
+            "resize-pane",
+            "-t",
+            "%1",
+            "-x",
+            "30%"
+          ],
+          "exit": 0,
+          "stdout": "",
+          "stderr": "",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 30,
+          "step": "resize-pane"
+        },
+        {
+          "argv": [
+            "-L",
+            "tbase1",
+            "list-panes",
+            "-a",
+            "-F",
+            "#{pane_id} #{pane_left} #{pane_width}"
+          ],
+          "exit": 0,
+          "stdout": "%1 0 119\n%2 120 80\n%3 120 80",
+          "stderr": "",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 26,
+          "step": "geometry-after-resize"
+        },
+        {
+          "argv": [
+            "-L",
+            "tbase1",
+            "kill-pane",
+            "-t",
+            "%2"
+          ],
+          "exit": 0,
+          "stdout": "",
+          "stderr": "",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 55,
+          "step": "kill-pane-first"
+        },
+        {
+          "argv": [
+            "-L",
+            "tbase1",
+            "kill-pane",
+            "-t",
+            "%2"
+          ],
+          "exit": 1,
+          "stdout": "",
+          "stderr": "psmux: can't find pane: %2",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 22,
+          "step": "kill-pane-dead"
+        }
+      ],
+      "caller": {
+        "pane_id": "%1",
+        "session_id": "-F $1299",
+        "window_target": "-F probe:0"
+      },
+      "panes": {
+        "a": "%2",
+        "b": "%3"
+      },
+      "capture_panes": {
+        "a": {
+          "pane": "%2",
+          "marker": "TEAM_PROBE_MARKER_A",
+          "marker_present": true,
+          "exit": 0,
+          "stderr": "",
+          "text": "PS C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-team-probe> echo TEAM_PROBE_MARKER_A\nTEAM_PROBE_MARKER_A\nPS C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-team-probe>",
+          "attempts": 1,
+          "attempt_texts": [
+            {
+              "exit": 0,
+              "text": "PS C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-team-probe> echo TEAM_PROBE_MARKER_A\nTEAM_PROBE_MARKER_A\nPS C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-team-probe>"
+            }
+          ]
+        },
+        "b": {
+          "pane": "%3",
+          "marker": "TEAM_PROBE_MARKER_B",
+          "marker_present": true,
+          "exit": 0,
+          "stderr": "",
+          "text": "PS C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-team-probe> echo TEAM_PROBE_MARKER_B\nTEAM_PROBE_MARKER_B\nPS C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-team-probe>",
+          "attempts": 1,
+          "attempt_texts": [
+            {
+              "exit": 0,
+              "text": "PS C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-team-probe> echo TEAM_PROBE_MARKER_B\nTEAM_PROBE_MARKER_B\nPS C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-team-probe>"
+            }
+          ]
+        }
+      },
+      "geometry": {
+        "before_layout": {
+          "argv": [
+            "-L",
+            "tbase1",
+            "list-panes",
+            "-a",
+            "-F",
+            "#{pane_id} #{pane_left} #{pane_width}"
+          ],
+          "exit": 0,
+          "stdout": "%1 0 59\n%2 60 140\n%3 60 140",
+          "stderr": "",
+          "panes": [
+            {
+              "pane_id": "%1",
+              "pane_left": "0",
+              "pane_width": "59",
+              "raw": "%1 0 59"
+            },
+            {
+              "pane_id": "%2",
+              "pane_left": "60",
+              "pane_width": "140",
+              "raw": "%2 60 140"
+            },
+            {
+              "pane_id": "%3",
+              "pane_left": "60",
+              "pane_width": "140",
+              "raw": "%3 60 140"
+            }
+          ]
+        },
+        "after_layout": {
+          "argv": [
+            "-L",
+            "tbase1",
+            "list-panes",
+            "-a",
+            "-F",
+            "#{pane_id} #{pane_left} #{pane_width}"
+          ],
+          "exit": 0,
+          "stdout": "%1 0 59\n%2 60 140\n%3 60 140",
+          "stderr": "",
+          "panes": [
+            {
+              "pane_id": "%1",
+              "pane_left": "0",
+              "pane_width": "59",
+              "raw": "%1 0 59"
+            },
+            {
+              "pane_id": "%2",
+              "pane_left": "60",
+              "pane_width": "140",
+              "raw": "%2 60 140"
+            },
+            {
+              "pane_id": "%3",
+              "pane_left": "60",
+              "pane_width": "140",
+              "raw": "%3 60 140"
+            }
+          ]
+        },
+        "after_resize": {
+          "argv": [
+            "-L",
+            "tbase1",
+            "list-panes",
+            "-a",
+            "-F",
+            "#{pane_id} #{pane_left} #{pane_width}"
+          ],
+          "exit": 0,
+          "stdout": "%1 0 119\n%2 120 80\n%3 120 80",
+          "stderr": "",
+          "panes": [
+            {
+              "pane_id": "%1",
+              "pane_left": "0",
+              "pane_width": "119",
+              "raw": "%1 0 119"
+            },
+            {
+              "pane_id": "%2",
+              "pane_left": "120",
+              "pane_width": "80",
+              "raw": "%2 120 80"
+            },
+            {
+              "pane_id": "%3",
+              "pane_left": "120",
+              "pane_width": "80",
+              "raw": "%3 120 80"
+            }
+          ]
+        }
+      },
+      "teardown": {
+        "kill_pane_first": {
+          "argv": [
+            "-L",
+            "tbase1",
+            "kill-pane",
+            "-t",
+            "%2"
+          ],
+          "exit": 0,
+          "stdout": "",
+          "stderr": "",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 55,
+          "step": "kill-pane-first"
+        },
+        "kill_pane_dead": {
+          "argv": [
+            "-L",
+            "tbase1",
+            "kill-pane",
+            "-t",
+            "%2"
+          ],
+          "exit": 1,
+          "stdout": "",
+          "stderr": "psmux: can't find pane: %2",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 22,
+          "step": "kill-pane-dead"
+        }
+      },
+      "cwd": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-team-probe",
+      "note": "send-keys types `echo <MARKER>` in place of OmO's `opencode attach ...` so the observable is a marker in the pane, not a live opencode process",
+      "existing_panes": []
+    },
+    "shim": {
+      "label": "shim",
+      "binary": "C:\\Users\\Daniel\\AppData\\Local\\opencode-psmux-bridge\\bin\\tmux.exe",
+      "namespace": "tbase1_shim",
+      "started_utc": "2026-10-06T14:11:38.737Z",
+      "finished_utc": "2026-10-06T14:11:45.980Z",
+      "aborted": false,
+      "abort_reason": null,
+      "invocations": [
+        {
+          "argv": [
+            "-L",
+            "tbase1_shim",
+            "new-session",
+            "-d",
+            "-s",
+            "probe",
+            "-x",
+            "200",
+            "-y",
+            "50",
+            "-P",
+            "-F",
+            "#{pane_id}"
+          ],
+          "exit": 0,
+          "stdout": "%1",
+          "stderr": "",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 168,
+          "step": "new-session"
+        },
+        {
+          "argv": [
+            "-L",
+            "tbase1_shim",
+            "display",
+            "-p",
+            "-F",
+            "#{session_id}",
+            "-t",
+            "%1"
+          ],
+          "exit": 0,
+          "stdout": "-F $1301",
+          "stderr": "",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 112,
+          "step": "display-session-id"
+        },
+        {
+          "argv": [
+            "-L",
+            "tbase1_shim",
+            "display",
+            "-p",
+            "-F",
+            "#{session_name}:#{window_index}",
+            "-t",
+            "%1"
+          ],
+          "exit": 0,
+          "stdout": "-F probe:0",
+          "stderr": "",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 120,
+          "step": "display-window-target"
+        },
+        {
+          "argv": [
+            "-L",
+            "tbase1_shim",
+            "list-panes",
+            "-t",
+            "-F probe:0",
+            "-F",
+            "#{pane_id}"
+          ],
+          "exit": 1,
+          "stdout": "",
+          "stderr": "psmux: no server running on session 'tbase1_shim__-F probe'",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 98,
+          "step": "list-panes"
+        },
+        {
+          "argv": [
+            "-L",
+            "tbase1_shim",
+            "split-window",
+            "-t",
+            "%1",
+            "-h",
+            "-d",
+            "-l",
+            "70%",
+            "-P",
+            "-F",
+            "#{pane_id}",
+            "-c",
+            "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-team-probe"
+          ],
+          "exit": 0,
+          "stdout": "%2",
+          "stderr": "",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 122,
+          "step": "split-window-a"
+        },
+        {
+          "argv": [
+            "-L",
+            "tbase1_shim",
+            "select-pane",
+            "-t",
+            "%2",
+            "-T",
+            "omo-team-probe-a"
+          ],
+          "exit": 0,
+          "stdout": "",
+          "stderr": "",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 119,
+          "step": "select-pane-a"
+        },
+        {
+          "argv": [
+            "-L",
+            "tbase1_shim",
+            "set-option",
+            "-p",
+            "-t",
+            "%2",
+            "@omo_attach_server_url",
+            "http://127.0.0.1:59999"
+          ],
+          "exit": 1,
+          "stdout": "",
+          "stderr": "psmux: pane-scoped option '@omo_attach_server_url' is not supported (supported: remain-on-exit)",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 88,
+          "step": "set-option-url-a"
+        },
+        {
+          "argv": [
+            "-L",
+            "tbase1_shim",
+            "set-option",
+            "-p",
+            "-t",
+            "%2",
+            "@omo_attach_session_id",
+            "ses_probe_a"
+          ],
+          "exit": 1,
+          "stdout": "",
+          "stderr": "psmux: pane-scoped option '@omo_attach_session_id' is not supported (supported: remain-on-exit)",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 88,
+          "step": "set-option-session-a"
+        },
+        {
+          "argv": [
+            "-L",
+            "tbase1_shim",
+            "send-keys",
+            "-t",
+            "%2",
+            "echo TEAM_PROBE_MARKER_A",
+            "Enter"
+          ],
+          "exit": 0,
+          "stdout": "",
+          "stderr": "",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 106,
+          "step": "send-keys-a"
+        },
+        {
+          "argv": [
+            "-L",
+            "tbase1_shim",
+            "capture-pane",
+            "-p",
+            "-t",
+            "%2"
+          ],
+          "exit": 0,
+          "stdout": "PS C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-team-probe> echo TEAM_PROBE_MARKER_A\nTEAM_PROBE_MARKER_A\nPS C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-team-probe>",
+          "stderr": "",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 103,
+          "step": "capture-pane"
+        },
+        {
+          "argv": [
+            "-L",
+            "tbase1_shim",
+            "split-window",
+            "-t",
+            "%2",
+            "-v",
+            "-d",
+            "-P",
+            "-F",
+            "#{pane_id}",
+            "-c",
+            "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-team-probe"
+          ],
+          "exit": 0,
+          "stdout": "%3",
+          "stderr": "",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 96,
+          "step": "split-window-b"
+        },
+        {
+          "argv": [
+            "-L",
+            "tbase1_shim",
+            "select-pane",
+            "-t",
+            "%3",
+            "-T",
+            "omo-team-probe-b"
+          ],
+          "exit": 0,
+          "stdout": "",
+          "stderr": "",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 110,
+          "step": "select-pane-b"
+        },
+        {
+          "argv": [
+            "-L",
+            "tbase1_shim",
+            "set-option",
+            "-p",
+            "-t",
+            "%3",
+            "@omo_attach_server_url",
+            "http://127.0.0.1:59999"
+          ],
+          "exit": 1,
+          "stdout": "",
+          "stderr": "psmux: pane-scoped option '@omo_attach_server_url' is not supported (supported: remain-on-exit)",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 92,
+          "step": "set-option-url-b"
+        },
+        {
+          "argv": [
+            "-L",
+            "tbase1_shim",
+            "set-option",
+            "-p",
+            "-t",
+            "%3",
+            "@omo_attach_session_id",
+            "ses_probe_b"
+          ],
+          "exit": 1,
+          "stdout": "",
+          "stderr": "psmux: pane-scoped option '@omo_attach_session_id' is not supported (supported: remain-on-exit)",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 98,
+          "step": "set-option-session-b"
+        },
+        {
+          "argv": [
+            "-L",
+            "tbase1_shim",
+            "send-keys",
+            "-t",
+            "%3",
+            "echo TEAM_PROBE_MARKER_B",
+            "Enter"
+          ],
+          "exit": 0,
+          "stdout": "",
+          "stderr": "",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 93,
+          "step": "send-keys-b"
+        },
+        {
+          "argv": [
+            "-L",
+            "tbase1_shim",
+            "capture-pane",
+            "-p",
+            "-t",
+            "%3"
+          ],
+          "exit": 0,
+          "stdout": "PS C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-team-probe> echo TEAM_PROBE_MARKER_B\nTEAM_PROBE_MARKER_B\nPS C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-team-probe>",
+          "stderr": "",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 106,
+          "step": "capture-pane"
+        },
+        {
+          "argv": [
+            "-L",
+            "tbase1_shim",
+            "list-panes",
+            "-a",
+            "-F",
+            "#{pane_id} #{pane_left} #{pane_width}"
+          ],
+          "exit": 0,
+          "stdout": "%1 0 59\n%2 60 140\n%3 60 140",
+          "stderr": "",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 83,
+          "step": "geometry-before-layout"
+        },
+        {
+          "argv": [
+            "-L",
+            "tbase1_shim",
+            "select-layout",
+            "-t",
+            "-F probe:0",
+            "main-vertical"
+          ],
+          "exit": 1,
+          "stdout": "",
+          "stderr": "psmux: no server running on session 'tbase1_shim__-F probe'",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 76,
+          "step": "select-layout"
+        },
+        {
+          "argv": [
+            "-L",
+            "tbase1_shim",
+            "list-panes",
+            "-a",
+            "-F",
+            "#{pane_id} #{pane_left} #{pane_width}"
+          ],
+          "exit": 0,
+          "stdout": "%1 0 59\n%2 60 140\n%3 60 140",
+          "stderr": "",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 92,
+          "step": "geometry-after-layout"
+        },
+        {
+          "argv": [
+            "-L",
+            "tbase1_shim",
+            "resize-pane",
+            "-t",
+            "%1",
+            "-x",
+            "30%"
+          ],
+          "exit": 0,
+          "stdout": "",
+          "stderr": "",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 84,
+          "step": "resize-pane"
+        },
+        {
+          "argv": [
+            "-L",
+            "tbase1_shim",
+            "list-panes",
+            "-a",
+            "-F",
+            "#{pane_id} #{pane_left} #{pane_width}"
+          ],
+          "exit": 0,
+          "stdout": "%1 0 59\n%2 60 140\n%3 60 140",
+          "stderr": "",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 82,
+          "step": "geometry-after-resize"
+        },
+        {
+          "argv": [
+            "-L",
+            "tbase1_shim",
+            "kill-pane",
+            "-t",
+            "%2"
+          ],
+          "exit": 0,
+          "stdout": "",
+          "stderr": "",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 116,
+          "step": "kill-pane-first"
+        },
+        {
+          "argv": [
+            "-L",
+            "tbase1_shim",
+            "kill-pane",
+            "-t",
+            "%2"
+          ],
+          "exit": 1,
+          "stdout": "",
+          "stderr": "psmux: can't find pane: %2",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 107,
+          "step": "kill-pane-dead"
+        }
+      ],
+      "caller": {
+        "pane_id": "%1",
+        "session_id": "-F $1301",
+        "window_target": "-F probe:0"
+      },
+      "panes": {
+        "a": "%2",
+        "b": "%3"
+      },
+      "capture_panes": {
+        "a": {
+          "pane": "%2",
+          "marker": "TEAM_PROBE_MARKER_A",
+          "marker_present": true,
+          "exit": 0,
+          "stderr": "",
+          "text": "PS C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-team-probe> echo TEAM_PROBE_MARKER_A\nTEAM_PROBE_MARKER_A\nPS C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-team-probe>",
+          "attempts": 1,
+          "attempt_texts": [
+            {
+              "exit": 0,
+              "text": "PS C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-team-probe> echo TEAM_PROBE_MARKER_A\nTEAM_PROBE_MARKER_A\nPS C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-team-probe>"
+            }
+          ]
+        },
+        "b": {
+          "pane": "%3",
+          "marker": "TEAM_PROBE_MARKER_B",
+          "marker_present": true,
+          "exit": 0,
+          "stderr": "",
+          "text": "PS C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-team-probe> echo TEAM_PROBE_MARKER_B\nTEAM_PROBE_MARKER_B\nPS C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-team-probe>",
+          "attempts": 1,
+          "attempt_texts": [
+            {
+              "exit": 0,
+              "text": "PS C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-team-probe> echo TEAM_PROBE_MARKER_B\nTEAM_PROBE_MARKER_B\nPS C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-team-probe>"
+            }
+          ]
+        }
+      },
+      "geometry": {
+        "before_layout": {
+          "argv": [
+            "-L",
+            "tbase1_shim",
+            "list-panes",
+            "-a",
+            "-F",
+            "#{pane_id} #{pane_left} #{pane_width}"
+          ],
+          "exit": 0,
+          "stdout": "%1 0 59\n%2 60 140\n%3 60 140",
+          "stderr": "",
+          "panes": [
+            {
+              "pane_id": "%1",
+              "pane_left": "0",
+              "pane_width": "59",
+              "raw": "%1 0 59"
+            },
+            {
+              "pane_id": "%2",
+              "pane_left": "60",
+              "pane_width": "140",
+              "raw": "%2 60 140"
+            },
+            {
+              "pane_id": "%3",
+              "pane_left": "60",
+              "pane_width": "140",
+              "raw": "%3 60 140"
+            }
+          ]
+        },
+        "after_layout": {
+          "argv": [
+            "-L",
+            "tbase1_shim",
+            "list-panes",
+            "-a",
+            "-F",
+            "#{pane_id} #{pane_left} #{pane_width}"
+          ],
+          "exit": 0,
+          "stdout": "%1 0 59\n%2 60 140\n%3 60 140",
+          "stderr": "",
+          "panes": [
+            {
+              "pane_id": "%1",
+              "pane_left": "0",
+              "pane_width": "59",
+              "raw": "%1 0 59"
+            },
+            {
+              "pane_id": "%2",
+              "pane_left": "60",
+              "pane_width": "140",
+              "raw": "%2 60 140"
+            },
+            {
+              "pane_id": "%3",
+              "pane_left": "60",
+              "pane_width": "140",
+              "raw": "%3 60 140"
+            }
+          ]
+        },
+        "after_resize": {
+          "argv": [
+            "-L",
+            "tbase1_shim",
+            "list-panes",
+            "-a",
+            "-F",
+            "#{pane_id} #{pane_left} #{pane_width}"
+          ],
+          "exit": 0,
+          "stdout": "%1 0 59\n%2 60 140\n%3 60 140",
+          "stderr": "",
+          "panes": [
+            {
+              "pane_id": "%1",
+              "pane_left": "0",
+              "pane_width": "59",
+              "raw": "%1 0 59"
+            },
+            {
+              "pane_id": "%2",
+              "pane_left": "60",
+              "pane_width": "140",
+              "raw": "%2 60 140"
+            },
+            {
+              "pane_id": "%3",
+              "pane_left": "60",
+              "pane_width": "140",
+              "raw": "%3 60 140"
+            }
+          ]
+        }
+      },
+      "teardown": {
+        "kill_pane_first": {
+          "argv": [
+            "-L",
+            "tbase1_shim",
+            "kill-pane",
+            "-t",
+            "%2"
+          ],
+          "exit": 0,
+          "stdout": "",
+          "stderr": "",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 116,
+          "step": "kill-pane-first"
+        },
+        "kill_pane_dead": {
+          "argv": [
+            "-L",
+            "tbase1_shim",
+            "kill-pane",
+            "-t",
+            "%2"
+          ],
+          "exit": 1,
+          "stdout": "",
+          "stderr": "psmux: can't find pane: %2",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 107,
+          "step": "kill-pane-dead"
+        }
+      },
+      "cwd": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-team-probe",
+      "note": "send-keys types `echo <MARKER>` in place of OmO's `opencode attach ...` so the observable is a marker in the pane, not a live opencode process",
+      "existing_panes": [],
+      "shim_call_log": {
+        "path": "C:\\Users\\Daniel\\AppData\\Local\\opencode-psmux-bridge\\bin\\state\\shim-calls.jsonl",
+        "exists": true,
+        "total_lines": 766,
+        "new_records": [
+          {
+            "v": 2,
+            "at": "2026-10-06T14:11:38.899Z",
+            "pid": 35340,
+            "correlationId": "pane-muwrbtec-03c83fda",
+            "verb": "new-session",
+            "classification": "pass-through",
+            "kind": "passthrough",
+            "rewritten": false,
+            "argc": 13,
+            "dashDashInserted": false,
+            "envSlotCount": 0,
+            "envSlotNames": [],
+            "descriptorFileUsed": false,
+            "backend": "C:\\Users\\Daniel\\AppData\\Local\\psmux\\psmux.exe",
+            "backendSource": "registry",
+            "resolution": "resolved",
+            "outcome": "forwarded",
+            "exitCode": 0,
+            "durationMs": 127,
+            "argv": [
+              "-L",
+              "tbase1_shim",
+              "new-session",
+              "-d",
+              "-s",
+              "probe",
+              "-x",
+              "200",
+              "-y",
+              "50",
+              "-P",
+              "-F",
+              "#{pane_id}"
+            ],
+            "followUps": [],
+            "helper": null,
+            "backendName": "psmux.exe",
+            "installDir": "C:\\Users\\Daniel\\AppData\\Local\\psmux"
+          },
+          {
+            "v": 2,
+            "at": "2026-10-06T14:11:39.010Z",
+            "pid": 25900,
+            "correlationId": "pane-muwrbtjo-497b6216",
+            "verb": "display",
+            "classification": "pass-through",
+            "kind": "passthrough",
+            "rewritten": false,
+            "argc": 8,
+            "dashDashInserted": false,
+            "envSlotCount": 0,
+            "envSlotNames": [],
+            "descriptorFileUsed": false,
+            "backend": "C:\\Users\\Daniel\\AppData\\Local\\psmux\\psmux.exe",
+            "backendSource": "registry",
+            "resolution": "resolved",
+            "outcome": "forwarded",
+            "exitCode": 0,
+            "durationMs": 46,
+            "argv": [
+              "-L",
+              "tbase1_shim",
+              "display",
+              "-p",
+              "-F",
+              "#{session_id}",
+              "-t",
+              "%1"
+            ],
+            "followUps": [],
+            "helper": null,
+            "backendName": "psmux.exe",
+            "installDir": "C:\\Users\\Daniel\\AppData\\Local\\psmux"
+          },
+          {
+            "v": 2,
+            "at": "2026-10-06T14:11:39.128Z",
+            "pid": 14388,
+            "correlationId": "pane-muwrbtmv-995722c7",
+            "verb": "display",
+            "classification": "pass-through",
+            "kind": "passthrough",
+            "rewritten": false,
+            "argc": 8,
+            "dashDashInserted": false,
+            "envSlotCount": 0,
+            "envSlotNames": [],
+            "descriptorFileUsed": false,
+            "backend": "C:\\Users\\Daniel\\AppData\\Local\\psmux\\psmux.exe",
+            "backendSource": "registry",
+            "resolution": "resolved",
+            "outcome": "forwarded",
+            "exitCode": 0,
+            "durationMs": 49,
+            "argv": [
+              "-L",
+              "tbase1_shim",
+              "display",
+              "-p",
+              "-F",
+              "#{session_name}:#{window_index}",
+              "-t",
+              "%1"
+            ],
+            "followUps": [],
+            "helper": null,
+            "backendName": "psmux.exe",
+            "installDir": "C:\\Users\\Daniel\\AppData\\Local\\psmux"
+          },
+          {
+            "v": 2,
+            "at": "2026-10-06T14:11:39.230Z",
+            "pid": 26648,
+            "correlationId": "pane-muwrbtq1-e8af8f06",
+            "verb": "list-panes",
+            "classification": "pass-through",
+            "kind": "passthrough",
+            "rewritten": false,
+            "argc": 7,
+            "dashDashInserted": false,
+            "envSlotCount": 0,
+            "envSlotNames": [],
+            "descriptorFileUsed": false,
+            "backend": "C:\\Users\\Daniel\\AppData\\Local\\psmux\\psmux.exe",
+            "backendSource": "registry",
+            "resolution": "resolved",
+            "outcome": "forwarded",
+            "exitCode": 1,
+            "durationMs": 37,
+            "argv": [
+              "-L",
+              "tbase1_shim",
+              "list-panes",
+              "-t",
+              "-F probe:0",
+              "-F",
+              "#{pane_id}"
+            ],
+            "followUps": [],
+            "helper": null,
+            "backendName": "psmux.exe",
+            "installDir": "C:\\Users\\Daniel\\AppData\\Local\\psmux"
+          },
+          {
+            "v": 2,
+            "at": "2026-10-06T14:11:39.348Z",
+            "pid": 29520,
+            "correlationId": "pane-muwrbtsw-a5ac796d",
+            "verb": "split-window",
+            "classification": "pass-through",
+            "kind": "passthrough",
+            "rewritten": false,
+            "argc": 14,
+            "dashDashInserted": false,
+            "envSlotCount": 0,
+            "envSlotNames": [],
+            "descriptorFileUsed": false,
+            "backend": "C:\\Users\\Daniel\\AppData\\Local\\psmux\\psmux.exe",
+            "backendSource": "registry",
+            "resolution": "resolved",
+            "outcome": "forwarded",
+            "exitCode": 0,
+            "durationMs": 53,
+            "argv": [
+              "-L",
+              "tbase1_shim",
+              "split-window",
+              "-t",
+              "%1",
+              "-h",
+              "-d",
+              "-l",
+              "70%",
+              "-P",
+              "-F",
+              "#{pane_id}",
+              "-c",
+              "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-team-probe"
+            ],
+            "followUps": [],
+            "helper": null,
+            "backendName": "psmux.exe",
+            "installDir": "C:\\Users\\Daniel\\AppData\\Local\\psmux"
+          },
+          {
+            "v": 2,
+            "at": "2026-10-06T14:11:39.470Z",
+            "pid": 30032,
+            "correlationId": "pane-muwrbtw2-5298f379",
+            "verb": "select-pane",
+            "classification": "pass-through",
+            "kind": "passthrough",
+            "rewritten": false,
+            "argc": 7,
+            "dashDashInserted": false,
+            "envSlotCount": 0,
+            "envSlotNames": [],
+            "descriptorFileUsed": false,
+            "backend": "C:\\Users\\Daniel\\AppData\\Local\\psmux\\psmux.exe",
+            "backendSource": "registry",
+            "resolution": "resolved",
+            "outcome": "forwarded",
+            "exitCode": 0,
+            "durationMs": 60,
+            "argv": [
+              "-L",
+              "tbase1_shim",
+              "select-pane",
+              "-t",
+              "%2",
+              "-T",
+              "omo-team-probe-a"
+            ],
+            "followUps": [],
+            "helper": null,
+            "backendName": "psmux.exe",
+            "installDir": "C:\\Users\\Daniel\\AppData\\Local\\psmux"
+          },
+          {
+            "v": 2,
+            "at": "2026-10-06T14:11:39.560Z",
+            "pid": 30300,
+            "correlationId": "pane-muwrbtz7-63310d57",
+            "verb": "set-option",
+            "classification": "pass-through",
+            "kind": "passthrough",
+            "rewritten": false,
+            "argc": 8,
+            "dashDashInserted": false,
+            "envSlotCount": 0,
+            "envSlotNames": [],
+            "descriptorFileUsed": false,
+            "backend": "C:\\Users\\Daniel\\AppData\\Local\\psmux\\psmux.exe",
+            "backendSource": "registry",
+            "resolution": "resolved",
+            "outcome": "forwarded",
+            "exitCode": 1,
+            "durationMs": 37,
+            "argv": [
+              "-L",
+              "tbase1_shim",
+              "set-option",
+              "-p",
+              "-t",
+              "%2",
+              "@omo_attach_server_url",
+              "http://127.0.0.1:59999"
+            ],
+            "followUps": [],
+            "helper": null,
+            "backendName": "psmux.exe",
+            "installDir": "C:\\Users\\Daniel\\AppData\\Local\\psmux"
+          },
+          {
+            "v": 2,
+            "at": "2026-10-06T14:11:39.643Z",
+            "pid": 12168,
+            "correlationId": "pane-muwrbu1g-c96fcab0",
+            "verb": "set-option",
+            "classification": "pass-through",
+            "kind": "passthrough",
+            "rewritten": false,
+            "argc": 8,
+            "dashDashInserted": false,
+            "envSlotCount": 0,
+            "envSlotNames": [],
+            "descriptorFileUsed": false,
+            "backend": "C:\\Users\\Daniel\\AppData\\Local\\psmux\\psmux.exe",
+            "backendSource": "registry",
+            "resolution": "resolved",
+            "outcome": "forwarded",
+            "exitCode": 1,
+            "durationMs": 40,
+            "argv": [
+              "-L",
+              "tbase1_shim",
+              "set-option",
+              "-p",
+              "-t",
+              "%2",
+              "@omo_attach_session_id",
+              "ses_probe_a"
+            ],
+            "followUps": [],
+            "helper": null,
+            "backendName": "psmux.exe",
+            "installDir": "C:\\Users\\Daniel\\AppData\\Local\\psmux"
+          },
+          {
+            "v": 2,
+            "at": "2026-10-06T14:11:39.750Z",
+            "pid": 27368,
+            "correlationId": "pane-muwrbu4g-7b10078f",
+            "verb": "send-keys",
+            "classification": "pass-through",
+            "kind": "passthrough",
+            "rewritten": false,
+            "argc": 7,
+            "dashDashInserted": false,
+            "envSlotCount": 0,
+            "envSlotNames": [],
+            "descriptorFileUsed": false,
+            "backend": "C:\\Users\\Daniel\\AppData\\Local\\psmux\\psmux.exe",
+            "backendSource": "registry",
+            "resolution": "resolved",
+            "outcome": "forwarded",
+            "exitCode": 0,
+            "durationMs": 39,
+            "argv": [
+              "-L",
+              "tbase1_shim",
+              "send-keys",
+              "-t",
+              "%2",
+              "echo TEAM_PROBE_MARKER_A",
+              "Enter"
+            ],
+            "followUps": [],
+            "helper": null,
+            "backendName": "psmux.exe",
+            "installDir": "C:\\Users\\Daniel\\AppData\\Local\\psmux"
+          },
+          {
+            "v": 2,
+            "at": "2026-10-06T14:11:41.050Z",
+            "pid": 36900,
+            "correlationId": "pane-muwrbv4h-6c9172b3",
+            "verb": "capture-pane",
+            "classification": "pass-through",
+            "kind": "passthrough",
+            "rewritten": false,
+            "argc": 6,
+            "dashDashInserted": false,
+            "envSlotCount": 0,
+            "envSlotNames": [],
+            "descriptorFileUsed": false,
+            "backend": "C:\\Users\\Daniel\\AppData\\Local\\psmux\\psmux.exe",
+            "backendSource": "registry",
+            "resolution": "resolved",
+            "outcome": "forwarded",
+            "exitCode": 0,
+            "durationMs": 41,
+            "argv": [
+              "-L",
+              "tbase1_shim",
+              "capture-pane",
+              "-p",
+              "-t",
+              "%2"
+            ],
+            "followUps": [],
+            "helper": null,
+            "backendName": "psmux.exe",
+            "installDir": "C:\\Users\\Daniel\\AppData\\Local\\psmux"
+          },
+          {
+            "v": 2,
+            "at": "2026-10-06T14:11:41.152Z",
+            "pid": 37236,
+            "correlationId": "pane-muwrbv7b-fbadd741",
+            "verb": "split-window",
+            "classification": "pass-through",
+            "kind": "passthrough",
+            "rewritten": false,
+            "argc": 12,
+            "dashDashInserted": false,
+            "envSlotCount": 0,
+            "envSlotNames": [],
+            "descriptorFileUsed": false,
+            "backend": "C:\\Users\\Daniel\\AppData\\Local\\psmux\\psmux.exe",
+            "backendSource": "registry",
+            "resolution": "resolved",
+            "outcome": "forwarded",
+            "exitCode": 0,
+            "durationMs": 41,
+            "argv": [
+              "-L",
+              "tbase1_shim",
+              "split-window",
+              "-t",
+              "%2",
+              "-v",
+              "-d",
+              "-P",
+              "-F",
+              "#{pane_id}",
+              "-c",
+              "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-team-probe"
+            ],
+            "followUps": [],
+            "helper": null,
+            "backendName": "psmux.exe",
+            "installDir": "C:\\Users\\Daniel\\AppData\\Local\\psmux"
+          },
+          {
+            "v": 2,
+            "at": "2026-10-06T14:11:41.266Z",
+            "pid": 37336,
+            "correlationId": "pane-muwrbva5-055cf57f",
+            "verb": "select-pane",
+            "classification": "pass-through",
+            "kind": "passthrough",
+            "rewritten": false,
+            "argc": 7,
+            "dashDashInserted": false,
+            "envSlotCount": 0,
+            "envSlotNames": [],
+            "descriptorFileUsed": false,
+            "backend": "C:\\Users\\Daniel\\AppData\\Local\\psmux\\psmux.exe",
+            "backendSource": "registry",
+            "resolution": "resolved",
+            "outcome": "forwarded",
+            "exitCode": 0,
+            "durationMs": 53,
+            "argv": [
+              "-L",
+              "tbase1_shim",
+              "select-pane",
+              "-t",
+              "%3",
+              "-T",
+              "omo-team-probe-b"
+            ],
+            "followUps": [],
+            "helper": null,
+            "backendName": "psmux.exe",
+            "installDir": "C:\\Users\\Daniel\\AppData\\Local\\psmux"
+          },
+          {
+            "v": 2,
+            "at": "2026-10-06T14:11:41.358Z",
+            "pid": 35748,
+            "correlationId": "pane-muwrbvd4-e638d09a",
+            "verb": "set-option",
+            "classification": "pass-through",
+            "kind": "passthrough",
+            "rewritten": false,
+            "argc": 8,
+            "dashDashInserted": false,
+            "envSlotCount": 0,
+            "envSlotNames": [],
+            "descriptorFileUsed": false,
+            "backend": "C:\\Users\\Daniel\\AppData\\Local\\psmux\\psmux.exe",
+            "backendSource": "registry",
+            "resolution": "resolved",
+            "outcome": "forwarded",
+            "exitCode": 1,
+            "durationMs": 39,
+            "argv": [
+              "-L",
+              "tbase1_shim",
+              "set-option",
+              "-p",
+              "-t",
+              "%3",
+              "@omo_attach_server_url",
+              "http://127.0.0.1:59999"
+            ],
+            "followUps": [],
+            "helper": null,
+            "backendName": "psmux.exe",
+            "installDir": "C:\\Users\\Daniel\\AppData\\Local\\psmux"
+          },
+          {
+            "v": 2,
+            "at": "2026-10-06T14:11:41.455Z",
+            "pid": 3204,
+            "correlationId": "pane-muwrbvfp-8d7330d2",
+            "verb": "set-option",
+            "classification": "pass-through",
+            "kind": "passthrough",
+            "rewritten": false,
+            "argc": 8,
+            "dashDashInserted": false,
+            "envSlotCount": 0,
+            "envSlotNames": [],
+            "descriptorFileUsed": false,
+            "backend": "C:\\Users\\Daniel\\AppData\\Local\\psmux\\psmux.exe",
+            "backendSource": "registry",
+            "resolution": "resolved",
+            "outcome": "forwarded",
+            "exitCode": 1,
+            "durationMs": 42,
+            "argv": [
+              "-L",
+              "tbase1_shim",
+              "set-option",
+              "-p",
+              "-t",
+              "%3",
+              "@omo_attach_session_id",
+              "ses_probe_b"
+            ],
+            "followUps": [],
+            "helper": null,
+            "backendName": "psmux.exe",
+            "installDir": "C:\\Users\\Daniel\\AppData\\Local\\psmux"
+          },
+          {
+            "v": 2,
+            "at": "2026-10-06T14:11:41.549Z",
+            "pid": 32500,
+            "correlationId": "pane-muwrbvia-77ff25b9",
+            "verb": "send-keys",
+            "classification": "pass-through",
+            "kind": "passthrough",
+            "rewritten": false,
+            "argc": 7,
+            "dashDashInserted": false,
+            "envSlotCount": 0,
+            "envSlotNames": [],
+            "descriptorFileUsed": false,
+            "backend": "C:\\Users\\Daniel\\AppData\\Local\\psmux\\psmux.exe",
+            "backendSource": "registry",
+            "resolution": "resolved",
+            "outcome": "forwarded",
+            "exitCode": 0,
+            "durationMs": 43,
+            "argv": [
+              "-L",
+              "tbase1_shim",
+              "send-keys",
+              "-t",
+              "%3",
+              "echo TEAM_PROBE_MARKER_B",
+              "Enter"
+            ],
+            "followUps": [],
+            "helper": null,
+            "backendName": "psmux.exe",
+            "installDir": "C:\\Users\\Daniel\\AppData\\Local\\psmux"
+          },
+          {
+            "v": 2,
+            "at": "2026-10-06T14:11:42.869Z",
+            "pid": 35400,
+            "correlationId": "pane-muwrbwiu-c0e8db5c",
+            "verb": "capture-pane",
+            "classification": "pass-through",
+            "kind": "passthrough",
+            "rewritten": false,
+            "argc": 6,
+            "dashDashInserted": false,
+            "envSlotCount": 0,
+            "envSlotNames": [],
+            "descriptorFileUsed": false,
+            "backend": "C:\\Users\\Daniel\\AppData\\Local\\psmux\\psmux.exe",
+            "backendSource": "registry",
+            "resolution": "resolved",
+            "outcome": "forwarded",
+            "exitCode": 0,
+            "durationMs": 47,
+            "argv": [
+              "-L",
+              "tbase1_shim",
+              "capture-pane",
+              "-p",
+              "-t",
+              "%3"
+            ],
+            "followUps": [],
+            "helper": null,
+            "backendName": "psmux.exe",
+            "installDir": "C:\\Users\\Daniel\\AppData\\Local\\psmux"
+          },
+          {
+            "v": 2,
+            "at": "2026-10-06T14:11:42.953Z",
+            "pid": 30820,
+            "correlationId": "pane-muwrbwlf-dc5e6386",
+            "verb": "list-panes",
+            "classification": "pass-through",
+            "kind": "passthrough",
+            "rewritten": false,
+            "argc": 6,
+            "dashDashInserted": false,
+            "envSlotCount": 0,
+            "envSlotNames": [],
+            "descriptorFileUsed": false,
+            "backend": "C:\\Users\\Daniel\\AppData\\Local\\psmux\\psmux.exe",
+            "backendSource": "registry",
+            "resolution": "resolved",
+            "outcome": "forwarded",
+            "exitCode": 0,
+            "durationMs": 38,
+            "argv": [
+              "-L",
+              "tbase1_shim",
+              "list-panes",
+              "-a",
+              "-F",
+              "#{pane_id} #{pane_left} #{pane_width}"
+            ],
+            "followUps": [],
+            "helper": null,
+            "backendName": "psmux.exe",
+            "installDir": "C:\\Users\\Daniel\\AppData\\Local\\psmux"
+          },
+          {
+            "v": 2,
+            "at": "2026-10-06T14:11:43.029Z",
+            "pid": 31528,
+            "correlationId": "pane-muwrbwno-135da1d1",
+            "verb": "select-layout",
+            "classification": "pass-through",
+            "kind": "passthrough",
+            "rewritten": false,
+            "argc": 6,
+            "dashDashInserted": false,
+            "envSlotCount": 0,
+            "envSlotNames": [],
+            "descriptorFileUsed": false,
+            "backend": "C:\\Users\\Daniel\\AppData\\Local\\psmux\\psmux.exe",
+            "backendSource": "registry",
+            "resolution": "resolved",
+            "outcome": "forwarded",
+            "exitCode": 1,
+            "durationMs": 34,
+            "argv": [
+              "-L",
+              "tbase1_shim",
+              "select-layout",
+              "-t",
+              "-F probe:0",
+              "main-vertical"
+            ],
+            "followUps": [],
+            "helper": null,
+            "backendName": "psmux.exe",
+            "installDir": "C:\\Users\\Daniel\\AppData\\Local\\psmux"
+          },
+          {
+            "v": 2,
+            "at": "2026-10-06T14:11:44.325Z",
+            "pid": 10280,
+            "correlationId": "pane-muwrbxnl-77f81b99",
+            "verb": "list-panes",
+            "classification": "pass-through",
+            "kind": "passthrough",
+            "rewritten": false,
+            "argc": 6,
+            "dashDashInserted": false,
+            "envSlotCount": 0,
+            "envSlotNames": [],
+            "descriptorFileUsed": false,
+            "backend": "C:\\Users\\Daniel\\AppData\\Local\\psmux\\psmux.exe",
+            "backendSource": "registry",
+            "resolution": "resolved",
+            "outcome": "forwarded",
+            "exitCode": 0,
+            "durationMs": 37,
+            "argv": [
+              "-L",
+              "tbase1_shim",
+              "list-panes",
+              "-a",
+              "-F",
+              "#{pane_id} #{pane_left} #{pane_width}"
+            ],
+            "followUps": [],
+            "helper": null,
+            "backendName": "psmux.exe",
+            "installDir": "C:\\Users\\Daniel\\AppData\\Local\\psmux"
+          },
+          {
+            "v": 2,
+            "at": "2026-10-06T14:11:44.410Z",
+            "pid": 27044,
+            "correlationId": "pane-muwrbxqc-5dae5de3",
+            "verb": "resize-pane",
+            "classification": "pass-through",
+            "kind": "suppressed",
+            "rewritten": false,
+            "argc": 7,
+            "dashDashInserted": false,
+            "envSlotCount": 0,
+            "envSlotNames": [],
+            "descriptorFileUsed": false,
+            "backend": "C:\\Users\\Daniel\\AppData\\Local\\psmux\\psmux.exe",
+            "backendSource": "registry",
+            "resolution": "resolved",
+            "outcome": "suppressed",
+            "exitCode": 0,
+            "durationMs": 22,
+            "argv": [
+              "-L",
+              "tbase1_shim",
+              "resize-pane",
+              "-t",
+              "%1",
+              "-x",
+              "30%"
+            ],
+            "followUps": [],
+            "helper": null,
+            "backendName": "psmux.exe",
+            "installDir": "C:\\Users\\Daniel\\AppData\\Local\\psmux"
+          },
+          {
+            "v": 2,
+            "at": "2026-10-06T14:11:45.714Z",
+            "pid": 37696,
+            "correlationId": "pane-muwrbyq7-2fa20fde",
+            "verb": "list-panes",
+            "classification": "pass-through",
+            "kind": "passthrough",
+            "rewritten": false,
+            "argc": 6,
+            "dashDashInserted": false,
+            "envSlotCount": 0,
+            "envSlotNames": [],
+            "descriptorFileUsed": false,
+            "backend": "C:\\Users\\Daniel\\AppData\\Local\\psmux\\psmux.exe",
+            "backendSource": "registry",
+            "resolution": "resolved",
+            "outcome": "forwarded",
+            "exitCode": 0,
+            "durationMs": 36,
+            "argv": [
+              "-L",
+              "tbase1_shim",
+              "list-panes",
+              "-a",
+              "-F",
+              "#{pane_id} #{pane_left} #{pane_width}"
+            ],
+            "followUps": [],
+            "helper": null,
+            "backendName": "psmux.exe",
+            "installDir": "C:\\Users\\Daniel\\AppData\\Local\\psmux"
+          },
+          {
+            "v": 2,
+            "at": "2026-10-06T14:11:45.830Z",
+            "pid": 13912,
+            "correlationId": "pane-muwrbysf-1b52e81b",
+            "verb": "kill-pane",
+            "classification": "pass-through",
+            "kind": "passthrough",
+            "rewritten": false,
+            "argc": 5,
+            "dashDashInserted": false,
+            "envSlotCount": 0,
+            "envSlotNames": [],
+            "descriptorFileUsed": false,
+            "backend": "C:\\Users\\Daniel\\AppData\\Local\\psmux\\psmux.exe",
+            "backendSource": "registry",
+            "resolution": "resolved",
+            "outcome": "forwarded",
+            "exitCode": 0,
+            "durationMs": 71,
+            "argv": [
+              "-L",
+              "tbase1_shim",
+              "kill-pane",
+              "-t",
+              "%2"
+            ],
+            "followUps": [],
+            "helper": null,
+            "backendName": "psmux.exe",
+            "installDir": "C:\\Users\\Daniel\\AppData\\Local\\psmux"
+          },
+          {
+            "v": 2,
+            "at": "2026-10-06T14:11:45.937Z",
+            "pid": 26580,
+            "correlationId": "pane-muwrbyvn-dd73cd44",
+            "verb": "kill-pane",
+            "classification": "pass-through",
+            "kind": "passthrough",
+            "rewritten": false,
+            "argc": 5,
+            "dashDashInserted": false,
+            "envSlotCount": 0,
+            "envSlotNames": [],
+            "descriptorFileUsed": false,
+            "backend": "C:\\Users\\Daniel\\AppData\\Local\\psmux\\psmux.exe",
+            "backendSource": "registry",
+            "resolution": "resolved",
+            "outcome": "forwarded",
+            "exitCode": 1,
+            "durationMs": 63,
+            "argv": [
+              "-L",
+              "tbase1_shim",
+              "kill-pane",
+              "-t",
+              "%2"
+            ],
+            "followUps": [],
+            "helper": null,
+            "backendName": "psmux.exe",
+            "installDir": "C:\\Users\\Daniel\\AppData\\Local\\psmux"
+          }
+        ]
+      }
+    }
+  },
+  "cleanup": {
+    "kept": false,
+    "binary": "C:\\Users\\Daniel\\AppData\\Local\\psmux\\psmux.exe",
+    "namespaces": [
+      {
+        "namespace": "tbase1",
+        "kill_session": {
+          "argv": [
+            "-L",
+            "tbase1",
+            "kill-session",
+            "-t",
+            "probe"
+          ],
+          "exit": 0,
+          "stdout": "",
+          "stderr": "",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 259
+        },
+        "list_sessions": {
+          "argv": [
+            "-L",
+            "tbase1",
+            "list-sessions",
+            "-F",
+            "#{session_name}"
+          ],
+          "exit": 0,
+          "stdout": "",
+          "stderr": "",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 25
+        },
+        "sessionsLeft": [],
+        "kill_server": {
+          "argv": [
+            "-L",
+            "tbase1",
+            "kill-server"
+          ],
+          "exit": 0,
+          "stdout": "",
+          "stderr": "",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 77
+        }
+      },
+      {
+        "namespace": "tbase1_shim",
+        "kill_session": {
+          "argv": [
+            "-L",
+            "tbase1_shim",
+            "kill-session",
+            "-t",
+            "probe"
+          ],
+          "exit": 0,
+          "stdout": "",
+          "stderr": "",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 257
+        },
+        "list_sessions": {
+          "argv": [
+            "-L",
+            "tbase1_shim",
+            "list-sessions",
+            "-F",
+            "#{session_name}"
+          ],
+          "exit": 0,
+          "stdout": "",
+          "stderr": "",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 21
+        },
+        "sessionsLeft": [],
+        "kill_server": {
+          "argv": [
+            "-L",
+            "tbase1_shim",
+            "kill-server"
+          ],
+          "exit": 0,
+          "stdout": "",
+          "stderr": "",
+          "error": null,
+          "timed_out": false,
+          "duration_ms": 76
+        }
+      }
+    ],
+    "sessionsLeft": [],
+    "ok": true
+  },
+  "fatal": null,
+  "ok": true
+}

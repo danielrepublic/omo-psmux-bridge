@@ -1,0 +1,59 @@
+Issue #1 — Windows team-mode pane support: validation record (2026-10-06)
+=======================================================================
+
+Host: WINDOWS-DANIEL (Windows, Windows PowerShell 5.1.26100.9444, node v24.19.0)
+Backend under test: psmux 3.3.8 (`%LOCALAPPDATA%\psmux\psmux.exe`)
+Treatment binary: dist/tmux.exe built from this change set with
+  `bun build --compile src/cli.ts --outfile dist/tmux.exe --target=bun-windows-x64`
+  size 86134272 bytes, SHA-256 ffa9460f29e6ee0ca58f96573a26ff05fc328382f984244fbebb444e0c5ab41d
+  staged at %LOCALAPPDATA%\opencode-psmux-bridge\staging\team-mode\bin\tmux.exe
+  (the installed shim was never overwritten)
+
+1. Rule D0 — `display -p -F` fix spelling (throwaway -L tfix1, cleaned)
+-----------------------------------------------------------------------
+  display -p -F "#{session_id}" -t %1                        -> -F $1303   (broken)
+  display -p    "#{session_id}" -t %1  (drop -F)             -> $1303      (fixed)
+  display -p -F "#{session_name}:#{window_index}" -t %1      -> -F p:0     (broken)
+  display -p    "#{session_name}:#{window_index}" -t %1      -> p:0        (fixed)
+  display -p -t %1 "#{window_width},#{window_height}"        -> 100,30     (unchanged shape)
+  tmux 3.7c control for the same argv                        -> $0
+
+2. Rule 1e — geometry (throwaway -L tgeo1, cleaned)
+---------------------------------------------------
+  after team splits (-t %1 -h -l 70%, then -t %2 -v):
+      %1 0 59   %2 60 140   %3 60 140
+  after select-layout -t p:0 main-vertical (VALID target):
+      %1 0 119  %2 120 80   %3 120 80       (layout applies; caller is main)
+  after set-option main-pane-width 30 + select-layout main-vertical (the rule-1e sequence):
+      %1 0 59   %2 60 140   %3 60 140       (caller ~29.6% = intended 30%)
+
+3. Probe run — baseline vs staged binary
+----------------------------------------
+  Probe: scripts/windows/parity/team-layout-probe.cjs (D3)
+  Run A (baseline): --shim <installed shim>  -> team-layout-probe-before.json
+  Run B (AFTER):    --shim <staged binary>   -> team-layout-probe-after.json
+  Both runs: ok=true, cleanup.ok=true, sessionsLeft=[]
+
+  AFTER shim arm, per command:
+    display x2        -> $1310 / probe:0; record rewritten=true,
+                         rewriteReason=psmux-client-treats-display-F-as-message-text
+    list-panes        -> exit 0, %1 (valid target)
+    set-option -p x4  -> suppressed, exit 0, no backend call,
+                         suppressionReason=psmux-refuses-pane-scoped-options
+    select-layout -t  -> exit 0; geometry 59/140 -> 119/80
+    resize-pane -x 30%-> rewritten; follow-up select-layout main-vertical;
+                         geometry 59/140 (~30%)
+    send-keys x2      -> capture-pane markers present
+    kill-pane (dead)  -> exit 1, stderr "psmux: can't find pane: %2"
+  DIRECT arm (control) still shows raw psmux behaviour: `-F $1308`,
+  select-layout target corrupted -> exit 1. The treatment's success is
+  therefore attributable to the shim.
+
+4. Protocol notes
+-----------------
+  - Every probe invocation and every manual command carried `-L <namespace>`;
+    all namespaces were killed with kill-session + kill-server and verified
+    empty (list-sessions). No server process was left behind by this work.
+  - The Windows host had 3 psmux.exe processes before and after these runs;
+    namespaces created here (tbase1, tbase1_shim, tfix1, tgeo1, tafter1,
+    tafter1_shim) were all verified gone.

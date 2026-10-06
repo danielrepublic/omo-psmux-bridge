@@ -1,0 +1,37 @@
+  ??  ?? Messages from teammates and the lead are automatically delivered to you as new conversation turns. You do NOT need to manually poll or read inbox
+  ?? files. If a message arrives mid-turn, it is queued and delivered when your current turn ends. When you report on a teammate message, you do NOT
+  ?? need to quote it back ??the lead has already seen it.
+  ??  ?? ## Idle is normal
+  ??  ?? Going idle after sending a message is the expected flow ??it does NOT mean you are done or unavailable. Idle simply means you are waiting for
+  ?? input. Idle teammates can still receive messages; the next `team_send_message` to you wakes you up. Do not treat your own idle state ??or another
+  ?? teammate's ??as an error.
+  ??  ?? ## Communication rules
+  ??  ?? - Do NOT send structured JSON status messages like `{"type":"idle",...}` or `{"type":"task_completed",...}`. Communicate in plain natural language
+  ?? when you message teammates.
+  ?? - Do NOT use terminal tools (Bash, file readers) to inspect another teammate's session, inbox, or pane. Send a `team_send_message` instead.
+  ?? - Always refer to teammates by their NAME (e.g., `to: "lead"`, `to: "researcher"`), never by internal session IDs.
+  ??  ?? ## Wrap-up
+  ??  ?? When you finish your assigned work, ALWAYS, in this order:
+  ?? 1. Mark your task `status: "completed"` (or `"failed"` with a reason) via `team_task_update` ??the lead's closure check reads `team_task_list`, so
+  ?? the task update must land before any completion message.
+  ?? 2. Re-check `team_task_list` for newly unblocked work. If there is any, claim it and continue ??do not idle.
+  ?? 3. If `team_task_list` shows nothing left for you, send the lead a single short `team_send_message` with your results and the phrase `closure-
+  ?? ready` so the lead knows you have no more work in flight. Then go idle.
+  ?? <!-- OMO_INTERNAL_INITIATOR -->
+  ??
+     + Thought: 1.6s
+
+  ??  ?? $ echo E2E-MEMBER-OK && cd
+  ??  ?? E2E-MEMBER-OK
+  ?? C:\Users\Daniel\AppData\Local\Temp\omo-e2e-probe3
+  ??
+     + Thought: 1.9s
+
+     ??team_send_message [teamRunId=e3bf4dba-7420-449a-b9f4-4763447ba122, to=lead, body=E2E-MEMBER-OK
+       Current directory: C:\Users\Daniel\AppData\Local\Temp\omo-e2e-probe3
+       closure-ready, summary=E2E probe complete]
+
+     ?? Sisyphus-Junior 繚 LongCat 2.5 Preview Free
+
+  ??  ?? Subagent (1 of 1) 23.4K (2%)                                                                                      Parent up  Prev left  Next right
+  ??

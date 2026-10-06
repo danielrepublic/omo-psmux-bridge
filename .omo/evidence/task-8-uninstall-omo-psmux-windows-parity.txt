@@ -1,0 +1,117 @@
+================================================================================
+TASK 8 UNINSTALL EVIDENCE - omo-psmux-bridge Windows parity
+================================================================================
+Status: PASS - round trip verified, host restored to 10 entries
+Host: windows-daniel (WINDOWS-DANIEL, PowerShell 5.1, console encoding BIG5)
+Date: 2026-10-05
+
+--------------------------------------------------------------------------------
+ROOT CAUSE (one sentence)
+--------------------------------------------------------------------------------
+The previous uninstall.ps1 failed because $PSScriptRoot evaluated to an empty
+string in the param block when invoked via Start-Process -File, causing
+[System.IO.Path]::GetFullPath('') to throw ArgumentException before any PATH
+modification occurred.
+
+--------------------------------------------------------------------------------
+WHAT CHANGED
+--------------------------------------------------------------------------------
+Both install.ps1 and uninstall.ps1 were fixed in the repo worktree
+(/home/daniel/omo-psmux-bridge-wt/windows-parity/scripts/windows/):
+
+  The $BinDir default was moved from the param block to the body of the
+  script, with a fallback chain:
+    1. $BinDir parameter (if provided)
+    2. $PSScriptRoot (if non-empty)
+    3. GetDirectoryName($MyInvocation.MyCommand.Path) (if non-empty)
+  Only after resolving a non-empty $BinDir does the script call
+  [System.IO.Path]::GetFullPath($BinDir).TrimEnd('\').
+
+  This prevents GetFullPath from ever receiving an empty string, which was
+  the direct cause of the MethodInvocationException / ArgumentException.
+
+The fixed scripts were deployed to:
+  C:\Users\Daniel\AppData\Local\opencode-psmux-bridge\bin\install.ps1
+  C:\Users\Daniel\AppData\Local\opencode-psmux-bridge\bin\uninstall.ps1
+
+Timestamped backups of the previously deployed versions:
+  install.ps1.bak_20261005_194010
+  uninstall.ps1.bak_20261005_194010
+
+--------------------------------------------------------------------------------
+ROUND-TRIP EXIT CODES (all four steps)
+--------------------------------------------------------------------------------
+
+  Step 2 - install.ps1 (1st run):    exit_code=0  RESULT=ALREADY_CORRECT
+    Bridge entry was already present and first (from a prior install).
+    entries=11, bridge_first=True, changed=no.
+
+  Step 3 - install.ps1 (2nd run):    exit_code=0  RESULT=ALREADY_CORRECT
+    Idempotent: still exactly 11 entries, bridge_entries=1,
+    path_unchanged=True (byte-identical to after 1st run).
+
+  Step 4 - uninstall.ps1 (1st run):  exit_code=0  RESULT=REMOVED
+    Bridge entry removed. entries=10, bridge_entries=0, changed=yes.
+
+  Step 5 - uninstall.ps1 (2nd run):  exit_code=0  RESULT=ALREADY_ABSENT
+    Safe to run again: entries=10, bridge_entries=0,
+    path_unchanged=True (byte-identical to after 1st uninstall).
+
+--------------------------------------------------------------------------------
+DUPLICATE WinGet\Links ANALYSIS
+--------------------------------------------------------------------------------
+The duplicate C:\Users\Daniel\AppData\Local\Microsoft\WinGet\Links entry
+appears TWICE in the final PATH (at index 4 and index 9).
+
+This duplicate is PRE-EXISTING, not introduced by install.ps1:
+  - It was present in the baseline PATH before any script was run
+    (baseline[5] and baseline[10]).
+  - install.ps1 only removes entries matching the bridge bin path and
+    prepends the bridge bin. It does not add, remove, or reorder any
+    other entries.
+  - The duplicate persisted through the install->uninstall cycle because
+    it was already there, not because install.ps1 introduced it.
+
+install.ps1 does NOT introduce the duplicate. No fix was needed for this.
+
+--------------------------------------------------------------------------------
+FINAL PATH (byte-for-byte, 10 entries, bridge entry REMOVED)
+--------------------------------------------------------------------------------
+C:\Users\Daniel\bin;C:\Users\Daniel\AppData\Local\Microsoft\WindowsApps;C:\Users\Daniel\AppData\Local\Programs\Microsoft VS Code\bin;C:\Users\Daniel\AppData\Roaming\npm;C:\Users\Daniel\AppData\Local\Microsoft\WinGet\Links;C:\Users\Daniel\AppData\Local\Microsoft\WinGet\Packages\ast-grep.ast-grep_Microsoft.Winget.Source_8wekyb3d8bbwe;C:\Users\Daniel\AppData\Local\Microsoft\WinGet\Packages\yt-dlp.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-N-125875-g5d4d3bdc61-win64-gpl\bin;C:\Users\Daniel\.dotnet\tools;C:\Users\Daniel\AppData\Local\psmux;C:\Users\Daniel\AppData\Local\Microsoft\WinGet\Links
+
+  [0]  C:\Users\Daniel\bin
+  [1]  C:\Users\Daniel\AppData\Local\Microsoft\WindowsApps
+  [2]  C:\Users\Daniel\AppData\Local\Programs\Microsoft VS Code\bin
+  [3]  C:\Users\Daniel\AppData\Roaming\npm
+  [4]  C:\Users\Daniel\AppData\Local\Microsoft\WinGet\Links
+  [5]  C:\Users\Daniel\AppData\Local\Microsoft\WinGet\Packages\ast-grep.ast-grep_Microsoft.Winget.Source_8wekyb3d8bbwe
+  [6]  C:\Users\Daniel\AppData\Local\Microsoft\WinGet\Packages\yt-dlp.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-N-125875-g5d4d3bdc61-win64-gpl\bin
+  [7]  C:\Users\Daniel\.dotnet\tools
+  [8]  C:\Users\Daniel\AppData\Local\psmux
+  [9]  C:\Users\Daniel\AppData\Local\Microsoft\WinGet\Links  (pre-existing duplicate)
+
+  Entry count: 10
+  Bridge entry present: NO
+  Machine PATH unchanged: YES (fingerprint EC47C1F9...39078, len=467, before==after)
+
+--------------------------------------------------------------------------------
+TMUX.EXE INTEGRITY
+--------------------------------------------------------------------------------
+  sha256: 9EA5E733FD78F4EA966A85A5CF062D1113C644FEFF80AD3B3084574C2BA2A858
+  Expected: 9EA5E733FD78F4EA966A85A5CF062D1113C644FEFF80AD3B3084574C2BA2A858
+  Match: YES - tmux.exe is untouched (86,110,208 bytes, never executed)
+
+--------------------------------------------------------------------------------
+CONSTRAINTS COMPLIANCE
+--------------------------------------------------------------------------------
+  - bin\tmux.exe: never touched, moved, copied, or executed
+  - psmux.cmd, opencode.cmd, omo-opencode-port.ps1: never modified
+  - No session killed; opencode.exe pid 18944 never signalled
+  - Machine/system PATH: never modified (fingerprint verified before==after)
+  - No git WRITE commands run
+  - No notepads or ledger entries created
+  - No setx used; user PATH modified only via HKCU\Environment registry key
+
+================================================================================
+END OF EVIDENCE
+================================================================================

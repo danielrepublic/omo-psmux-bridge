@@ -1,0 +1,298 @@
+EVIDENCE: plan todo 4, omo-psmux-windows-parity
+Artifact under test: CONTRACT.md (worktree root)
+Checker:             /tmp/opencode/check-contract.py (real script, not a dry run)
+OmO bundle:          oh-my-openagent 5.1.18 (NOT 5.1.17, which is not installed)
+psmux source:        /tmp/opencode/psmux-v338 at 66cf61354c473b35d4f0c06c57384fc46d61ffdb (tag v3.3.8)
+
+================================================================================
+QA CASE 1 (happy): every citation resolves. Real output, unmodified.
+================================================================================
+$ python3 /tmp/opencode/check-contract.py CONTRACT.md
+source: CONTRACT.md
+citations: 111 total (72 OmO bundle, 37 psmux v3.3.8, 2 prior-session transcript)
+bundle: /home/daniel/.cache/opencode/packages/oh-my-openagent@5.1.18/node_modules/oh-my-openagent/dist/index.js
+psmux:  /tmp/opencode/psmux-v338 (v3.3.8)
+----------------------------------------------------------------------------------------------------
+OK       index.js:8343                                  -> var TMUX_COMMAND_SHELL = "/bin/sh";
+OK       index.js:8318                                  -> function shellQuoteForNestedCommand(value) {
+OK       index.js:8319                                  -> return `'${value.replaceAll("'", "'\\''")}'`.replace(/\\/g, "\\\\").replace(/\$/g, "\\$...
+OK       index.js:8321                                  -> function buildTmuxAttachCommand(serverUrl, sessionId, directory = process.cwd()) {
+OK       index.js:8325                                  -> return `${TMUX_COMMAND_SHELL} -c "opencode attach ${escapedUrl} --session ${escapedSess...
+OK       index.js:8327                                  -> function buildTmuxPlaceholderCommand(description) {
+OK       index.js:8329                                  -> return `${TMUX_COMMAND_SHELL} -c "printf '%s\\n%s\\n' \\"OMO subagent pane ready: ${esc...
+OK       index.js:8329                                  -> return `${TMUX_COMMAND_SHELL} -c "printf '%s\\n%s\\n' \\"OMO subagent pane ready: ${esc...
+OK       index.js:8331                                  -> function buildPaneAuthEnvironmentArgs() {
+OK       index.js:8332                                  -> const password = process.env.OPENCODE_SERVER_PASSWORD;
+OK       index.js:8334                                  -> return [];
+OK       index.js:8336                                  -> const args = ["-e", `OPENCODE_SERVER_PASSWORD=${password}`];
+OK       index.js:8339                                  -> args.push("-e", `OPENCODE_SERVER_USERNAME=${username}`);
+OK       index.js:8341                                  -> return args;
+OK       index.js:8336                                  -> const args = ["-e", `OPENCODE_SERVER_PASSWORD=${password}`];
+OK       index.js:8401                                  -> const initialCmd = deps.isCmuxCompatEnvironment() ? buildTmuxAttachCommand(serverUrl, s...
+OK       index.js:8402                                  -> const args = [
+OK       index.js:8403                                  -> "split-window",
+OK       index.js:8404                                  -> splitDirection,
+OK       index.js:8409                                  -> ...targetPaneId ? ["-t", targetPaneId] : [],
+OK       index.js:8410                                  -> ...authEnvArgs,
+OK       index.js:8411                                  -> initialCmd
+OK       index.js:8413                                  -> const result = await runTmuxCommand(tmux, args);
+OK       index.js:8500                                  -> const placeholderCmd = buildTmuxPlaceholderCommand(description);
+OK       index.js:8501                                  -> const result = await runTmuxCommand(tmux, ["respawn-pane", "-k", ...authEnvArgs, "-t", ...
+OK       index.js:8547                                  -> const opencodeCmd = buildTmuxAttachCommand(serverUrl, sessionId, directory);
+OK       index.js:8548                                  -> const result = await deps.runTmuxCommand(tmux, [
+OK       index.js:8549                                  -> "respawn-pane",
+OK       index.js:8550                                  -> "-k",
+OK       index.js:8554                                  -> opencodeCmd
+OK       index.js:8617                                  -> const args = [
+OK       index.js:8618                                  -> "new-window",
+OK       index.js:8619                                  -> "-d",
+OK       index.js:8621                                  -> ISOLATED_WINDOW_NAME,
+OK       index.js:8624                                  -> "#{pane_id}",
+OK       index.js:8626                                  -> placeholderCmd
+OK       index.js:8647                                  -> var ISOLATED_WINDOW_NAME = "omo-agents";
+OK       index.js:8727                                  -> const args = sessionAlreadyExists ? [
+OK       index.js:8728                                  -> "new-window",
+OK       index.js:8730                                  -> isolatedSessionName,
+OK       index.js:8736                                  -> ] : [
+OK       index.js:8738                                  -> "-d",
+OK       index.js:8741                                  -> ...sizeArgs,
+OK       index.js:8746                                  -> placeholderCmd
+OK       index.js:8418                                  -> const title = `omo-subagent-${description.slice(0, 20)}`;
+OK       index.js:8419                                  -> const titleResult = await runTmuxCommand(tmux, ["select-pane", "-t", paneId, "-T", titl...
+OK       index.js:8506                                  -> const title = `omo-subagent-${description.slice(0, 20)}`;
+OK       index.js:8507                                  -> const titleResult = await runTmuxCommand(tmux, ["select-pane", "-t", paneId, "-T", titl...
+OK       index.js:8414                                  -> const paneId = result.output;
+OK       index.js:8415                                  -> if (result.exitCode !== 0 || !paneId) {
+OK       index.js:8448                                  -> await dependencies.runTmuxCommand(tmux, ["send-keys", "-t", paneId, "C-c"]);
+OK       index.js:8451                                  -> const result = await dependencies.runTmuxCommand(tmux, ["kill-pane", "-t", paneId]);
+OK       index.js:8453                                  -> const paneAlreadyGone = result.exitCode !== 0 && /can't find pane/i.test(trimmedStderr);
+OK       index.js:26718                                 -> var TmuxConfigSchema = z48.object({
+OK       index.js:26719                                 -> enabled: z48.boolean().default(false),
+OK       index.js:8227                                  -> function isInsideTmuxEnvironment(environment) {
+OK       index.js:8228                                  -> return Boolean(environment.TMUX);
+OK       index.js:8233                                  -> function isInsideTmux() {
+OK       index.js:8378                                  -> if (!deps.isInsideTmux() && !deps.isCmuxCompatEnvironment()) {
+OK       index.js:8385                                  -> const serverRunning = await deps.isServerRunning(serverUrl);
+OK       index.js:8390                                  -> const tmux = await deps.getTmuxPath();
+OK       index.js:150702                                -> function resolveServerUrl(rawServerUrl, env, log) {
+OK       index.js:150712                                -> log("[tmux-session-manager] ctx.serverUrl has port 0; falling back. " + "team_mode tmux...
+OK       index.js:9071                                  -> async function findVerifiedTmuxPath() {
+OK       index.js:9072                                  -> const path = await findCommandPath("tmux");
+OK       index.js:9077                                  -> const verifyProc = spawn([path, "-V"], {
+OK       index.js:9083                                  -> if (verifyExitCode !== 0) {
+OK       index.js:8390                                  -> const tmux = await deps.getTmuxPath();
+OK       src/pane.rs:938                                -> pub fn set_tmux_env(builder: &mut CommandBuilder, pane_id: usize, control_port: Option<...
+OK       src/pane.rs:944                                -> builder.env("TMUX", format!("/tmp/psmux-{}/{},{},0", server_pid, sn, port));
+OK       src/pane.rs:945                                -> builder.env("TMUX_PANE", format!("%{}", pane_id));
+OK       src/pane.rs:955                                -> builder.env("MSYS2_ENV_CONV_EXCL", "TMUX");
+OK       src/pane.rs:1283                               -> fn detect_bash_c_wrapper(cmd: &str) -> Option<(&str, &str)> {
+OK       src/pane.rs:1286                               -> ("/bin/sh -c ", "sh"),
+OK       src/pane.rs:1562                               -> if let Some((inner_script, _)) = detect_bash_c_wrapper(trimmed) {
+OK       src/pane.rs:392                                -> let mut shell_cmd = if command.is_some() {
+OK       src/pane.rs:100                                -> static CACHED_SHELL_PATH: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::ne...
+OK       src/pane.rs:161                                -> pub fn cached_shell() -> Option<&'static str> {
+OK       src/server/connection.rs:2093                  -> "respawn-pane" | "respawnp" => {
+OK       src/server/connection.rs:2102                  -> let command = args.iter().position(|a| *a == "--")
+OK       src/server/connection.rs:2103                  -> .map(|i| args[i + 1..].join(" "))
+OK       src/server/connection.rs:2106                  -> let _ = tx.send(CtrlReq::RespawnPane(workdir, kill, command, empty));
+OK       src/server/mod.rs:3890                         -> CtrlReq::RespawnPane(workdir, kill, command, empty) => {
+OK       docs/tmux_args_reference.md:91                 -> | `respawn-pane` | `respawnp`, `resp` | `kc:t:` plus `-- <command>` | CLI, SRV, CFG, CTL |
+OK       omo-psmux-bridge.md:609                        -> | `respawn-pane -k -t %1 <命令>` | ❌ 沒有 | 沒變（掉回預設 shell） |
+OK       omo-psmux-bridge.md:610                        -> | `respawn-pane -k -t %1 -- <命令>` | ✅ 有 | **沒變（`%1` → `%1`）** |
+OK       src/server/connection.rs:3580                  -> "respawn-window" | "respawnw" => {
+OK       src/server/connection.rs:3581                  -> let _ = tx.send(CtrlReq::RespawnWindow);
+OK       docs/tmux_args_reference.md:92                 -> | `respawn-window` | `respawnw` | none | CLI, SRV, CFG |
+OK       index.js:8898                                  -> function calculateMainPaneWidth(windowWidth, options) {
+OK       index.js:8914                                  -> const layoutProc = spawnCommand([tmux, "select-layout", layout], {
+OK       index.js:8921                                  -> const sizeProc = spawnCommand([tmux, "set-window-option", dimension, `${mainPaneSize}%`...
+OK       index.js:8937                                  -> await deps.runTmuxCommand(tmux, ["resize-pane", "-t", mainPaneId, "-x", String(mainWidt...
+OK       src/format.rs:1525                             -> "pane_start_command" => app.default_shell.clone(),
+OK       docs/integration.md:421                        -> > **Supervising a namespace.** Unlike tmux, psmux runs one server process per
+OK       docs/scripting.md:420                          -> | `#{pid}` / `#{server_pid}` | PID of the server process that answered the request. psm...
+OK       src/server/mod.rs:884                          -> let listener = TcpListener::bind(("127.0.0.1", 0))?;
+OK       src/platform.rs:333                            -> pub fn acquire_session_mutex(name: &str) -> Option<SessionMutex> {
+OK       src/platform.rs:346                            -> let obj = format!("Local\\psmux-session-{sanitized}");
+OK       src/paths.rs:79                                -> if let Some(raw) = std::env::var_os("PSMUX_DATA_DIR") {
+OK       src/paths.rs:83                                -> "PSMUX_DATA_DIR must be an absolute non-empty path"
+OK       docs/faq.md:120                                -> **Q: Can I run multiple isolated psmux servers?**
+OK       docs/faq.md:121                                -> A: Yes, use the `-L` flag for server namespaces: `psmux -L work new-session -s dev`. Ea...
+OK       src/types.rs:1345                              -> pub fn port_file_base(&self) -> String {
+OK       src/types.rs:1346                              -> if let Some(ref sn) = self.socket_name {
+OK       src/types.rs:1347                              -> format!("{}__{}", sn, self.session_name)
+OK       installer/psmux.nsi:34                         -> InstallDir "$LOCALAPPDATA\psmux"
+OK       installer/psmux.nsi:35                         -> InstallDirRegKey HKCU "Software\psmux" "InstallDir"
+OK       installer/psmux.nsi:87                         -> File "${SOURCE_DIR}\psmux.exe"
+OK       installer/psmux.nsi:88                         -> File "${SOURCE_DIR}\pmux.exe"
+OK       installer/psmux.nsi:89                         -> File "${SOURCE_DIR}\tmux.exe"
+----------------------------------------------------------------------------------------------------
+checked 111 citations: 111 OK, 0 MISMATCH
+RESULT: PASS
+EXIT=0
+
+================================================================================
+QA CASE 2 (failure): ONE citation's line number corrupted by +50.
+Requirement: the checker MUST report MISMATCH, not pass. A checker that always
+passes is worse than no checker.
+================================================================================
+$ sed 's|`index.js:8343`|`index.js:8393`|' CONTRACT.md > /tmp/opencode/CONTRACT.scratch-corrupt.md
+$ diff <(grep -n 'index.js:83' CONTRACT.md) <(grep -n 'index.js:83' /tmp/opencode/CONTRACT.scratch-corrupt.md)
+1c1
+< 78:- `index.js:8343` → `var TMUX_COMMAND_SHELL = "/bin/sh";`
+---
+> 78:- `index.js:8393` → `var TMUX_COMMAND_SHELL = "/bin/sh";`
+
+$ python3 /tmp/opencode/check-contract.py /tmp/opencode/CONTRACT.scratch-corrupt.md
+source: /tmp/opencode/CONTRACT.scratch-corrupt.md
+citations: 111 total (72 OmO bundle, 37 psmux v3.3.8, 2 prior-session transcript)
+bundle: /home/daniel/.cache/opencode/packages/oh-my-openagent@5.1.18/node_modules/oh-my-openagent/dist/index.js
+psmux:  /tmp/opencode/psmux-v338 (v3.3.8)
+----------------------------------------------------------------------------------------------------
+MISMATCH index.js:8393                                  (CONTRACT.md:78)
+         expected substring: var TMUX_COMMAND_SHELL = "/bin/sh";
+         actual line:        return { success: false };
+----------------------------------------------------------------------------------------------------
+checked 111 citations: 110 OK, 1 MISMATCH
+RESULT: FAIL
+EXIT=1
+
+VERDICT: MISMATCH reported, exit 1. The checker has teeth.
+
+================================================================================
+QA CASE 2b (failure): zero citations must NOT report success.
+Guards against the checker passing vacuously.
+================================================================================
+$ printf 'This document cites nothing at all.\n' > /tmp/opencode/CONTRACT.scratch-empty.md
+$ python3 /tmp/opencode/check-contract.py /tmp/opencode/CONTRACT.scratch-empty.md
+FATAL: zero citations extracted from /tmp/opencode/CONTRACT.scratch-empty.md.
+A checker that finds nothing must not report success.
+EXIT=3
+
+================================================================================
+QA CASE 2c (failure): correct line number, WRONG quoted text must also fail.
+Guards against a checker that only validates line numbers exist.
+================================================================================
+$ sed 's|/bin/sh";|/bin/bash";|; s|index.js:8393|index.js:8343|' ... > scratch-text.md
+$ python3 /tmp/opencode/check-contract.py /tmp/opencode/CONTRACT.scratch-text.md
+MISMATCH index.js:8343                                  (CONTRACT.md:78)
+         expected substring: var TMUX_COMMAND_SHELL = "/bin/bash";
+         actual line:        var TMUX_COMMAND_SHELL = "/bin/sh";
+checked 111 citations: 110 OK, 1 MISMATCH
+RESULT: FAIL
+EXIT=1
+
+================================================================================
+UPSTREAM ANCESTRY, verified directly (basis for the Retirement conditions table)
+================================================================================
+$ git -C /tmp/opencode/psmux-v338 rev-parse HEAD
+66cf61354c473b35d4f0c06c57384fc46d61ffdb
+$ git -C /tmp/opencode/psmux-v338 describe --tags
+v3.3.8
+
+$ git log -1 --format='%H %ad %s' --date=short c20016c1ebd8557748ca3c4a7e7f99f5d872aa90
+c20016c1ebd8557748ca3c4a7e7f99f5d872aa90 2026-09-03 fix(#580): accept the documented respawn shell-command operand and forward it whole
+$ git log -1 --format='%H %ad %s' --date=short 4addc0a
+4addc0a730e57f827c286c76eec24489a5667200 2026-09-29 fix(#708): respawn-pane keeps the pane's history and applies -e
+
+$ git tag   # every tag this clone carries
+v0.1.0 v0.2.0 v0.2.1 v0.2.2 v0.2.7 v0.3.0 v0.3.1 v0.3.2 v0.3.3 v0.3.4 v0.3.5 v0.3.6 v0.3.7 v0.3.8 v0.3.9 v0.4.0 v0.4.1 v0.4.10 v0.4.3 v0.4.4 v0.4.5 v0.4.6 v0.4.7 v0.4.8 v0.4.9 v3.1.0-fix-102 v3.1.0-fix-103 v3.1.0-fix-70-71 v3.2.0 v3.3.0 v3.3.0.4 v3.3.1 v3.3.2 v3.3.3 v3.3.4 v3.3.4-fix-167 v3.3.4-fix-266 v3.3.4-fix-272 v3.3.4-fix-273 v3.3.4-fix-88 v3.3.5 v3.3.6 v3.3.7 v3.3.8 
+
+$ for t in $(git tag); do git merge-base --is-ancestor c20016c $t && echo $t; done
+  (no lines above => c20016c is in NO tagged release)
+$ for t in $(git tag); do git merge-base --is-ancestor 4addc0a $t && echo $t; done
+  (no lines above => 4addc0a is in NO tagged release)
+
+This is exactly why CONTRACT.md section 8.1 seeds the release column null:
+a semver string cannot prove ancestry, so the table is maintained, not computed.
+
+================================================================================
+AUTOMATED VERIFICATION
+================================================================================
+$ grep -n 'INFERRED' CONTRACT.md   # every hit must be a deliberate label
+15:2. **An inference.** Prefixed `INFERRED:` followed by the reasoning. An
+66:INFERRED: this document goes stale the moment either tool is upgraded. The
+126:INFERRED: Template B's infinite `sleep 86400` loop is what keeps the placeholder
+156:INFERRED: because the empty case is the default, any bridge logic that
+176:INFERRED: the redaction requirement follows from the credential being present in
+215:INFERRED: `splitDirection` defaults to `-h` because the function signature
+327:INFERRED: `sizeArgs` is empty when the source pane's dimensions cannot be
+381:INFERRED: by the definition in section 3, none of these carries a payload, so
+421:INFERRED: `resolveServerUrl` reads `OPENCODE_PORT` and otherwise falls back to a
+445:INFERRED: the requirement that `-V` exit 0 is derived directly from
+455:INFERRED: therefore no OmO configuration key and no environment variable can
+483:INFERRED: because psmux sets these variables itself and correctly, any bridge
+524:INFERRED: the translator may therefore extract the payload as "the final
+572:INFERRED: inserting `--` changes the meaning of argv OmO emitted, so it is a
+599:INFERRED: because the credential is dropped by psmux on this path, the bridge
+618:INFERRED: adding special handling for `respawn-window` would be speculative
+721:INFERRED: Option A is the lower-risk default, on the grounds that pass-through
+743:INFERRED: the correct discriminator is something the bridge itself controls.
+762:INFERRED: N sessions means N servers and N unrelated ports. The bridge must
+774:INFERRED: a port collision is structurally impossible, because binding port `0`
+809:INFERRED: because the namespace is folded into the discovery-file name and into
+828:INFERRED: the shim must be named `tmux.exe` and must precede psmux's own
+$ grep -c 'INFERRED' CONTRACT.md
+22
+
+$ grep -n 'c20016c\|4addc0a' CONTRACT.md   # both present, in Retirement conditions
+644:`c20016c` or might not, and nothing in the string says which. Therefore the
+653:| Insert `--` before the payload on `respawn-pane` | 7.1, `respawn-pane` positional operand drop | `c20016c` | `fix(#580): accept the documented respawn shell-command operand and forward it whole` | 2026-09-03 | **no** | `null` | drop the `--` insertion, keep pass-through |
+654:| Apply `-e NAME=VALUE` on the respawn path | 7.2, `respawn-pane` `-e` drop | `4addc0a` | `fix(#708): respawn-pane keeps the pane's history and applies -e` | 2026-09-29 | **no** | `null` | drop the self-application, forward `-e` through |
+655:| Nothing, off-path | 7.3, `respawn-window` argument drop | `c20016c` | same commit as row 1 | 2026-09-03 | **no** | `null` | no change; re-check only if a future bundle emits the verb |
+659:- `c20016c` = `c20016c1ebd8557748ca3c4a7e7f99f5d872aa90`
+660:- `4addc0a` = `4addc0a730e57f827c286c76eec24489a5667200`
+667:### 8.3 `c20016c` also fixes defect 3
+677:Defect 2's fix is a separate commit (`4addc0a`) from defect 1's (`c20016c`), so
+678:the two workarounds retire independently. A release that ships `c20016c` but not
+679:`4addc0a` still needs the `-e` self-application.
+861:| Q-CONTRACT-4 | Which release will first contain `c20016c` and `4addc0a`? Section 8.2 is seeded `null` deliberately. | upgrade check, section 8.1 rule |
+
+$ grep -c 'index.js:' CONTRACT.md
+86
+  (lines containing an index.js: citation; 86 textual occurrences total,
+   0 of which lack a checker assertion, 69 distinct line numbers, 72 citation instances)
+
+================================================================================
+STALE LINE NUMBERS FOUND AND CORRECTED (plan/draft numbers that did not resolve)
+================================================================================
+1. oh-my-openagent@5.1.17  -> only 5.1.18 is installed. All citations re-resolved
+   against 5.1.18. The plan's LINE NUMBERS are correct for 5.1.18; only the
+   version string was stale.
+   /home/daniel/.cache/opencode/packages/oh-my-openagent@5.1.18
+
+2. docs/tmux_args_reference.md:93  ->  :93 is the rotate-window row, not respawn-pane
+   draft claimed: | `rotate-window` | `rotatew` | `UDt:` | CLI, SRV, CFG, CTL |
+   ACTUAL  :91:  | `respawn-pane` | `respawnp`, `resp` | `kc:t:` plus `-- <command>` | CLI, SRV, CFG, CTL |
+
+3. installer/psmux.nsi:89-91  ->  :90 is README.md and :91 is LICENSE
+     File "${SOURCE_DIR}\tmux.exe"
+     File "${REPO_DIR}\README.md"
+     File "${REPO_DIR}\LICENSE"
+   ACTUAL: the three binaries are :87-89 (the plan's todo 1 block already had this right)
+     File "${SOURCE_DIR}\psmux.exe"
+     File "${SOURCE_DIR}\pmux.exe"
+     File "${SOURCE_DIR}\tmux.exe"
+
+4. draft line 226 claims cached_shell() 'reads $SHELL'. At v3.3.8 it does not:
+   $ grep -n 'env::var("SHELL")\|env::var_os("SHELL")' src/*.rs
+   -> ZERO hits. cached_shell() walks pwsh -> powershell -> cmd:
+           let resolved = which::which("pwsh").ok()
+               .or_else(|| which::which("powershell").ok())
+               .or_else(|| which::which("cmd").ok())
+   The draft's CONCLUSION holds more strongly than stated, not less.
+
+5. Found by the checker itself, not by transcription: src/types.rs port_file_base
+   body is at :1347, not :1346 (the plan/draft did not cite this line).
+
+================================================================================
+CLEANUP RECEIPT
+================================================================================
+Removed: /tmp/opencode/CONTRACT.scratch-corrupt.md  (the +50 corrupted copy)
+Removed: /tmp/opencode/CONTRACT.scratch-empty.md   (zero-citation guard case)
+Removed: /tmp/opencode/CONTRACT.scratch-text.md     (wrong-text guard case)
+KEPT:    /tmp/opencode/psmux-v338 at 66cf61354c473b35d4f0c06c57384fc46d61ffdb
+         (tag v3.3.8), cloned OUTSIDE the repo, no patches, no fork, no vendored copy.
+         Kept deliberately: todos 5 and 19 cite v3.3.8 source lines.
+KEPT:    /tmp/opencode/check-contract.py, so the next agent can re-verify.
+
+No git WRITE command was run inside the worktree. The only git writes were
+clone/checkout in the throwaway /tmp/opencode/psmux-v338 repo.

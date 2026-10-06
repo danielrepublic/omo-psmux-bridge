@@ -1,0 +1,87 @@
+Issue #1 — Windows E2E: OmO team-mode visualization through the staged bridge shim
+==================================================================================
+Run: 2026-10-06 23:40:53 - 23:41:56 (+08:00), Windows host WINDOWS-DANIEL.
+Binary under test: dist/tmux.exe built from this change set, staged at
+  %LOCALAPPDATA%\opencode-psmux-bridge\staging\team-mode\bin\tmux.exe
+  SHA-256 ffa9460f29e6ee0ca58f96573a26ff05fc328382f984244fbebb444e0c5ab41d
+  (installed shim untouched; user's global omo.jsonc untouched)
+
+Setup
+-----
+- Throwaway project %TEMP%\omo-e2e-probe3 with a project-local .omo/omo.jsonc:
+    { "[opencode]": { "team_mode": { "enabled": true, "tmux_visualization": true } } }
+  (the loader merges project config over the user config; bundle:21560, 26003)
+- Fresh psmux session e2eprobe06234052 in the DEFAULT namespace (no -L,
+  production-faithful; see the harness note below for why).
+- In-pane PATH override so `tmux` resolves the staged shim first. where.exe
+  captured before (user PATH; installed bridge bin) and after (staging first):
+    ...\opencode-psmux-bridge\staging\team-mode\bin\tmux.exe
+    ...\opencode-psmux-bridge\bin\tmux.exe
+    ...\psmux\tmux.exe
+    ...\opencode-psmux-bridge\bin\opencode.cmd
+  (opencode resolves to the bridge port wrapper, so the GAP-17 health gate is
+  satisfied; the layout proceeding past the server check is the evidence.)
+- The opencode TUI was launched inside the pane from the project dir and asked
+  to call team_create exactly once (team e2e-team3, one member probe-member).
+
+Result: PASS
+------------
+- Member pane created: %2, title `omo-team-probe-member`.
+  Final geometry (list-panes -t <sess>:0 -F
+  '#{pane_id} #{pane_index} #{pane_title} #{pane_left} #{pane_width}'):
+    %1 0 WINDOWS-DANIEL     0  65
+    %2 1 omo-team-probe-member 66 154
+  Window width 220: caller 65/220 (~30%), member column 154/220 (~70%) - the
+  rule-1e geometry (main-pane-width 30 + main-vertical) on a real run.
+- Member pane capture (issue-1-e2e-team-mode-member-pane.txt) shows the
+  attached session, rendered in the opencode attach TUI:
+    $ echo E2E-MEMBER-OK && cd
+    E2E-MEMBER-OK
+    C:\Users\Daniel\AppData\Local\Temp\omo-e2e-probe3
+    team_send_message [teamRunId=e3bf4dba-7420-449a-b9f4-4763447ba122, to=lead,
+      body=E2E-MEMBER-OK ... closure-ready, summary=E2E probe complete]
+    footer: Sisyphus-Junior | Subagent (1 of 1) | Parent up  Prev left  Next right
+- Main pane shows the teamRunId and the member's closure message.
+
+Staged shim call log, exact sequence (12 records, all exit 0)
+-------------------------------------------------------------
+  -V            passthrough         (tmux path verification)
+  list-sessions passthrough
+  display       rewritten  rewriteReason=psmux-client-treats-display-F-as-message-text
+  display       rewritten  rewriteReason=psmux-client-treats-display-F-as-message-text
+  list-panes    passthrough
+  split-window  passthrough
+  select-pane   passthrough
+  set-option    suppressed suppressionReason=psmux-refuses-pane-scoped-options
+  set-option    suppressed suppressionReason=psmux-refuses-pane-scoped-options
+  send-keys     passthrough
+  select-layout passthrough
+  resize-pane   rewritten  argv=["set-option","main-pane-width","30"]
+                followUps=[{reason=psmux-reads-main-pane-size-only-inside-apply-layout,
+                            argv=["select-layout","main-vertical"]}]
+
+Cleanup
+-------
+- kill-session -t e2eprobe06234052 exit 0.
+- list-sessions afterwards lists only `default` (the pre-existing session).
+- psmux process count: 3 before / 3 after - no server leaked.
+
+Harness note (not a bridge defect)
+----------------------------------
+An earlier run isolated the session under `-L te2f`. OmO's plugin then aborted
+the layout: `list-panes -t <session>:0` and `select-layout -t <session>:0`
+exited 1, because a client without -L cannot resolve a session target inside a
+namespaced server (port file is `<ns>__<session>`), while pane-id targets
+resolve via the current server. `#{session_name}` is the bare session name, so
+the plugin's targets do not carry the namespace. Re-running in the default
+namespace (above) passes end to end. The bridge forwards exactly what OmO
+emits; this is an OmO-under-namespace limitation, recorded so future E2E runs
+use the default namespace.
+
+Artifacts in this directory
+---------------------------
+- issue-1-e2e-team-mode-summary.json      driver summary (JSON)
+- issue-1-e2e-team-mode-shim-calls.jsonl  the 12 staged-shim records
+- issue-1-e2e-team-mode-member-pane.txt   member pane capture (raw ANSI)
+- issue-1-e2e-team-mode-panes-final.txt   pane titles + geometry
+- issue-1-e2e-team-mode-cleanup.txt       list-sessions after cleanup

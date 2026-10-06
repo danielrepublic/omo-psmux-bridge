@@ -1,0 +1,441 @@
+================================================================================
+TASK 7 - REAL-BINARY / ADVERSARIAL / CLEANUP EVIDENCE
+plan: .omo/plans/omo-psmux-windows-parity.md  (todo 7, lines 185-193)
+worker scope: REAL opencode binary passthrough, REAL port binding,
+             port-reservation adversarial cases (exhaustion, steal-retry),
+             %TEMP% cleanup, bin/ deliverable tidy.
+             (argv-forwarding contract matrix is owned by a parallel worker
+              via a stand-in recorder - deliberately NOT duplicated here.)
+target host: windows-daniel  (user Daniel)
+started: see §T0
+================================================================================
+
+§T0 PRECONDITIONS / IDENTITY
+STATUS: DONE
+
+§A  REAL-BINARY PASSTHROUGH (wrapper vs real .exe)
+STATUS: DONE
+
+§B  REAL PORT BINDING (TMUX set, no args)
+STATUS: DONE
+
+§C  RESERVATION ADVERSARIAL CASES
+  C1 exhaustion (7801-7901 occupied)
+  C2 steal-retry (single retry recovers on next port)
+STATUS: DONE
+
+§D  %TEMP% CLEANUP (three aborted runs' leftovers)
+STATUS: DONE
+
+§E  bin/ DELIVERABLE TIDY (relocate 2 backups, keep 3 entries)
+STATUS: DONE
+
+§F  FINAL RE-CHECK
+STATUS: DONE
+
+================================================================================
+--------------------------------------------------------------------------------
+§T0 PRECONDITIONS / IDENTITY   (script: %TEMP%\t7x-recon.ps1 -> t7x-recon-result.txt)
+--------------------------------------------------------------------------------
+target host           : windows-daniel (User Daniel), Windows NT 10.0.26200.0
+PowerShell            : 5.1.26100.9444
+LOCALAPPDATA          : C:\Users\Daniel\AppData\Local
+TEMP                  : C:\Users\Daniel\AppData\Local\Temp
+
+IDENTITIES (SHA256, read-only, unmodified by me):
+  bin\opencode.cmd            1560 B  335CD4D2F33509125205FC3DDFCDD05B256DFFA056036D45334D1B392E12A05E
+  bin\omo-opencode-port.ps1  13925 B  24705D90904CEC0B789BF73355ACF487624D74FE3BD625EACF6F0B66FBA31E52
+  bin\tmux.exe             86110208 B  9EA5E733FD78F4EA966A85A5CF062D1113C644FEFF80AD3B3084574c2BA2A858  <- PRISTINE, matches expected
+  npm opencode.exe      180599176 B  5283C2CD5B4285855DAA97E6F7D17BF48146227CDF2A940E79E0F2B7869FD06E
+
+bin\ listing at start (5 entries - needs tidying to 3):
+  omo-opencode-port.ps1            13925
+  opencode.cmd                     1560
+  opencode.cmd.bak-lf-20261005T044437Z  1529   -> to be MOVED (todo 20 backup discipline)
+  opencode.cmd.bak-lf-20261005T044758Z  1560   -> to be MOVED (todo 20 backup discipline)
+  tmux.exe                      86110208
+
+Get-Command opencode -All  (confirms fact #3: no .exe on PATH, only ps1/cmd/no-ext shim)
+  ExternalScript  C:\Users\Daniel\AppData\Roaming\npm\opencode.ps1
+  Application     C:\Users\Daniel\AppData\Roaming\npm\opencode.cmd
+  Application     C:\Users\Daniel\AppData\Roaming\npm\opencode
+  => CreateProcess cannot launch opencode.ps1; all real-binary tests use the absolute
+     path ...\node_modules\opencode-ai\bin\opencode.exe
+
+CLEAN BASELINE (asserted before any test):
+  psmux processes                  = 0
+  listening sockets in 7801-7901   = 0
+  processes from %TEMP%\t7fakeapp  = 0
+
+USER PATH BASELINE (install.ps1 has NOT been run; bridge bin dir absent - as required)
+  C:\Users\Daniel\bin;
+  C:\Users\Daniel\AppData\Local\Microsoft\WindowsApps;
+  C:\Users\Daniel\AppData\Local\Programs\Microsoft VS Code\bin;
+  C:\Users\Daniel\AppData\Roaming\npm;
+  C:\Users\Daniel\AppData\Local\Microsoft\WinGet\Links;
+  C:\Users\Daniel\AppData\Local\Microsoft\WinGet\Packages\ast-grep.ast-grep_Microsoft.Winget.Source_8wekyb3d8bbwe;
+  C:\Users\Daniel\AppData\Local\Microsoft\WinGet\Packages\yt-dlp.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-N-125875-g5d4d3bdc61-win64-gpl\bin;
+  C:\Users\Daniel\.dotnet\tools;
+  C:\Users\Daniel\AppData\Local\psmux
+  SHA256 of that string: recorded in §F re-check for byte comparison.
+
+%TEMP% protected names - ALL ABSENT (nothing to preserve-delete hazard):
+  omo-config.md, omo-install.md, e2e-stock-omo.ps1, omo-swap-A, omo-swap-B,
+  omo-official, omodocs, omo-lab-seed, omo-configtest, omo-inventory.ps1,
+  omo-state.ps1, probe*  -> none present in %TEMP% at all.
+%TEMP%\t7fakeapp  -> ALREADY ABSENT (no dir, no live processes). Nothing to kill.
+%TEMP%\t7stage    -> ALREADY ABSENT.
+STATUS: DONE
+
+--------------------------------------------------------------------------------
+§A  REAL-BINARY PASSTHROUGH   (scripts t7r-A.ps1 then t7r-A2.ps1)
+--------------------------------------------------------------------------------
+METHOD (mandated by the host facts, and it worked):
+  Start-Process -NoNewWindow -PassThru -RedirectStandardOutput <file>
+                 -RedirectStandardError  <file>
+  + $p.WaitForExit(25000) as the bound.  NEVER ReadToEndAsync.
+  GOTCHA FOUND AND FIXED: with -PassThru, $p.ExitCode comes back EMPTY/NULL
+  after exit unless the process HANDLE is cached first ($null = $p.Handle).
+  First pass therefore produced rc="" for all 8 cases; pass 2 (t7r-A2) fixed it.
+  Everything below is from pass 2, which has real exit codes.
+
+WRAPPER   = C:\Users\Daniel\AppData\Local\opencode-psmux-bridge\bin\opencode.cmd
+            (launched as: cmd.exe /c <wrapper> <args>)
+REAL EXE  = C:\Users\Daniel\AppData\Roaming\npm\node_modules\opencode-ai\bin\opencode.exe
+            (this is exactly what the helper's Resolve-RealOpencode returns,
+             Kind='exe', verified by reading omo-opencode-port.ps1:132-138)
+SIDE BY SIDE, EVERY COMPARISON HAS BOTH EXIT CODES AND BOTH BYTE LENGTHS
+(stdout AND stderr, because opencode prints help to STDERR, not stdout):
+
+A1 wrapper  --version        TMUX UNSET  exit=0  stdout=8B  stderr=0B   "1.18.34\n"
+A2 real exe --version        TMUX UNSET  exit=0  stdout=8B  stderr=0B   "1.18.34\n"
+   -> stdout BYTE-IDENTICAL: len 8 vs 8, sha256 both
+      29D256D9962E8595B1D05C6E6343B3BE74D1268586DF175B0BDCFD735018F2BF
+   -> stderr both empty: 0 vs 0. Recorded as VACUOUS, not claimed as a match.
+
+A3 wrapper  models --help    TMUX UNSET  exit=0  stdout=0B  stderr=885B
+A4 real exe models --help    TMUX UNSET  exit=0  stdout=0B  stderr=885B
+   -> stdout both 0B: VACUOUS on stdout, explicitly NOT counted as a pass.
+   -> the real comparison is stderr: 885 vs 885 BYTE-IDENTICAL,
+      sha256 both E60D4CD3EBF2A32A7E8B82E65ACBC07CD45A191ACC274D87C6BF61CA7C188BB1
+      last line: "      --refresh     refresh the models cache from models.dev  [boolean]"
+
+A5  real exe --help         TMUX UNSET  exit=0  stdout=0B  stderr=4291B  elapsed 690 ms
+A5b wrapper  --help         TMUX UNSET  exit=0  stdout=0B  stderr=4291B  elapsed 1068 ms
+   -> stderr BYTE-IDENTICAL 4291 vs 4291, sha256 both
+      250E987DCB0FE9B8808AB6C6C1DBA216E1C8283F9CE1B44A167BE77A8ED9974E
+   -> ascii-art OPENCODE banner + Commands/Flags table, written to STDERR.
+
+  *** CORRECTION TO A PREVIOUSLY RECORDED "MEASURED FACT" ***
+  The brief stated: "opencode --help NEVER EXITS without a TTY. I measured a
+  hard timeout at 25 s with zero stdout." That is NOT what the binary does.
+  Measured here, twice, with file capture: exit code 0 in 690 ms (real exe) and
+  1068 ms (through the wrapper). stdout IS 0 bytes, but that is because opencode
+  writes --help to stderr, not because it hangs.
+  The earlier "hangs forever" reading is an artefact of PIPE-based capture -
+  the same root cause as the separate "stream capture lies" fact. With
+  Start-Process file redirection, --help is fast and deterministic.
+  Recorded as a real, successful observation. NOT hidden, NOT narrowed.
+
+A6 wrapper  --version        TMUX SET    exit=0  stdout=8B  stderr=0B   "1.18.34\n"
+A7 real exe --version        TMUX SET    exit=0  stdout=8B  stderr=0B   "1.18.34\n"
+   -> stdout BYTE-IDENTICAL: 8 vs 8, sha256 both
+      29D256D9962E8595B1D05C6E6343B3BE74D1268586DF175B0BDCFD735018F2BF
+   -> identical to the TMUX-unset pair, so the wrapper did NOT mangle the
+      passthrough when TMUX is set: no port was reserved, no --port injected,
+      OPENCODE_PORT was not consulted (--version short-circuits at
+      omo-opencode-port.ps1:313-318 before any port work).
+   TMUX value used for A6/A7: /tmp/psmux-t7/default,4242,0
+
+§A VERDICT: PASS. Passthrough is byte-identical to the real .exe on stdout for
+--version, and on stderr for both --help and models --help, with identical exit
+codes, in both the TMUX-unset and TMUX-set states. stdout is empty for the two
+help cases on BOTH sides and that is stated, not papered over.
+STATUS: DONE
+
+--------------------------------------------------------------------------------
+§B  REAL PORT BINDING   (scripts t7b.ps1 -> t7b2.ps1 -> t7b4.ps1)
+--------------------------------------------------------------------------------
+LAUNCH: TMUX = /tmp/psmux-t7/default,4242,0 (SET), argv = <none>, via the wrapper.
+BASELINE before every run: opencode.exe pids = [18944] (the USER'S LIVE SESSION -
+snapshotted and never killed; teardown only ever targets pids absent from it);
+all 101 ports 7801-7901 bindable.
+
+RESULT: chosen port n = 7801  (in range 7801-7901: True)
+
+(i)  THE CHILD'S ENVIRONMENT CARRIED OPENCODE_PORT=<n>   -- PROVEN, twice over
+     1. Real TcpListener bind probe reports 7801 NOT bindable while the child ran
+        => the child owns the port. (Probe = System.Net.Sockets.TcpListener with
+           ExclusiveAddressUse, i.e. a real bind - never netstat/ss/lsof.)
+     2. The child's OWN memory was searched (read-only, VirtualQueryEx +
+        ReadProcessMemory, 1612 regions / 386 MB scanned) for the UTF-16LE string
+        "OPENCODE_PORT=7801". FOUND at 0x2748112DC70, 3 occurrences, with this
+        surrounding context read out of the same block:
+          ...OMO_PS=C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe
+           | OneDrive=C:\Users\Daniel\OneDrive
+           | OPENCODE_PORT=7801
+           | OS=Windows_NT
+           | Path=C:\Program Files\OpenSSH;C:\WINDOWS\system32;...
+        i.e. it sits among NAME=VALUE siblings, so it is the real environment
+        block, not a coincidence. TMUX=/tmp/psmux-t7/default,4242,0 was also
+        found present in the same child.
+(ii) Get-NetTCPConnection -LocalPort 7801 -State Listen  -- SUCCEEDS
+        local=127.0.0.1:7801 state=Listen ownpid=40508  (ownpid == the child)
+        listener appeared at 2587 ms; child spawn seen at 1088 ms.
+     Reproduced independently in an earlier run: ownpid=32120 at 2377 ms.
+     Child command line, read from Win32_Process:
+        "C:\Users\Daniel\AppData\Roaming\npm\node_modules\opencode-ai\bin\opencode.exe" --port 7801
+     Wrapper's own stderr, exact 72 bytes on disk (od -c verified):
+        [opencode-wrapper] tmux detected -> starting opencode with --port 7801\r\n
+     The real binary runs its full TUI headless: 3722 bytes of ANSI output on
+     stdout in an earlier run, rendering "Sisyphus - Ultraworker",
+     "Space Bunny Free", "OpenCode Go", "Ask anything", "1.18.34".
+
+TEARDOWN (wrapper FIRST, then child - the reverse makes the wrapper respawn):
+  killed cmd.exe wrapper 36312 -> killed helper powershell.exe 25444
+  -> killed child opencode.exe 40508
+  AFTER: opencode pids = [18944] (baseline only), survivors beyond baseline = 0,
+  still listening on 7801 = 0, port bindable again = True.
+
+HARNESS FAILURES FOUND AND FIXED IN THIS SECTION (recorded so they are not
+repeated by whoever reads this next):
+  * Reading a Start-Process -RedirectStandardOutput/-Error FILE while the
+    writing process tree is still alive throws IOException (the redirect file is
+    not opened with FILE_SHARE_READ). t7b.ps1 died on exactly this: it tried to
+    learn the chosen port by regexing the wrapper's stderr, so $chosen stayed
+    $null, so the poll loop NEVER CHECKED ANY PORT, and it printed
+    "FAILED_nothing_listening" - which was an ARTEFACT OF MY OWN BUG, not a
+    measurement. Fixed by deriving the port from the child's Win32_Process
+    CommandLine instead (the wrapper's choice is visible there), and by reading
+    the redirect files only after teardown.
+  * On this host Add-Type compiles with warnings-as-errors; an unused local made
+    the whole C# helper fail to load, which surfaced as the misleading
+    "Unable to find type" TypeNotFound.
+  * `` `e `` in a PowerShell double-quoted string is NOT ESC on this host, so
+    -replace "`e",'<ESC>' silently replaced every letter "e" in the displayed
+    text. The underlying bytes were always correct; only the rendering lied.
+    Ground truth for the 72-byte wrapper stderr came from `od -c` on the fetched
+    file.
+  * PEB-based environment reading does NOT work on this host: PEB+0x20 is not
+    RTL_USER_PROCESS_PARAMETERS (a scan of 0x200 bytes at that pointer found no
+    plausible UNICODE_STRING in either powershell.exe or explorer.exe), and
+    VirtualQueryEx walking from 0x10000 aborts immediately because the first
+    region is based at 0. Replaced with the offset-free memory search above,
+    which self-validated (it located a planted marker in our own process first).
+
+§B VERDICT: PASS. n = 7801, in range; OPENCODE_PORT=7801 verified in the live
+child's environment block; a real listening socket on 7801 owned by that child.
+STATUS: DONE
+
+--------------------------------------------------------------------------------
+§C  RESERVATION ADVERSARIAL CASES   (scripts t7c.ps1, t7c2.ps1)
+--------------------------------------------------------------------------------
+PROBING DISCIPLINE: every "is this port free?" question in this section was
+answered by actually BINDING it with System.Net.Sockets.TcpListener on
+127.0.0.1 with ExclusiveAddressUse=$true. Get-NetTCPConnection was used ONLY to
+assert an outcome that had already been produced by a bind. No netstat, no ss,
+no lsof anywhere.
+
+=== C1  EXHAUSTION =============================================== PASS
+Setup: 101 real TcpListeners bound, one on every port 7801..7901.
+  listeners_bound = 101 of 101, bind_failures = []
+  ports_still_bindable_while_held = 0   (real bind probe on all 101)
+Launch: TMUX set, argv <none>, through the wrapper.
+  wrapper_exit_code            = 1        (non-zero: PASS)
+  exited_within_30s            = True
+  NEW opencode.exe spawned     = 0        (no process started: PASS)
+      (opencode pids stayed [18944], the user's own session, untouched)
+  wrapper stderr, exact 65 bytes:
+      [opencode-wrapper] no free port in 7801-7901; refusing to start\r\n
+  exhaustion_message_present   = True
+  did_NOT_fall_back_to_4096    = True     (no silent default-port fallback)
+  wrapper stdout               = 0 bytes
+Release: listeners stopped ->
+  after_release_bindable       = 101 of 101, range free again: True
+  listening_7801_7901_now      = 0
+
+=== C2  STEAL-RETRY =============================================== PASS, with a
+                                                            REAL DEFECT FOUND
+C2a  the steal itself, done from a SEPARATE powershell process with a real
+     TcpListener, launched the instant the first child appeared - i.e. squarely
+     inside the close-then-exec window:
+       first port chosen        = 7801
+       thief bound port 7801    = True, stolen_after_ms = 88, tries = 1,
+                                  held_ms = 45017
+       listener on 7801         = 1, ownpid = 32948 == the thief's pid
+       listener on 7802         = 0
+       child alive at 3s        = True
+       child alive at 6s        = True
+       child alive at 10s       = True
+       child alive at 15s       = True
+       child stdout             = 0 bytes - it printed NOTHING at all
+       NO RETRY. wrapper stderr stayed at the single line
+         "[opencode-wrapper] tmux detected -> starting opencode with --port 7801"
+       retry_message_count = 0
+
+     >>> REAL DEFECT (reported, NOT fixed - the installed files are read-only):
+     The wrapper's specified recovery path is unreachable against the real
+     binary. omo-opencode-port.ps1:361-368 retries only when the child EXITS
+     NON-ZERO *and* the port is no longer bindable. The real opencode, when the
+     port it was told to use is already held, does not exit and does not report
+     anything - it stays alive indefinitely, silently, having printed 0 bytes.
+     So `WaitForExit()` at line 282 never returns, the retry condition is never
+     evaluated, and the user is left with a live opencode that will never serve
+     on the port the wrapper reserved for it. In this state the wrapper holds a
+     reservation it can neither use nor release.
+     Consequence for the plan: "close-then-exec with a single retry" is a
+     correct description of the code, but it does not actually recover from a
+     port stolen in the TOCTOU window when the payload is the real opencode.
+     Anything stronger would need either a pre-flight bind re-check immediately
+     before exec plus a bounded liveness wait, or a payload that fails fast.
+
+C2b  the retry mechanism itself, proved by creating the condition it waits for.
+     Same steal, then I killed ONLY the first child (the wrapper and its helper
+     were left alone), which is precisely "child exited non-zero while the port
+     is now owned by somebody else":
+       FIRST_PORT_CHOSEN  = 7801
+       PORT_AFTER_RETRY   = 7802
+       retry_is_next_port = True
+       retry child        = "…\opencode.exe" --port 7802, pid 37988
+       Get-NetTCPConnection -LocalPort 7802 -State Listen
+                           = SUCCESS at 19808 ms
+                             (local=127.0.0.1:7802 state=Listen ownpid=37988)
+       retry_port_bindable_now = False (child owns it)
+       wrapper stderr, exact 159 bytes, verbatim:
+         [opencode-wrapper] tmux detected -> starting opencode with --port 7801\r\n
+         [opencode-wrapper] port 7801 was taken (EADDRINUSE) -> retrying once with --port 7802\r\n
+       retry_message_count = 1  -> EXACTLY ONE retry, never more (the
+             "must NOT retry more than once" constraint holds)
+       THE PORT PAIR: 7801 -> 7802
+     Teardown: wrapper first, then helper, then children, then thief.
+       opencode pids after = [18944] (baseline only), survivors = 0
+       free ports at end = 101/101, listening in 7801-7901 = 0
+
+§C VERDICT: C1 PASS. C2 steal-retry PASS as code (single retry, next port,
+7801 -> 7802, verified by a real bind and a real listener), with a genuine
+defect recorded for C2a: the real opencode neither exits nor reports when its
+reserved port is stolen, so the retry cannot fire on its own.
+STATUS: DONE
+
+--------------------------------------------------------------------------------
+§D  %TEMP% CLEANUP   (script t7def.ps1 + t7z-final.ps1 + t7zz.ps1)
+--------------------------------------------------------------------------------
+%TEMP% = C:\Users\Daniel\AppData\Local\Temp
+processes running out of t7fakeapp : 0  (nothing to kill)
+%TEMP%\t7fakeapp  : ALREADY ABSENT before I started - nothing to delete
+%TEMP%\t7stage    : ALREADY ABSENT before I started
+
+DELETED - 270 items in the first pass, then 5 more in the cleanup passes.
+275 total. Nothing was deleted that I did not create or that the brief named.
+
+  * every explicitly-named item:
+      t7v2  (directory)            t7-p1.ps1        t7-peek.ps1
+      t7-st.ps1   t7-st2.ps1       t7-chk.ps1       t7-suite1.ps1
+      t7acc1.ps1                   fake.out         fake2.ps1
+  * the abandoned-run families:
+      t7acc*        25 files  (t7acc_*.out / t7acc_*.err / t7acc1.ps1)
+      t7accf_*      74 files  (every _n / _t transcript of the earlier
+                                 argv-forwarding sweeps)
+      t7cap_*        8 files      t7rec_*      91 files
+      t7r_* / t7r.ps1 / t7r  (dir)              t7r2     (dir)
+      t7matrix*.ps1  3 files      t7probe1..5.ps1  5 files
+      t7out-*.txt / t7p-run.txt / t7p-ver.txt / t7p2-out.txt / t7p3-out.txt
+      t7s1-out.txt t7s2-out.txt t7s3-out.txt t7s_*.txt
+      t7m3_*.txt   10 files      t7diag.log t7diag.ps1
+      t7install.ps1 t7install2.ps1 t7install3.ps1   t7lib.ps1
+      t7qa1.ps1                     t7v_v1..v7 .txt  6 files
+  * MY OWN scratch from this session (also removed):
+      t7x-recon*, t7r-A*, t7r-A2*, t7b*, t7b2*, t7b3, t7b4*, t7c*, t7c2*,
+      t7envfind*, t7scan*, t7dbg*, t7err*, t7cs.cs, t7r*, t7r2, t7z-final*,
+      t7zz*  and the t7b / t7b2 / t7b4 / t7c / t7c2 / t7r / t7r2 directories
+
+  SKIPPED_COUNT = 0.  A safety valve was in place: any t7*/fake* item modified
+  in the previous 180 s that was not mine would have been left alone so a
+  parallel worker could not be sabotaged. It never had to fire.
+
+PROTECTED - verified ABSENT at recon, therefore nothing of theirs was at risk,
+  and re-verified absent afterwards:
+  omo-config.md, omo-install.md, e2e-stock-omo.ps1, omo-swap-A, omo-swap-B,
+  omo-official, omodocs, omo-lab-seed, omo-configtest, omo-inventory.ps1,
+  omo-state.ps1, probe*   ->  none of these exist in %TEMP% on this host.
+
+FINAL: TEMP_t7_or_fake_remaining = []   (empty)
+
+--------------------------------------------------------------------------------
+§E  bin/ DELIVERABLE TIDY   (script t7def.ps1)
+--------------------------------------------------------------------------------
+bin\ held 5 entries at §T0. The two line-ending backups were MOVED (never
+deleted - todo 20 depends on backup discipline) into a newly created directory:
+
+  C:\Users\Daniel\AppData\Local\opencode-psmux-bridge\evidence\install-backups\
+    opencode.cmd.bak-lf-20261005T044437Z   1529 B
+      sha256 110CE7E38146C910990DD7243168B76CCBA77BB2D039CDF050FB937CDBFAD691
+    opencode.cmd.bak-lf-20261005T044758Z   1560 B
+      sha256 335CD4D2F33509125205FC3DDFCDD05B256DFFA056036D45334D1B392E12A05E
+  source sha256+length == destination sha256+length for BOTH: identical = True
+  (the second backup is byte-identical to the live opencode.cmd, which is the
+   whole point of keeping it - sha 335CD4D2... matches §T0's live wrapper)
+
+--------------------------------------------------------------------------------
+§F  FINAL RE-CHECK   (scripts t7def.ps1, t7z-final.ps1, t7zz.ps1)
+--------------------------------------------------------------------------------
+bin dir holds EXACTLY THREE ENTRIES ................... PASS
+  C:\Users\Daniel\AppData\Local\opencode-psmux-bridge\bin
+    omo-opencode-port.ps1    13925 B
+    opencode.cmd              1560 B
+    tmux.exe              86110208 B
+  bin_entry_count = 3, got == want, no .bak files left behind
+
+psmux process count = 0 ................................ PASS
+processes touching the bridge or tmux.exe = 0 .......... PASS
+  (no psmux/tmux process was ever started by this worker; no throwaway -L
+   namespace was needed because nothing was ever launched)
+
+nothing listening in 7801-7901 ........................ PASS
+  ports_NOT_bindable_in_range = 0   (real TcpListener bind on all 101)
+  Get-NetTCPConnection listen count in range = 0
+
+user PATH unchanged ................................... PASS
+  sha256 of the user PATH before = after
+    DA76254C347C5537355F1C89CD4C5F1ACC212F14ED426DC8CE8EC94DFD77C79D
+  comparison was case-SENSITIVE and byte-exact: identical.
+  bridge bin dir present in user PATH = False  (install.ps1 was never run)
+  machine PATH untouched (length 467, never written)
+
+tmux.exe still pristine ............................... PASS
+  expected 9EA5E733FD78F4EA966A85A5CF062D1113C644FEFF80AD3B3084574c2BA2A858
+  actual   9EA5E733FD78F4EA966A85A5CF062D1113C644FEFF80AD3B3084574C2BA2A858
+  The two differ ONLY in the case of one hex digit (c vs C) - same 64-char
+  value, and my first comparison used -ceq (case-sensitive) and so printed a
+  misleading False. Re-compared case-insensitively: MATCHES = True,
+  length_match = True, chars_differing_only_by_case = True.
+  Size 86110208 B, untouched: never moved, copied or executed.
+  opencode.cmd and omo-opencode-port.ps1 also re-hashed after all work and are
+  byte-identical to §T0 - I modified neither, as required.
+
+opencode processes = [18944] .......................... as expected
+  18944 is the user's own live session, snapshotted before every launch and
+  never killed. No bare `opencode.exe` was ever terminated.
+
+*** ONE FINAL CHECK DID NOT COME OUT CLEAN - REPORTED, NOT PAPERED OVER ***
+stray ~\.psmux entries = 6, NOT 0.
+  C:\Users\Daniel\.psmux\  exists, 6 recursive entries:
+    DIR  instances            utime 2026-10-05T04:26:12Z
+    DIR  servers              utime 2026-10-05T04:26:40Z
+    FILE .registry_sweep   0 B    utime 2026-10-03T05:00:37Z
+    FILE last_session     13 B    utime 2026-10-05T03:14:43Z
+    FILE next_session_id   2 B    utime 2026-10-05T04:22:02Z
+    FILE ssh_input.log  991 B    utime 2026-10-05T03:14:43Z
+  Every one of those timestamps PREDATES this worker's first SSH connection
+  (2026-10-05T07:11Z). They are psmux's own runtime state - instances/ and
+  servers/ are the live-session directories psmux itself creates - left behind
+  by the earlier psmux-side tasks (8/13/15), not by me, and not named in §D's
+  delete list. I deliberately did NOT delete them: psmux state is outside this
+  task's mandate, `instances/` and `servers/` may still be referenced by other
+  workers, and destroying another task's state is exactly the kind of damage a
+  cleanup pass must not cause. With psmux_process_count = 0 there is no live
+  server holding them. Whoever owns the psmux state should decide whether
+  ~/.psmux should be cleared as part of that work.
+================================================================================
+END OF TASK 7 REAL-BINARY / ADVERSARIAL / CLEANUP EVIDENCE
+================================================================================

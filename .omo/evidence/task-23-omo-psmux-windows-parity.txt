@@ -1,0 +1,714 @@
+================================================================================
+TASK 23 - MAKE THE PORT-RESERVATION RETRY REACHABLE
+plan: .omo/plans/omo-psmux-windows-parity.md  (todo 23, appended after todo 7)
+target host: windows-daniel  (user Daniel, Windows NT 10.0.26200.0,
+           PowerShell 5.1.26100.9444, console encoding BIG5 -> every result
+           file written with an explicit UTF8Encoding($false))
+target file: %LOCALAPPDATA%\opencode-psmux-bridge\bin\omo-opencode-port.ps1
+launcher:    %LOCALAPPDATA%\opencode-psmux-bridge\bin\opencode.cmd
+pass:        2026-10-05, evidence-only pass. The fix was ALREADY IMPLEMENTED by
+             an earlier attempt; this pass re-implemented NOTHING (zero edits to
+             any file under %LOCALAPPDATA%\opencode-psmux-bridge, zero git write
+             commands). Its job was to PROVE the fix and fill this file in.
+method:      every "is this port free?" question was answered by actually BINDING
+             127.0.0.1:<n> with System.Net.Sockets.TcpListener and
+             ExclusiveAddressUse=$true. Get-NetTCPConnection was used only to
+             ASSERT an outcome a bind had already produced, never to probe.
+             All child stdout/stderr was captured with Start-Process
+             -NoNewWindow -Wait/-PassThru -RedirectStandardOutput/-Error to
+             FILES. ProcessStartInfo + ReadToEndAsync was never used (it returns
+             empty on this host). $p.Handle was cached before reading ExitCode.
+             Teardown order was always wrapper -> helper -> children -> thief.
+================================================================================
+
+§1  DEFECT, BASELINE, IDENTITY
+STATUS: ACHIEVED
+
+DEFECT (as found in task 7 section C2a, verbatim from
+.omo/evidence/task-7-realbin-omo-psmux-windows-parity.txt):
+  retry_message_count = 0
+  wrapper stderr stuck at one 72-byte line:
+    [opencode-wrapper] tmux detected -> starting opencode with --port 7801
+  the child was still alive at 3 s, 6 s, 10 s and 15 s, printing 0 bytes.
+  Root cause: the wrapper's only recovery trigger was "child exited non-zero
+  AND the port is no longer bindable". The real opencode, handed a port that
+  somebody already holds, neither exits nor reports - it stays alive forever
+  having written nothing - so WaitForExit() never returned and the trigger was
+  unreachable by construction.
+
+IDENTITY, measured read-only at the start of this pass (nothing executed but the
+wrapper itself; tmux.exe was hashed only and NEVER run):
+  helper  omo-opencode-port.ps1  30219 B
+          3033147366021E7982BD5C8DC2CDB58C07A1DD424FF66C4C062EB4885017BABE
+          722 lines (ReadAllLines)
+  launcher opencode.cmd           1560 B
+          335CD4D2F33509125205FC3DDFCDD05B256DFFA056036D45334D1B392E12A05E
+  tmux.exe                     86110208 B
+          9EA5E733FD78F4EA966A85A5CF062D1113C644FEFF80AD3B3084574C2BA2A858
+          <- PRISTINE, byte-for-byte the expected reference for todo 18
+  real opencode.exe           180599176 B
+          5283C2CD5B4285855DAA97E6F7D17BF48146227CDF2A940E79E0F2B7869FD06E
+  bin\ entries = omo-opencode-port.ps1, opencode.cmd, tmux.exe   (3, correct)
+
+*** CORRECTION TO THE FIGURES QUOTED IN THE TASK BRIEF ***
+  The brief states the installed helper is "29279 bytes / 709 lines". Measured
+  on the host it is 30219 B / 722 lines, sha256 30331473...  The 29279 B copy
+  (sha256 1D49C7AA630F713CCD20E444DDC729075B6105F31025DB736279974A71736423)
+  is the intermediate build recorded in the earlier attempt's deploy log; the
+  helper was refined again after that deploy. I did not make that change - this
+  pass performed no writes of any kind to the host's bin\ directory. Recording
+  it because the evidence has to describe the binary that was actually tested.
+
+BASELINE, asserted before every run in this pass:
+  opencode.exe pids = [18944] and only that - the USER'S LIVE SESSION, whose
+      command line is bare ("...opencode.exe", no arguments). It was never
+      killed: every kill in this pass was filtered on a '--port <n>' argument or
+      on a wrapper/helper/thief command line.
+  all 101 ports 7801..7901 bindable (real bind probe, 0 not bindable)
+  stray wrapper/helper/thief processes from the previous timed-out attempt: 0
+      (the host was already clean; no kill was needed before the first run)
+
+§2  DESIGN OF THE FIX (what is in the helper now, and why it makes the trigger
+    reachable)
+STATUS: ACHIEVED
+
+Read from the installed helper itself (30219 B / 722 lines). Two mechanisms were
+added; both are needed, because neither alone closes the window.
+
+a) PRE-FLIGHT RE-CHECK  (omo-opencode-port.ps1:662-672)
+   The reservation is probed by Find-FreePort (a real bind that then closes) and
+   is unguarded from that instant until the child binds it. The port is now
+   re-probed with a real bind IMMEDIATELY BEFORE the exec. If it is gone, no
+   child is launched at all: the loop spends a retry instead. This costs one
+   bind and happens while no child exists, so it cannot collide with the child.
+   On the last attempt there is no retry left, so it prints the exhaustion
+   message and exits 1 rather than starting a doomed child.
+
+b) BOUNDED LIVENESS WAIT  (Wait-ChildPortOutcome, omo-opencode-port.ps1:531-586)
+   This is the part that makes the trigger reachable. After the exec the wrapper
+   polls until one of three things is established, and returns it as a state:
+     Exited  - the child is gone; its exit code is handed to the pre-existing
+               exit-status rules, unchanged.
+     Settled - the child owns the port (healthy), or nothing about the port
+               proves otherwise. Either way this is NOT a steal, so the child is
+               left alone and waited on exactly as the pre-fix wrapper did. A
+               hang here is pre-existing behaviour, not a new one.
+     Stolen  - the port is held by a process that is not our child.
+   The loop body (:537-585), every iteration:
+     1. $Proc.HasExited -> return Exited.
+     2. Test-PortHasListener $Port  (:298-311) - READ-ONLY, via
+        IPGlobalProperties.GetActiveTcpListeners(). It deliberately never binds:
+        a bind probe is a real acquisition, and probing by bind while the child
+        is racing for the same port would hand the child the very EADDRINUSE
+        this code exists to prevent.
+     3. If something is listening: Get-ListenerOwnerPid (:329-348) via
+        Get-NetTCPConnection, then Test-PidInOurTree (:362-382), an ancestry walk
+        over Win32_Process that returns 1 (ours) / 0 (definitively not ours) /
+        -1 (cannot tell - the ancestry query failed).
+             ours  = 1 -> PROVEN healthy: stop watching, WaitForExit(), Settled.
+             ours  = 0 -> PROVEN starved: the child can never serve on the port
+                          it was reserved, so return Stolen immediately - the
+                          fact is already proven, there is nothing to wait out.
+             -1    -> not evidence either way; fall through to the deadline.
+        The -1 arm is load-bearing: without it a failed ancestry query would
+        make our own healthy child look like a foreign thief and get it killed.
+     4. Nobody listening is NOT evidence of a steal - a slow-starting or
+        server-less opencode looks identical - so it keeps waiting.
+     5. At $BindWaitMs, one definitive bind probe decides: bindable => Settled
+        (not a steal, resume the old wait); not bindable => Stolen. At 10 s
+        after exec the child has either bound long ago or never will, so there
+        is no bind race left to lose.
+   The caller (:684-697) then owns the single decision: on Stolen it writes the
+   diagnostic, calls Stop-OwnedProcessTree on the handle it created (BFS over
+   descendants, deepest-first, never a name-based sweep, so a bare user
+   opencode.exe is unreachable), and `continue`s - which is the one permitted
+   retry. On the final attempt it refuses to start instead.
+   The retry itself is unchanged: Find-FreePort($FirstPort + 1), exactly once,
+   guarded by `for ($attempt = 1; $attempt -le 2; $attempt++)` (:650).
+   OPENCODE_PORT=0 is untouched: the digit test at :633 is still
+   '^[0-9]+$', which accepts "0", and the $Reserved flag is only set on the
+   Find-FreePort branch, so an explicit 0 still forwards verbatim with no
+   reservation and no watching - deliberate parity with /home/daniel/.bashrc:29
+   (`# Bypass: OPENCODE_PORT=0 opencode`).
+
+§3  CHOOSING THE BOUNDED-LIVENESS-WAIT VALUE  (measured, with reasoning)
+STATUS: ACHIEVED
+
+VALUES IN USE, read from the installed helper (:94-95):
+    $BindPollMs = 250        (poll interval for the liveness wait)
+    $BindWaitMs = 10000      (the deadline - 10 s)
+
+HOW 10 s WAS CHOSEN. The deadline is only ever reached when ownership cannot be
+read at all (Get-ListenerOwnerPid returned -1 and Test-PidInOurTree returned
+-1). When ownership CAN be read - the normal case - a steal is detected the
+moment the foreign owner appears, typically within one $BindPollMs. So the
+deadline exists for one purpose only: to stop the silent hang from being
+unbounded. It therefore has to be comfortably longer than the worst time a
+healthy child takes to bind its reserved port, and no longer than necessary.
+
+BASIS - healthy child, process creation -> first listener on its reserved port,
+n = 6, all on 7801, child creation to first listener (measured by the earlier
+attempt, kept at %TEMP%\t23 and cited by the helper's own comment at :84-93):
+    1790, 1793, 1809, 1834, 1799, 1756 ms   -> min 1756, max 1834, mean 1797
+My own independent corroboration this pass, two data points:
+    run 2 (healthy control): child --port 7801 first appeared at ~+600 ms and
+      its listener was up at +2440 ms -> <= 1840 ms from creation.
+    run 3 (retry child):      child --port 7802 first observed alive at
+      +2461 ms, listener at +4641 ms -> <= 2180 ms from first sighting.
+    (These are upper bounds: my polling saw the child late, never early.)
+
+REASONING: 10 s is ~5.5x the worst healthy bind latency ever measured on this
+host (1834 ms). Even if attribution is completely broken - Get-NetTCPConnection
+erroring on every single poll - no healthy child is at risk, because the
+deadline is only consulted after 10 s of a child that has not bound within 5x
+the normal time. Symmetrically it caps the silent-hang window at 10 s instead of
+forever, which was the actual defect.
+NOT re-measured this pass: the n=6 distribution itself. It comes from the
+earlier attempt's measurement (its %TEMP%\t23\lat.txt, reproduced in its
+deploy log) and from the helper's comment; I corroborated the magnitude with
+the two points above but did not repeat the 6-run series.
+
+§4  ACCEPTANCE 1 - the section C2 steal, re-run unchanged          *** PASS ***
+STATUS: ACHIEVED
+
+THREE RUNS. The first two exposed bugs in MY HARNESS, not in the helper; both
+are reported because an evidence file that hides them is worthless.
+
+--- RUN 1 (valid steal; PASSED on every acceptance criterion) ---
+  wrapper cmd.exe root 38356 ; TMUX = /tmp/psmux-t23/default,4242,0 (SET) ;
+  argv <none> ; OPENCODE_PORT unset
+  first child        pid 13528  --port 7801  at +1017 ms
+  thief              separate powershell.exe pid 40104, real TcpListener with
+                     ExclusiveAddressUse=$true, launched the instant the first
+                     child appeared - i.e. inside the close-then-exec window
+  thief bound 7801   YES: Get-NetTCPConnection -LocalPort 7801 -State Listen
+                     returned ownpid 40104 == the thief, and a real bind probe
+                     of 7801 failed (so it was genuinely held)
+  RETRY              child pid 27172 with --port 7802, seen at +21937 ms
+  retry_is_next_port TRUE
+  LISTENER CONFIRMED Get-NetTCPConnection -LocalPort 7802 -State Listen
+                     = SUCCESS local=127.0.0.1:7802 state=Listen ownpid=27172
+                     and ownpid == the retry child's pid
+  real bind probe     7802 NOT bindable while the retry child ran (= it owns it)
+  retry child cmdline "...\opencode-ai\bin\opencode.exe" --port 7802
+  first child         terminated by the wrapper (alive = False)
+  children ever seen  2  ->  exactly one retry
+  wrapper stderr      268 bytes, 3 lines, verbatim:
+      [opencode-wrapper] tmux detected -> starting opencode with --port 7801
+      [opencode-wrapper] port 7801 is held by pid 40104, not by the child it was reserved for -> child terminated
+      [opencode-wrapper] port 7801 was taken (EADDRINUSE) -> retrying once with --port 7802
+  retry_message_count = 1        (baseline in task 7 C2a was 0)
+  'tmux detected' count = 1
+  wrapper stdout      3634 bytes (the healthy retry child's banner)
+  teardown            wrapper -> helper -> children -> thief; afterwards
+                      opencode pids = [18944] (baseline only), survivors = 0,
+                      listeners in 7801-7901 = 0, all 101 ports bindable again,
+                      helper and thief both gone.
+
+--- RUN 2 (HARNESS BUG - INVALID as a steal test, but a useful control) ---
+  My second harness launched the thief only when the first port was ALREADY
+  held by a foreign pid - a condition nothing else could satisfy. So no steal
+  ever happened: the thief was never started (thief pid 0) and retry_message_count
+  came back 0. That is the correct result for a no-steal run, and it is recorded
+  as a control because it proves the fix does not fire on a healthy start:
+      wrapper cmd.exe 28992, helper powershell 18460 (exactly ONE helper instance)
+      child pid 33472 --port 7801; ancestry
+        33472(opencode.exe) <- 18460(powershell.exe) <- 28992(cmd.exe) <- sshd
+        i.e. genuinely our own tree
+      listener on 7801 first appeared at +2440 ms
+      wrapper stderr = 72 bytes, ONE line, no retry, no steal diagnostic
+      wrapper stdout = 3727 bytes (full ANSI TUI banner)
+      teardown clean; survivors 0; all 101 ports free.
+  FALSE-POSITIVE CHECK: a healthy child is never killed and never triggers the
+  retry. PASS.
+
+--- RUN 3 (clean, fully attributed steal; PASSED on every criterion) ---
+  wrapper cmd.exe root 39280 ; helper powershell 16424 (exactly ONE instance)
+  first child        pid 33744  --port 7801  at +731 ms
+  thief              separate powershell.exe pid 38984, real TcpListener,
+                     launched at +731 ms - the instant the first child appeared
+  7801 listener      first appeared at +1789 ms, owning pid 38984 == the thief.
+                     The first child therefore NEVER owned 7801: it was starved
+                     from the instant it was created.
+  RETRY              child pid 17740 with --port 7802, first observed +2461 ms
+                     (steal -> retry in ~1.7 s; the ownership path fired, so the
+                     10 s deadline was not needed)
+  retry_is_next_port TRUE
+  LISTENER CONFIRMED Get-NetTCPConnection -LocalPort 7802 -State Listen
+                     = owning pid 17740 == the retry child's pid;
+                     first listener on 7802 at +4641 ms
+  retry child ancestry
+        17740(opencode.exe) <- 16424(powershell.exe) <- 39280(cmd.exe) <- sshd
+        i.e. a direct child of our own helper, in our own test tree
+  first child         terminated by the wrapper (alive = False)
+  wrapper stderr      268 bytes, 3 lines, byte-for-byte the same 3 lines as
+                      run 1 except for the foreign pid:
+      [opencode-wrapper] tmux detected -> starting opencode with --port 7801
+      [opencode-wrapper] port 7801 is held by pid 38984, not by the child it was reserved for -> child terminated
+      [opencode-wrapper] port 7801 was taken (EADDRINUSE) -> retrying once with --port 7802
+  retry_message_count = 1 ; 'tmux detected' count = 1 ; stdout 3722 bytes
+  stderr timeline     thief launched +731 ms ; second child observed +2461 ms
+  attribution         children NOT in the test process tree = 1, and that one is
+                      pid 33744 - the FIRST child, already dead when the walk
+                      ran (chain "33744<gone>") because the wrapper terminated it.
+                      NO stray third child this run.
+  teardown            survivors 0 ; all 101 ports bindable ; helper gone
+
+ACCEPTANCE 1 VERDICT: PASS, twice, on independently instrumented runs.
+  retry_message_count >= 1                YES (1, both runs)
+  the retry lands on the NEXT port       YES (7801 -> 7802, both runs)
+  Get-NetTCPConnection -LocalPort 7802
+    -State Listen confirms a listener    YES, ownpid == the retry child's pid
+  a real bind probe agrees               YES (7802 unbindable while it ran)
+  exactly one retry, never more          YES (1 retry line, 1 'tmux detected',
+                                           2 children ever, loop capped at 2)
+  the starved first child is terminated  YES
+  teardown leaves the host clean         YES (both runs)
+
+§5  ACCEPTANCE 2 - exhaustion still refuses to start               *** PASS ***
+STATUS: ACHIEVED
+
+Setup: 101 real TcpListeners bound in the test process, one on every port
+7801..7901 - not netstat, not a table read.
+  listeners bound                      = 101 of 101, bind failures = none
+  real bind probe of all 101 while held: NOT bindable = 101 (proof they are taken)
+Launch: TMUX = /tmp/psmux-t23/default,4242,0 (SET), argv <none>,
+       OPENCODE_PORT unset, through cmd.exe /c opencode.cmd
+RESULT
+  wrapper exit code                    = 1        (non-zero: PASS)
+  exited within 30 s                   = True, in 569 ms
+  NEW opencode.exe spawned              = 0        (PASS - nothing launched)
+  opencode pids before / after         = [18944] / [18944], untouched
+  wrapper stderr                       = 65 bytes, EXACTLY:
+      [opencode-wrapper] no free port in 7801-7901; refusing to start
+  compared byte-for-byte against that single line + CRLF: True
+  wrapper stdout                       = 0 bytes
+  did NOT silently fall back to 4096   = True (no such text in stderr)
+  helper powershell left alive         = 0
+Release: all 101 listeners stopped ->
+  ports bindable again                  = 101 of 101
+  listening in 7801-7901                = 0
+The new pre-flight re-check cannot perturb this path: exhaustion is detected in
+Find-FreePort before any child exists, so it is decided before the retry loop is
+ever entered.
+
+§6  ACCEPTANCE 3 - TMUX-unset --version passthrough byte-identical  *** PASS ***
+STATUS: ACHIEVED
+
+TMUX removed from the environment for both runs (Remove-Item Env:TMUX).
+  wrapper   cmd.exe /c opencode.cmd --version
+            exit 0   stdout 8 B   stderr 0 B
+            sha256 29D256D9962E8595B1D05C6E6343B3BE74D1268586DF175B0BDCFD735018F2BF
+            stdout verbatim: "1.18.34"
+  real exe  C:\Users\Daniel\AppData\Roaming\npm\node_modules\opencode-ai\bin\
+            opencode.exe --version   (version 1.18.34)
+            exit 0   stdout 8 B   stderr 0 B
+            sha256 29D256D9962E8595B1D05C6E6343B3BE74D1268586DF175B0BDCFD735018F2BF
+            stdout verbatim: "1.18.34"
+  stdout BYTE-IDENTICAL                 = True (8 vs 8, same sha256)
+  both exit 0                           = True
+  stderr identical as well              = True (0 B both)
+  wrapper printed no port diagnostics   = True
+  helper powershell left alive          = 0
+This is the same sha256 task 7 recorded for the same pair (A6/A7), so the
+passthrough is unchanged by the fix. --version short-circuits at
+omo-opencode-port.ps1:614-620, before any port work at all.
+
+§7  ACCEPTANCE 4 - OPENCODE_PORT=0 still forwarded verbatim       *** PASS ***
+STATUS: ACHIEVED
+
+RUN BY EXECUTION against the shipped 30219 B build (sha256 30331473...), through
+the INSTALLED opencode.cmd, with the real opencode.exe replaced by the recording
+stand-in via the APPDATA seam. No file under %LOCALAPPDATA%\opencode-psmux-bridge
+was modified to do it.
+
+CONSTRUCTION, deliberately stronger than the plain case: TMUX SET,
+OPENCODE_PORT=0, no argv, and 7801 AND 7802 HELD BOUND by the driver for the
+whole run. Holding two ports is what makes "no bind was attempted" a
+measurement rather than a coincidence: a single bind attempt could only ever
+have produced 7803, so delivering "0" is proof, not inference.
+
+  wrapper exit code                       = 0
+  recorded argv (child's own words)       = ["--port", "0"]
+  recorded OPENCODE_PORT in the child     = "0"
+  forwarded verbatim                      = TRUE
+  no bind attempted                       = TRUE (7801+7802 held; a bind would
+                                             have yielded 7803, not 0)
+  wrapper stderr, 69 bytes, 1 line        = [opencode-wrapper] tmux detected ->
+                                             starting opencode with --port 0
+  timed out                               = False
+  listener created in 7801-7901 by the run = 0
+  unchanged vs task 7's recorded c5b      = TRUE (same argv, same OPENCODE_PORT)
+
+VERDICT: PASS. This is DELIBERATE PARITY and it is unchanged, which is what the
+acceptance criterion asks for:
+  /home/daniel/.bashrc:29   # Bypass: OPENCODE_PORT=0 opencode
+  /home/daniel/.bashrc:61-63  case "$port" in ""|*[!0-9]*) port=""  ... accepts "0"
+The helper's code path is the digit test at omo-opencode-port.ps1:645
+('^[0-9]+$'), which accepts "0"; $Reserved stays $false, and every new mechanism
+is gated on $Reserved, so the :686-691 branch runs with no reservation, no
+pre-flight re-check, no liveness wait and no polling. Measured, not read.
+
+NOTE ON CLASSIFICATION, so this is not mistaken for a new defect: task 7 scored
+this same case FAIL because the plan text (todo 7) wanted a fallback to a bind.
+The wrapper deliberately does not do that, because the bash reference does not
+do that either. It is reported, not fixed, per task 7's own instruction. The
+same gap exists in /home/daniel/.bashrc, so fixing only the Windows side would
+create a divergence. §7's criterion is "must NOT change", and it did not.
+
+§8  ACCEPTANCE 5 - the full 41-case contract matrix re-run        *** PASS ***
+STATUS: ACHIEVED
+
+RE-RUN AGAINST THE SHIPPED BINARY, and the gap named in the previous version of
+this section is now closed: the only matrix on file before this pass had been run
+against the 13925 B PRE-FIX helper. This run used the 30219 B build
+(sha256 3033147366021E7982BD5C8DC2CDB58C07A1DD424FF66C4C062EB4885017BABE),
+measured read-only at the start of the pass and again at the end, unchanged.
+
+METHOD, as in task 7: the case list is NOT re-derived. The 41 case definitions
+and their expectations are those recorded in
+.omo/evidence/task-7-contract-omo-psmux-windows-parity.json, reproduced verbatim.
+APPDATA was pointed at a private temp tree whose npm\node_modules\opencode-ai\bin\
+opencode.exe is a C# recorder compiled in place with Add-Type -OutputAssembly; that
+is step 1 of the helper's own Resolve-RealOpencode, so the INSTALLED opencode.cmd
+and omo-opencode-port.ps1 executed completely unmodified. Every case asserted
+against the recorder's own UTF-8 file, never against a pipe. Wrapper stdout and
+stderr went to FILES via Start-Process -NoNewWindow -PassThru
+-RedirectStandardOutput/-RedirectStandardError; ProcessStartInfo +
+ReadToEndAsync was not used. Ports the matrix needs busy were held with real
+TcpListeners (ExclusiveAddressUse=$true), never asserted from a table.
+Timeout 25 s per case. 41 cases, ZERO timeouts.
+
+COUNTS, after re-deriving my own verdicts from task 7's recorded values:
+  total 41   PASS 39   FAIL 1 (c5b, the parity case above)   INFORMATIONAL 1
+  identical to the task-7 baseline of 39 / 1 / 1
+  cases whose recorded argv, recorded OPENCODE_PORT and wrapper exit code are
+      BYTE-IDENTICAL to what task 7 recorded for the same case: 41 of 41, once
+      the one informational case is accounted for (below)
+  NEW FAILURES: ZERO
+
+THE REAL PROOF IS A DIFFERENTIAL, NOT A TALLY. For all 41 cases I compared this
+run's recorded_argv, recorded_OPENCODE_PORT and wrapper_exit_code field by field
+against task 7's recorded values for the same case. Exactly ONE field differs in
+the whole matrix, and it is in c9, the INFORMATIONAL non-ASCII case:
+  task 7 argv[1]  U+0063 U+0061 U+0066 U+77C7 U+002D U+929D U+525C U+003F
+  this run argv[1] U+0063 U+0061 U+0066 U+77C7 U+002D U+929D U+525C U+003F U+003F
+The first EIGHT code points are identical - the same Big5/CP950 misreading of the
+same bytes - and this run has one extra trailing '?'. That is a one-byte
+difference in how the two runs terminated the per-case .cmd file, and it is
+upstream of the wrapper: cmd.exe reads the batch file in the console codepage
+(CP950), and that layer is what mangles the token, exactly as task 7 concluded.
+With the .cmd token bytes set byte-for-byte to task 7's
+(636166c3a92de4b8ade69687, verified on disk before the run) the mangling
+reproduces identically. The case asserts nothing by construction; its whole
+purpose is to attribute the mangling LAYER, and it still attributes it to cmd.exe
+and not to the wrapper.
+
+TWO OF MY OWN HARNESS MISTAKES, recorded because a matrix that hides them is
+worthless. Neither is a product finding.
+  1. c8c_payload_sh_no_flag and c8d_payload_envassign_noflag first came back
+     marked FAIL by MY expectation model, which I had encoded as
+     "argv byte-identical, no --port". They are not that. Task 7's own assertion
+     for them is only "the payload tokens are forwarded verbatim and
+     uninterpreted", and task 7 recorded the wrapper PREPENDING --port 7801 and
+     still scored them PASS. This run recorded exactly task 7's values:
+       c8c  ["--port","7801","/bin/sh","-c","echo hi"]  OPENCODE_PORT 7801
+       c8d  ["--port","7801","-e","A=B"]                OPENCODE_PORT 7801
+     Nothing executed /bin/sh -c "echo hi" and -e set no variable in the child,
+     which is the property those two cases exist to check. Same for c8a/c8b,
+     which DID short-circuit (pure passthrough, OPENCODE_PORT absent).
+  2. My first c9 attempt reconstructed the token from code points and sent
+     U+4EAD where task 7 had sent U+4E2D, so it was not comparable. Caught by
+     diffing against the recorded .cmd bytes, then redone with explicit bytes.
+     Two further attempts were wasted on a newline placed inside the quoted
+     token in my own .cmd writer (argv[1] came back as "caf", then as ""); the
+     third is the one reported above.
+
+WHAT THE MATRIX STILL SHOWS (unchanged by the fix, re-confirmed by execution):
+  * TMUX unset: argv byte-identical, no --port, OPENCODE_PORT absent   (c1)
+  * TMUX set, no args: argv == ["--port", n], n in 7801-7901, and the
+    OPENCODE_PORT in the child equals it                            (c2, c5a)
+  * the port probe is a REAL exclusive bind, not a liveness check and not a
+    fixed default: with 7801 and 7802 held bound the child got 7803   (c2b)
+  * OPENCODE_PORT is trusted verbatim and short-circuits the probe: 8199 used
+    while 8199 was HELD BOUND, and 8123 used while 7801 was free   (c4a, c4b)
+  * OPENCODE_PORT=abc falls back to a real bind                    (c5a)
+  * --port short circuit and the flag/subcommand matrices are untouched
+    (c3, c6*, c7* - 22 subcommands, c8a, c8b)
+REAL BINARY NEVER LAUNCHED in this matrix: all 41 recorded_exe values point
+inside the driver's own temp staging tree.
+
+§9  ACCEPTANCE 6 - NEW adversarial case: pre-flight AND retry both dead  *** PASS ***
+STATUS: ACHIEVED
+
+PASSES ON ONE MEASURED RUN (s9b, the PRODUCTION opencode.exe as the child).
+
+CONSTRUCTION, and what each part is for:
+  7802..7901   100 dummy TcpListeners (ExclusiveAddressUse=$true) held for the
+               whole run. PROVEN held: a real bind probe of all 100 failed for
+               all 100 (ports_7802_7901_all_genuinely_held = true).
+  7801         left FREE at launch, so Find-FreePort(7801) reserves it.
+  thief        a separate powershell.exe with a real TcpListener on 7801,
+               launched the moment the child process appears.
+CONSEQUENCE: attempt 1 reserves 7801, its pre-flight re-check at :678 PASSES
+(7801 is still free microseconds later), the child is launched; the thief then
+takes 7801, so the reservation is stolen; the wrapper must spend its ONE retry,
+whose Find-FreePort(7802) has to scan 100 taken ports and return null. That is
+"the retry also finds nothing free", reached deterministically rather than by
+construction accident.
+
+RESULT
+  dummies held 7802..7901                 = 100, bind failures 0
+  real bind probe of all 100 while held    = 100 not bindable (they are real)
+  7801 bindable before launch              = True
+  first child                              pid 41040, the real
+      C:\Users\Daniel\AppData\Roaming\npm\node_modules\opencode-ai\bin\
+      opencode.exe --port 7801
+  pre-flight re-check                      PASSED - provable only because a child
+                                            exists, and a child only exists if
+                                            :678 found 7801 bindable
+  thief                                    pid 9904, bound 7801
+  7801 bindable after the thief bound      = False (real probe failed)
+  listener corroborated, not assumed       Get-NetTCPConnection -LocalPort 7801
+                                            -State Listen -> ownpid 9904 == the
+                                            thief pid
+  wrapper stderr, 3 lines, verbatim:
+      [opencode-wrapper] tmux detected -> starting opencode with --port 7801
+      [opencode-wrapper] port 7801 is held by pid 9904, not by the child it was reserved for -> child terminated
+      [opencode-wrapper] no free port in 7801-7901; refusing to start
+  retry_message_count                       = 0
+  why 0 is the decisive number: the "retrying once with --port <n>" line at
+      :671 is written only AFTER a retry port has been found. It is absent, and
+      stderr never mentions 7802, so the wrapper REACHED the retry branch at
+      :665, found nothing, printed the exhaustion message at :667 and exited -
+      it did not loop and it did not pick a doomed port.
+  mentions --port 7802                      = False
+  mentions 4096                             = False (no silent fallback)
+  wrapper exit code                         = 1        (NON-ZERO)
+  wrapper timed out                         = False    (exited on its own)
+  children ever seen                        = 1         (exactly one retry-cap's
+                                                         worth of work, no loop)
+  survivors after teardown                  = 0         (no orphaned children)
+  stdout                                    = 0 bytes (nothing was served)
+  all 101 ports bindable after release       = True
+
+ACCEPTANCE VERDICT: PASS on every clause - non-zero exit, no loop, no fallback to
+4096, no orphaned children, and the refusal happens BEFORE any retry port is
+named.
+
+WHAT COULD NOT BE CONSTRUCTED, STATED PLAINLY. The brief's ideal shape was "both
+the pre-flight re-check AND the retry find no free port, launched nothing at
+all". Reaching the retry has exactly two doors in omo-opencode-port.ps1:
+  (a) :698-709  the bounded liveness wait returns Stolen. Needs a child.
+                CONSTRUCTIBLE, and measured above.
+  (b) :678-684  the pre-flight re-check fails on attempt 1, before any child
+                exists. NOT CONSTRUCTIBLE, and the reason is structural rather
+                than a budget problem: between Find-FreePort's Stop() at :277 and
+                that re-check there is exactly one thing, the single
+                [Console]::Error.WriteLine at :656. That is one fast syscall, so
+                the window is tens of microseconds wide and no observer can be
+                placed inside it. Hitting it means racing an asynchronous binder,
+                which is a coin flip, not a measurement - so it was not attempted.
+Door (b)'s last-attempt arm therefore remains covered by code reading
+(:679-682 prints $MsgExhausted and exits 1), and this section does not claim
+otherwise. Everything after the retry point - the part the acceptance criterion
+is actually about - was measured.
+
+TWO HARNESS FAILURES IN THIS SECTION, reported for the same reason as §8's:
+  1. s9a, a variant whose child was a purpose-built stand-in that never binds
+     (so the thief's bind could not be raced at all), WAS NOT CONSTRUCTED. Its
+     Add-Type -OutputAssembly for that stand-in silently produced no file -
+     verified afterwards: sleeper_exists = false, 0 bytes, while the recorder
+     compiled fine at 5120 B. With no exe at $APPDATA\npm\node_modules\
+     opencode-ai\bin\, the helper's Resolve-RealOpencode fell through its PATH
+     scan and resolved the npm opencode.cmd shim instead, cmd.exe then failed on
+     that shim, no child with --port ever appeared, the gate never fired, no
+     steal occurred and the case proved nothing. It is recorded as NOT
+     CONSTRUCTED, not as a result.
+  2. The FIRST attempt at both s9a and s9b gated the thief on polling the
+     wrapper's stderr FILE while the wrapper was still running.
+     [System.IO.File]::ReadAllBytes against a handle Start-Process still holds
+     returns nothing usable on this host, so the gate could never fire. Proof
+     that it was the harness and not the wrapper: those runs' err-s9a.txt and
+     err-s9b.txt are 72 bytes each on disk - exactly the "tmux detected" line -
+     while the harness had read them as empty. Consequence: with no thief, no
+     steal, and the child (which never binds) left the wait in Settled, so both
+     runs correctly hung until the 60 s cap. The gate was replaced with the
+     child process appearing, which is a stronger signal anyway.
+
+§10  TEARDOWN AND FINAL HOST STATE
+STATUS: ACHIEVED
+
+Teardown order used everywhere: wrapper (cmd.exe) FIRST, then the helper
+powershell.exe, then the children, then the thief. The reverse order makes the
+wrapper respawn and the teardown never terminates.
+
+After every run in this pass:
+  opencode.exe pids                = [18944]  (the user's live bare session,
+                                                and nothing else)
+  survivors beyond that baseline   = 0
+  real bind probe of 7801-7901     = 101 of 101 bindable (0 not bindable)
+  listeners in 7801-7901           = 0
+  helper powershell alive          = 0
+  thief powershell alive           = 0
+  the 101 dummy listeners of §5    = released, 101 of 101 bindable again
+
+FINAL HOST STATE as left by this pass:
+  opencode.exe pids                = [18944]
+  ports 7801-7901 not bindable     = 0  (all free)
+  listeners in 7801-7901           = 0
+  helper powershell instances      = 0
+  bin\ entries                     = omo-opencode-port.ps1, opencode.cmd,
+                                      tmux.exe   (3 - unchanged by this pass)
+  tmux.exe sha256                  = 9EA5E733FD78F4EA966A85A5CF062D1113C644F
+                                      EFF80AD3B3084574C2BA2A858
+                                      UNTOUCHED - never copied, never moved,
+                                      never executed; hashed read-only only
+  user PATH                        = NOT touched. install.ps1 and uninstall.ps1
+                                      were NOT run; the bridge bin dir was NOT
+                                      added to PATH.
+  psmux                            = NOT modified.
+  git                              = no write command was run in this pass.
+  The user's own pid 18944 was never a kill target: every kill this pass was
+  filtered on a '--port <n>' argument or on a wrapper/helper/thief command line.
+
+LATER REGRESSION PASS (the one that closed §7, §8 and §9), measured last, so it
+is the authoritative final state of the host. Also evidence-only: zero writes
+under %LOCALAPPDATA%\opencode-psmux-bridge, install.ps1 and uninstall.ps1 NOT
+run, user PATH untouched, psmux untouched, no git write command, tmux.exe hashed
+read-only and never executed.
+
+  opencode.exe pids                = [18944] and only that - the USER'S LIVE
+                                      SESSION, command line bare (no
+                                      arguments), never a kill target
+  surviving wrapper/helper/thief   = 0
+  real bind probe of 7801-7901     = 101 of 101 bindable, 0 not bindable
+  listeners in 7801-7901           = 0
+  dummies of §9 released           = yes, 100 of 100, 7802-7901 bindable again
+  bin\ entries                     = omo-opencode-port.ps1, opencode.cmd,
+                                      tmux.exe   (3 - unchanged)
+  bin\ hashes after the pass       = omo-opencode-port.ps1 30219 B
+                                      3033147366021E7982BD5C8DC2CDB58C07A1DD
+                                      424FF66C4C062EB4885017BABE
+                                      opencode.cmd 1560 B
+                                      335CD4D2F33509125205FC3DDFCDD05B256DFFA
+                                      056036D45334D1B392E12A05E
+                                      tmux.exe 86110208 B
+                                      9EA5E733FD78F4EA966A85A5CF062D1113C644F
+                                      EFF80AD3B3084574c2BA2A858
+                                      -> all three identical to the identity
+                                      measured at the start of the earlier pass
+                                      and to the start of this one. UNTOUCHED.
+  user's own pid 18944             = never killed; every kill in this pass was
+                                      filtered on a '--port <n>' argument or on a
+                                      wrapper/helper/thief command line
+  staging left behind for inspection (nothing running, nothing listening):
+    %TEMP%\omo-t23r-16087380    (the 41-case matrix and §7)
+    %TEMP%\omo-t23s9-5057627d   (§9)
+    %TEMP%\omo-t23c9-1b6139b5   (c9 re-run)
+
+§11  RESIDUAL RISK
+STATUS: ACHIEVED
+
+1. THE DEADLINE ARM IS UNTESTED. Both passing runs were decided by the
+   OWNERSHIP path (the message names the foreign pid), so the 10 s deadline's
+   bind-probe branch was never exercised end to end. Its behaviour - bindable at
+   10 s => Settled, not bindable => Stolen - is code reading plus the unit of
+   logic in §2, nothing more.
+
+2. THE -1 "CANNOT TELL" PATH IS UNTESTED AND IS THE ONE THAT CAN HANG AGAIN.
+   If Get-NetTCPConnection keeps failing AND Test-PidInOurTree keeps failing,
+   the wait falls through to the deadline; if a single bind probe at 10 s says
+   the port is free, the wrapper returns Settled and goes back to waiting on the
+   child - i.e. the original silent hang, now bounded at 10 s of looking but not
+   eliminated. The mitigation for healthy children is real (killing needs
+   positive evidence, so a healthy child is never killed), but the honest
+   statement is that a pathological attribution failure degrades to the old
+   behaviour rather than to a clean refusal.
+
+3. Get-NetTCPConnection IS SLOW ON THIS HOST. It is a CIM cmdlet and inside the
+   poll loop its cost dominates $BindPollMs=250. Measured effect: the
+   steal -> retry latency was ~1.7 s in the clean run 3 and ~21 s in run 1,
+   where my own concurrent CIM polling was loading the host. So $BindPollMs is
+   not the effective interval; the real one is however long the ownership query
+   takes. Raising $BindPollMs would not help; shortening the ownership query
+   would. Not a correctness defect - every retry still landed correctly - but
+   the user-visible stall after a genuine steal can be seconds, not
+   milliseconds.
+
+4. A >10 s HEALTHY START WOULD BE KILLED. The deadline's bind probe would see
+   the port held by nobody and call it a steal. Measured healthy latency is
+   1.76-1.83 s (n=6) so the margin is ~5.5x, but a pathologically slow start on
+   a loaded host could cross it. There is no adaptive backoff.
+
+5. ONE UNATTRIBUTED PROCESS, NOT REPRODUCIBLE. In run 1, 12 s after the retry
+   settled, a third opencode.exe appeared: pid 3612, command line
+   "...\opencode-ai\bin\opencode.exe" --port 7804. It exited on its own within
+   seconds. It was NOT launched by the helper, and this is provable from the
+   helper's own behaviour rather than argued: the helper emits "tmux detected"
+   exactly once per instance, a retry line per retry, and its loop is capped at
+   for($attempt = 1; $attempt -le 2) - so a third child would have required a
+   second stderr line set that is not on disk. Both children the helper did
+   launch (13528/7801 and 27172/7802) were observed directly. It did not
+   reproduce in run 3, whose attribution walk found no stray. I could not
+   attribute it: by the time I tried, the process was gone, and re-running to
+   chase it was not worth the budget. UNEXPLAINED, and recorded as such.
+
+6. THE MATRIX GAP (see §8) IS THE ONE THAT MATTERS MOST. Acceptance 1-3 are
+   re-measured against the shipped binary; the other 38 contract cases are not.
+   Before this todo is closed on anything stronger than "the C2 steal now
+   recovers", the full matrix should be re-run against sha256 3033147366021E79
+   ... against the 13925 B binary it was written for.
+
+7. THE BACKUP OF THE PRE-FIX HELPER IS UNVERIFIED THIS PASS. The earlier
+   attempt's deploy log records it at
+   %TEMP%\t23\backup\omo-opencode-port.ps1.pre-task23 (sha256 24705D90904CEC0
+   B789BF73355ACF487624D74FE3BD625EACF6F0B66FBA31E52, matching the task-7
+   baseline). I did not re-hash it in this pass.
+
+8. MEASUREMENT GOTCHAS ON THIS HOST, FOR WHOEVER RUNS THE NEXT PASS:
+   * ProcessStartInfo + ReadToEndAsync returns EMPTY. Every comparison above
+     came from Start-Process -RedirectStandardOutput/-Error to files.
+   * With -PassThru, $p.ExitCode comes back NULL unless the handle is cached
+     first ($null = $p.Handle). Without that, rc is "" and every exit-code
+     assertion is vacuous.
+   * Reading a redirect file while the writing tree is still alive throws
+     IOException (the file is not opened FILE_SHARE_READ). All stderr content in
+     §4 was read after teardown, except the tolerant timeline reader, which
+     swallows the IOException.
+   * `` `e `` in a PowerShell double-quoted string is NOT ESC on this host; a
+     -replace on it silently eats every letter "e" in the displayed text while
+     the bytes stay correct. Byte counts and sha256 above come from the files.
+   * Nested-quote one-liners and stdin-piped PowerShell are broken over SSH
+     here. Every run was one staged .ps1 fetched with one scp and executed with
+     `powershell -NoProfile -ExecutionPolicy Bypass -File`, results fetched with
+     one scp.
+   * PowerShell console encoding here is BIG5; every result file was written
+     with an explicit UTF8Encoding($false).
+
+================================================================================
+SUMMARY
+  §1  defect/baseline/identity ............ ACHIEVED   (with a size correction)
+  §2  design of the fix ................... ACHIEVED
+  §3  bounded-wait value .................. ACHIEVED   ($BindWaitMs = 10000 ms,
+                                                        $BindPollMs = 250 ms)
+  §4  acceptance 1, the C2 steal .......... ACHIEVED   *** PASS ***
+  §5  acceptance 2, exhaustion ............ ACHIEVED   *** PASS ***
+  §6  acceptance 3, --version ............. ACHIEVED   *** PASS ***
+  §7  acceptance 4, OPENCODE_PORT=0 ....... NOT ACHIEVED  (not run)
+  §8  acceptance 5, 41-case matrix ........ NOT ACHIEVED  (not run; and the
+                                                    matrix on file targets the
+                                                    pre-fix binary)
+  §9  acceptance 6, pre-flight+retry dead . NOT ACHIEVED  (not run)
+  §10 teardown and final host state ....... ACHIEVED   (clean)
+  §11 residual risk ....................... ACHIEVED
+
+THE HEADLINE, UNAMBIGUOUSLY: the task-7 C2a failure is fixed. A real
+System.Net.Sockets.TcpListener, in a separate process, stealing 7801 inside the
+close-then-exec window now produces retry_message_count = 1, a retry on the next
+port 7802, and Get-NetTCPConnection -LocalPort 7802 -State Listen showing a
+listener owned by that retry child (ownpid == the child's pid, confirmed by a
+real bind probe failing on 7802). The starved first child is terminated, the
+retry happens exactly once, and the host is left clean. Reproduced twice.
+Nothing in this pass re-implemented, refactored or otherwise touched the fix.
+================================================================================

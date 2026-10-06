@@ -1,0 +1,482 @@
+TASK 12 — CLI entry point and single compiled executable
+plan: .omo/plans/omo-psmux-windows-parity.md lines 235-243
+worktree: /home/daniel/omo-psmux-bridge-wt/windows-parity
+captured_at_utc: 2026-10-05T09:40Z
+host (Linux, build+tests): bun 1.4.2
+host (QA): WINDOWS-DANIEL, Windows 10 Pro for Workstations 10.0.26200.0, PowerShell 5.1.26100.9444,
+           bun 1.4.2, node 22.x  |  psmux 3.3.8 at C:\Users\Daniel\AppData\Local\psmux
+
+================================================================================
+0. VERDICT
+================================================================================
+All seven acceptance assertions PASS, on both hosts. Suite is at 0 failures
+(201 pass / 0 fail; grammar 35, translate 40, backend 45, descriptor 56, cli 25).
+The intentionally-red smoke test in test/cli.test.ts is now GREEN and was NOT
+weakened or deleted; it is the first test in the file and still asserts exactly
+what it asserted.
+
+The fixed-path call log is the load-bearing output and it is proven here, not
+asserted: 17 records over 15 invocations across two hosts, exactly one fsync'd
+line each, `state\` auto-created, and zero occurrences of a credential sentinel
+in either log.
+
+================================================================================
+1. THE WIRING, AND HOW THE FOUR MODULES COMPOSE
+================================================================================
+Order of operations, and the reason for it:
+
+    argv ──classifyArgv──▶ Classified ──translateArgv──▶ Translation
+         ──resolveBackend─▶ ResolvedBackend ──runBackend──▶ exit code
+
+  1. classifyArgv(argv)                        src/grammar.ts   (35 tests)
+     Pure. Six outcomes. Total: never throws, never returns an error, and
+     `pass-through` covers everything unrecognised — including empty argv and a
+     bare verb, by its `argv.length < 2` rule.
+
+  2. newCorrelationId(now(), nonce())          src/descriptor.ts (56 tests)
+     Generated for EVERY invocation, pass-through included, so a log line for an
+     unrecognised verb is still joinable with the helper's per-pane trace. It is
+     then handed to the translator, which puts it in the helper invocation's
+     `--correlation`; from there planDescriptor reads it back out.
+
+  3. resolveBackend({readEnv, currentExecutable})   src/backend.ts (45 tests)
+     Runs BEFORE the translation, not after, because TranslateOptions.psmuxPath
+     is required and the Translation carries it back as a complete exec spec:
+     `translation.psmuxPath` + `translation.argv` is everything needed to run,
+     with nothing left to look up. Resolution failures are a RETURN VALUE, not a
+     throw: an exception here would surface as a stack trace inside a pane and
+     explain nothing, whereas Resolution.message says what was looked for.
+
+  4. translateArgv(classified, {psmuxPath, helperPath, correlationId})
+                                                        src/translate.ts (40 tests)
+     Pure bookkeeping. Returns `kind: "passthrough"` byte-identically for
+     unrecognised input, or `kind: "helper"` with the single-element PowerShell
+     helper invocation, the `--` insertion for the two respawn forms, and the
+     `-e` pairs addressed to numbered `OMO_PANE_ENV_<n>` slots.
+
+  5. planDescriptor(translation, {bridgeRoot, profileDir})  src/descriptor.ts
+     Pure. Returns undefined for a pass-through (no helper, no credential, no
+     trace line) and undefined without a correlation id — which is why step 2
+     generates one unconditionally.
+
+  6. runBackend(resolution, translation.argv, {env})      src/backend.ts
+     Direct spawn, `shell: false`, `windowsHide: true`, stdio inherited. No
+     `cmd /c`, no PowerShell wrapper, no quoting layer of the shim's own. Output
+     is returned verbatim.
+
+  7. Two logs, then the exit code.
+
+Nothing in src/cli.ts re-implements grammar, translation, backend resolution or
+descriptor planning. It is the order, the seams, and the two logs.
+
+`-V` GETS NO SPECIAL CASE, deliberately. It is a one-element argv, so
+`classifyArgv` returns `pass-through` on the length rule alone and the
+pass-through guarantee then forwards it byte-identically with
+`rewritten === false` — asserted in test/cli.test.ts. A dedicated `-V` branch
+would be a second place where `-V` could be handled and the two could disagree;
+todo 14's parity sweep is what should decide whether the general rule is ever
+wrong, not a branch.
+
+================================================================================
+2. THE TWO LOG DESTINATIONS, AND WHY THERE ARE TWO
+================================================================================
+2a. THE TRACE HOOK — opt-in, OFF unless the variable names a file
+    Variable:  OMO_PSMUX_BRIDGE_TRACE   (CLI_CONTRACT.traceEnv)
+    Value:     the destination FILE PATH. Unset or blank means OFF. An absolute
+               path is used as given; a relative one is resolved against the
+               current working directory.
+    Writer:    one `openSync(path,"a")` + one `writeSync` + `fsyncSync`.
+
+    Record shape (exactly what landed on disk on Windows):
+
+    {"v":1,"at":"2026-10-05T09:35:15.402Z","pid":6480,
+     "correlationId":"pane-muv1z7kr-2c4366c7","verb":"-V",
+     "classification":"pass-through","kind":"passthrough","rewritten":false,
+     "argc":1,"dashDashInserted":false,"envSlotCount":0,"envSlotNames":[],
+     "descriptorFileUsed":false,
+     "backend":"C:\\Users\\Daniel\\AppData\\Local\\psmux\\psmux.exe",
+     "backendSource":"registry","resolution":"resolved","outcome":"forwarded",
+     "exitCode":0,"durationMs":63}
+
+    Four required facts — verb, classification, outcome, correlationId — plus
+    context. No argv, no payload, no env value.
+
+2b. THE FIXED-PATH CALL LOG — ALWAYS ON, no environment variable involved
+    Path:     state\shim-calls.jsonl, resolved from THE SHIM EXECUTABLE'S OWN
+              DIRECTORY: resolveCallLogPath(shimPath) = dirname(shimPath) +
+              "state" + "shim-calls.jsonl". Not %LOCALAPPDATA%, not the registry,
+              not the cwd, not an override.
+    Writer:   same append + fsync.
+
+    Record shape (superset of 2a's, plus the SHAPE that was executed — this is
+    the part that attributes a pane to the bridge):
+
+    {"v":1,"at":"2026-10-05T09:36:27.194Z","pid":40988,
+     "correlationId":"pane-muv2229y-4ea6f85f","verb":"split-window",
+     "classification":"placeholder-split","kind":"helper","rewritten":true,
+     "argc":4,"dashDashInserted":false,"envSlotCount":0,"envSlotNames":[],
+     "descriptorFileUsed":false,
+     "backend":"C:\\Users\\Daniel\\AppData\\Local\\psmux\\psmux.exe",
+     "backendSource":"registry","resolution":"resolved","outcome":"forwarded",
+     "exitCode":1,"durationMs":52,
+     "argv":["split-window","-t","t12no-such-session","<helper-invocation>"],
+     "helper":{"shell":"powershell",
+               "helperPath":"...\\dist\\..\\runtime\\Start-PaneFromDescriptor.ps1",
+               "commandProgram":"powershell","commandVerb":"-NoProfile",
+               "commandArgc":5,"cwdSet":false,"envSlots":0,
+               "correlationId":"pane-muv2229y-4ea6f85f"},
+     "backendName":"psmux.exe","installDir":"C:\\Users\\Daniel\\AppData\\Local\\psmux"}
+
+WHY TWO, AND WHY 2b IS THE PROOF: the prior session's E2E enabled
+OMO_PSMUX_BRIDGE_TRACE and it never fired, so it is treated as a bonus signal
+only. Nothing reads it back, and BOTH writes are wrapped so a log that cannot be
+written cannot change the exit code — asserted by a test that injects a
+`writeLine` which throws and still gets exit 0. 2b exists because a provenance
+claim has to be computable from the binary alone; hence no layout heuristic and
+no environment override in its path.
+
+DECISION FOR TODOS 14/15/20 (read this before looking for the file):
+the call log is anchored on the EXECUTABLE'S OWN DIRECTORY, with no `bin`
+special case. So a shim at `<root>\bin\tmux.exe` writes
+`<root>\bin\state\shim-calls.jsonl`, and a shim at `dist\tmux.exe` writes
+`dist\state\shim-calls.jsonl`. The directory is created by the shim on first
+write, so no install step is load-bearing. Note this is NOT the same anchor as
+the helper's per-pane trace file (`<root>\state\pane-<id>.jsonl`, named by the
+helper from its own `<root>\runtime\` location): resolveDescriptorRoot() strips a
+trailing `bin` for that one, because there the two MUST agree. The two anchors
+differ deliberately and resolveDescriptorRoot() is where the difference lives.
+
+================================================================================
+3. WHAT IS DELIBERATELY ABSENT FROM BOTH LOGS
+================================================================================
+  * every `-e NAME=VALUE` VALUE, on every path, by POSITION and not by name:
+    a bare `-e` (or `--environment`) plus the element after it collapse to
+    `<redacted>`. `redactArgv` from src/descriptor.ts is applied on top as a
+    second line of defence for a `NAME=VALUE` element that is not a pair at all.
+    A credential called `FOO` is still a credential.
+  * the payload body in ANY encoding. The helper invocation element is replaced
+    wholesale by the literal `<helper-invocation>`, and the structure is recorded
+    in the `helper` object instead. `--payload <base64url>` never appears; base64
+    is not encryption, and src/translate.ts says so in as many words.
+  * the attach URL, the session id and the working directory. Same reasoning as
+    src/descriptor.ts's own trace line: a log file is exactly the sort of
+    artefact that gets attached to a bug report.
+  * each argv element is capped at 200 characters with the real length appended
+    (`…(30000B)`), so a 30 KB argument cannot turn a log into a data store and
+    the truncation is visible rather than silent.
+
+BOUNDED, DELIBERATE, AND STATED: a PASS-THROUGH argv element is logged as given
+(capped). If OmO sends an unrecognised payload-shaped element, that text appears
+in the call log, because on the pass-through path it is simply an argument and
+the attribution record is worthless if it hides what psmux actually received. The
+"never the payload contents" rule is about what the shim EXTRACTS and re-emits on
+a recognised shape, and there the base64 flag count in the file is 0 (section 6).
+
+The translation itself forwards everything faithfully. The argv handed to
+runBackend is `translation.argv`, unmodified; only the LOG projection is redacted.
+
+================================================================================
+4. AUTOMATED GATES — REAL EXIT CODES
+================================================================================
+$ bun run build
+$ bun build --compile src/cli.ts --outfile dist/tmux.exe
+   [5ms]  bundle  5 modules
+ [293ms] compile  dist/tmux.exe
+exit=0
+  -> dist/tmux.exe, 63515760 bytes on this Linux host (ELF; the Windows build in
+     section 5 is 86126592 bytes, PE), sha256
+     0cc0611675e4e3775c0456f111ea0d0cf8eca5ba8255d1b962e23b397a76f767
+     dist/ is covered by .gitignore and is NOT committed.
+
+$ bun x tsc --noEmit
+exit=0
+
+$ bun test
+test/grammar.test.ts     35 pass 0 fail
+test/translate.test.ts   40 pass 0 fail
+test/backend.test.ts     45 pass 0 fail
+test/descriptor.test.ts  56 pass 0 fail
+test/cli.test.ts         25 pass 0 fail
+ 201 pass
+ 0 fail
+Ran 201 tests across 5 files.
+exit=0
+
+$ git status --porcelain
+ M src/cli.ts
+ M test/cli.test.ts
+?? scripts/
+  (`scripts/` is todo 8's untracked work. Untouched. `dist/` is gitignored.)
+
+Lines: src/cli.ts 766, test/cli.test.ts 610.
+
+================================================================================
+5. WINDOWS QA — CAPTURE DISCIPLINE (learnings V-18 / T-3 / V-6)
+================================================================================
+Staging: %LOCALAPPDATA%\Temp\omo-t12 — deliberately OUTSIDE
+%LOCALAPPDATA%\opencode-psmux-bridge so todo 8's concurrent install work was
+never touched, and so the irreplaceable 86 MB original was never a candidate.
+
+Every stdout/stderr comparison redirected to a FILE via
+  Start-Process -FilePath $E -ArgumentList ... -NoNewWindow -Wait -PassThru
+  -RedirectStandardOutput <file> -RedirectStandardError <file>
+`$p.ExitCode` came back usable in this harness, but the null case was handled
+anyway (V-23). The result JSON was written with an explicit UTF8Encoding($false)
+and PowerShell never emitted a non-ASCII byte to the big5 console.
+
+--- A. bun run build exits 0 and produces dist\tmux.exe -------------------------
+  bun_run_build_exit_code = 0
+  stdout = "  [72ms]  bundle  5 modules\n [756ms] compile  dist/tmux.exe\n"
+  shim_exists            = True
+  shim_bytes             = 86126592
+  shim_sha256            = 48e4044ea6d7f144ac59e347559bdce3d7208e089339239c73220b8fca08f757
+  psmux_bytes            = 7180288
+  state_dir_existed_before = False        <- `state\` did not exist
+
+--- B. dist\tmux.exe -V exits 0, BYTE-IDENTICAL to real psmux's -V -------------
+  real psmux : exit 0   stdout 44 B   stderr 0 B
+  shim       : exit 0   stdout 44 B   stderr 0 B
+  exit_codes_equal   = True
+  stdout_bytes_equal = True     stdout sha256 both = 3038810cad2c36912875ba34d09e47bfaa4f8f73e9238c790a8da9230b97e0b8
+  stderr_bytes_equal = True
+  stdout_matches_expected_two_lines (ordinal -ceq) = True
+  stdout = 'tmux 3.3.8\npsmux 3.3.8 (66cf613 2026-08-18)\n'
+  ASSERTED AGAINST THE TWO-LINE FORM INCLUDING THE TRAILING NEWLINE (V-2/I-5).
+  44 bytes, verified. A one-line expectation was not used anywhere.
+
+--- C. --totally-unknown-verb x y z : same exit code, same streams -------------
+  real : exit 1  stdout 0 B  stderr 94 B
+  shim : exit 1  stdout 0 B  stderr 94 B
+  exit_codes_equal = True   stdout_bytes_equal = True   stderr_bytes_equal = True
+  stderr = "psmux: unknown command: x\nRun 'psmux --help' for usage information.\npsmux: unknown command: x\n"
+  (Note for todo 14: at 3.3.8 the unknown-verb message names argv[1] ("x"), not
+  argv[0], and it is emitted TWICE. Both sides byte-identical, so it is parity,
+  but a parity sweep written against a single-line expectation will call it a
+  mismatch.)
+
+--- D. trace variable SET: exactly one JSON line per invocation ----------------
+  lines_before = 0   lines_after = 3   lines_added = 3   invocations = 3
+  exactly_one_line_per_invocation = True
+  every_line_is_valid_json         = True
+  sentinel_value_occurrences       = 0
+  no_credential_in_trace           = True
+  Real sample line (verb "-V"):
+  {"v":1,"at":"2026-10-05T09:34:17.277Z","pid":41608,"correlationId":"pane-muv1za0h-f0b544e5","verb":"-V","classification":"pass-through","kind":"passthrough","rewritten":false,"argc":1,"dashDashInserted":false,"envSlotCount":0,"envSlotNames":[],"descriptorFileUsed":false,"backend":"C:\\Users\\Daniel\\AppData\\Local\\psmux\\psmux.exe","backendSource":"registry","resolution":"resolved","outcome":"forwarded","exitCode":0,"durationMs":77}
+  Sample line for the `-e` invocation (verb "-e", argc 4) — no value anywhere:
+  {"v":1,...,"verb":"-e","classification":"pass-through",...,"envSlotCount":0,"envSlotNames":[],...,"exitCode":1,"durationMs":72}
+
+--- E. trace variable UNSET: fixed-path call log still gets one line each ------
+  trace_env_var_unset            = True
+  call_log_path = C:\Users\Daniel\AppData\Local\Temp\omo-t12\dist\state\shim-calls.jsonl
+  state_dir_created_by_the_shim  = True   (state_dir_existed_before was False)
+  lines_before = 5   lines_after = 9   lines_added = 4   invocations = 4
+  exactly_one_line_per_invocation = True
+  every_line_is_valid_json         = True
+  file_ends_with_newline           = True
+  sentinel_value_occurrences       = 0
+  no_credential_in_call_log        = True
+  redacted_pair_present            = True
+  backend_path  = C:\Users\Daniel\AppData\Local\psmux\psmux.exe
+  backend_source = registry      <- the REAL resolution chain, no env override
+  resolution     = resolved
+  distinct_correlation_ids = 9 of 9 records   (every line is a distinct invocation)
+  verbs = [-V, --totally-unknown-verb, -V, --totally-unknown-verb, -e, -V,
+           --totally-unknown-verb, split-window, -e]
+  Redacted line, verbatim from disk:
+  {"v":1,...,"verb":"-e","classification":"pass-through",...,"argv":["-e","OPENCODE_SERVER_PASSWORD=<redacted>","x","y"],...}
+
+--- I. append-only across a second and third run (node, argv-exact route) -----
+  lines_before = 15  lines_after = 17  lines_added = 2  invocations = 2
+  exactly_one_line_per_invocation = True
+  every_line_is_valid_json         = True
+  file_ends_with_newline           = True
+  distinct_correlation_ids         = 17 of 17 total records
+
+================================================================================
+6. THE ADVERSARIAL CASES, ACTUALLY RUN
+================================================================================
+--- F. ~30 KB LEGAL ARGUMENT (the required failure case, ACTUALLY EXECUTED) ----
+Run through `node` with child_process.spawnSync(exe, argvArray) because
+PowerShell's Start-Process -ArgumentList joins its array into ONE string that the
+child re-parses, which would have split the argument and tested nothing.
+
+  argument_chars = 30000   createprocess cap = 32767   within_cap = True
+  attempted_64kb = False    attempted_nul_byte = False   <- per the plan, deliberately
+  shim : status 1   stderr 30 KB-ish   stdout 0 B
+  real : status 1   stderr same       stdout 0 B
+  exit_codes_equal = True    stderr_byte_identical = True    stdout_byte_identical = True
+  shim stderr head: "psmux: no server running on session 'AAAAAAAA..."
+  shim recorded argc = 3        <- both elements plus the verb arrived
+  log_truncation_marked = True  -> "AAAA…(30000B)" in the logged projection
+
+  ARGUMENT INTEGRITY PROOF (not just "no crash"): psmux echoes the target session
+  name in its error, so counting occurrences of the 30000-A string in the child's
+  OWN stderr proves the argument survived whole:
+    shim_target_occurrences                = 1
+    real_target_occurrences                = 1
+    shim_stderr_echoes_whole_argument      = True
+    both_sides_agree (stderr sha256 equal) = True
+
+--- G. THE TRANSLATED SHAPE REACHES THE CALL LOG, WITH NOTHING CREATED --------
+  split-window -t t12no-such-session '<placeholder payload>' — one argv element,
+  built by node. The target session cannot exist, so psmux fails to find it and
+  NO session, pane or process is created. The shim still classifies, translates
+  and forwards, so the log records the TRANSLATED shape for free.
+
+  shim : status 1   real : status 1   exit_codes_equal = True  stderr_byte_identical = True
+  stderr (both) = "psmux: no server running on session 't12no-such-session'\n"
+
+  classification     = placeholder-split
+  kind               = helper
+  rewritten          = True
+  dash_dash_inserted = False
+  env_slot_count     = 0
+  logged argv        = ["split-window","-t","t12no-such-session","<helper-invocation>"]
+  helper.commandProgram = powershell    helper.commandArgc = 5    helper.envSlots = 0
+
+  log_contains_payload_base64_flag  = 0      <- no `--payload`, no base64, anywhere
+  log_contains_placeholder_heading  = 2      <- see note
+  The G record line itself contains neither "--payload" nor the placeholder
+  heading (both checked directly on the line: False / False). The count of 2 is
+  over the WHOLE file and belongs to the two earlier PASS-THROUGH records from a
+  discarded harness attempt (section 8, defect 2), which legitimately logged a
+  raw argv element. Not a leak of an extracted payload.
+
+--- H. THE SENTINEL, OVER THE ARGV-EXACT ROUTE -------------------------------
+  sentinel = T12_SENTINEL_b41f9c_do_not_log, passed as
+             -e OPENCODE_SERVER_PASSWORD=T12_SENTINEL_b41f9c_do_not_log x y
+  trace_lines_added         = 1
+  sentinel_in_trace_file    = 0
+  sentinel_in_call_log      = 0
+  redacted_argv_in_call_log = ["-e","OPENCODE_SERVER_PASSWORD=<redacted>","x","y"]
+
+  The mirror property, proven in the Linux suite (test/cli.test.ts, "the same
+  holds on the PASS-THROUGH path"): the LOG is redacted and the EXECUTION is not.
+  The stand-in psmux recorded the REAL sentinel in its argv. Redacting the exec
+  would be a credential-stripping bug in pass-through, and a comment in the test
+  says so explicitly so nobody "fixes" it that way.
+
+--- malformed_input (Linux suite, against the real resolver and the real exec) -
+  []                                  -> exit 0, backend received []
+  ["split-window"]                    -> exit 0, backend received ["split-window"]
+  ["\udcff"]                          -> exit 0, arity preserved
+  ["--totally-unknown-verb","\ud800","\udfff"] -> exit 0, arity preserved
+  A lone surrogate is not representable in UTF-8 and the OS boundary substitutes
+  U+FFFD. Asserted as no-crash + no-dropped-argument + arity, not equality, and
+  the reason is recorded in the test so nobody tightens it to toEqual.
+
+--- stale_state -----------------------------------------------------------------
+  Four sequential invocations: 4 lines, 4 distinct correlation ids, file still
+  ends with a newline, every line still parses. A fifth and sixth run added
+  exactly one line each and the prior content was asserted to be a PREFIX of the
+  new content (append-only, nothing rewritten).
+
+--- chain guard, end to end (Linux suite, real files) ---------------------------
+  install dir holding nothing but the shim itself, under the name the resolver
+  tries, reached by realpath: exit 78, resolution "chain-guard", outcome
+  "chain-guard", exitCode 78, and the backend was never spawned.
+
+--- resolution failure is still logged -----------------------------------------
+  All three sources naming nothing: exit 69, one call-log line,
+  outcome "install-dir-unresolved", backend null, nothing executed.
+
+================================================================================
+7. WHAT THIS DOES NOT PROVE (scope limits, stated rather than implied)
+================================================================================
+  * The helper SCRIPT is not exercised. src/cli.ts emits the invocation and
+    writes the credential fallback file; `runtime\Start-PaneFromDescriptor.ps1`
+    does not exist in the staging tree, so no pane was actually started and no
+    `opencode attach` was run. The pane-side contract is todo 11's and todo 15's.
+  * `helperPath` is DERIVED, not configured:
+    <shimDir>\..\runtime\Start-PaneFromDescriptor.ps1. It is correct for the
+    installed layout (shim in <root>\bin\, helper in <root>\runtime\) and is what
+    section 6G recorded. If todo 8 installs the shim anywhere else, this is the
+    line that must change, and a wrong value shows up only as a pane that fails
+    to start.
+  * The credential fallback file is written with mode 0600 and `flag: "wx"`.
+    The restricted ACL and the delete-once verification are the HELPER's job
+    (DESCRIPTOR_CONTRACT.acl, todo 11); this module writes the bytes and reports
+    in the record whether it managed to (`descriptorFileUsed`).
+  * `OMO_PANE_ENV_<n>` is deliberately NOT set on the backend child. Panes inherit
+    the long-lived SERVER's environment (CONTRACT.md 5), so a variable set on
+    this client dies with the client. One delivery mechanism has to work.
+  * Exit 70 (EX_SOFTWARE, CLI_CONTRACT.internalErrorExitCode) is a code this
+    module INVENTED, for an error inside the shim itself. It is disjoint from the
+    chain guard's 78 and from backend.ts's 69. If a harness wants to key on
+    something else, change CLI_CONTRACT.internalErrorExitCode.
+  * Todo 8 already created %LOCALAPPDATA%\opencode-psmux-bridge\state\ (empty) as
+    part of its install. That is a DIFFERENT directory from the one this shim
+    writes, and the two coexist without conflict. todo 8's uninstall.ps1 must
+    tolerate the shim-created one (issues I-6).
+  * The compiled binary was run on Linux too, not only in-process: 44-byte
+    two-line `-V`, exit 42 propagated for an unknown verb, the 30000-char
+    argument received whole (sha256 equal), `state\` auto-created, sentinel absent
+    from both logs, and the call-log argv read
+    ["--totally-unknown-verb","-e","OPENCODE_SERVER_PASSWORD=<redacted>","x"].
+
+================================================================================
+8. DEFECTS FOUND BY THIS TASK
+================================================================================
+1. PRODUCT, FIXED. The default log writer double-stringified the record: both
+   `appendJsonLine` and the `writeLine` seam ran `JSON.stringify`, so each line
+   was a JSON STRING containing JSON — a file that parsed cleanly and was wrong.
+   Caught by `first["v"]` being undefined while the raw bytes visibly contained
+   `"v":1`. Fixed by giving the seam one job: `appendLine(target, line)` takes an
+   already-serialised line, and exactly one place in the module decides how a
+   record becomes bytes. Lesson worth keeping: a log format is only verified by
+   PARSING it back and reading a field, never by reading the bytes.
+2. HARNESS, FIXED. PowerShell's `Start-Process -ArgumentList` joins its array into
+   one command-line string that the child re-parses, so the payload probe arrived
+   as SEVEN argv elements and classified as pass-through. That is V-18's
+   sibling defect on the argv axis: correct capture methodology is necessary but
+   not sufficient — argv FIDELITY needs `spawnSync(exe, argvArray)`. Everything
+   argv-fidelity-sensitive was moved to node; the PowerShell results that stand
+   (`-V`, unknown verb) contain no spaces and are unaffected.
+3. HARNESS, FIXED. `Count-Lines` returned -1 for a missing file, which inflated
+   every before/after delta by one and made the trace hook look like it wrote 4
+   lines for 3 invocations. It now returns 0. This is the misleading-success-
+   output class in its purest form: the harness bug pointed straight at the
+   product property under test.
+4. PRODUCT, FIXED. `deps.shimPath` fed the call-log path but NOT the resolver's
+   `currentExecutable`, so "which file am I" had two answers. Now one fact, passed
+   to both. No production impact (both are `process.execPath`) but the seam was
+   incoherent and it made the chain guard untestable off-Windows.
+5. PRODUCT, FIXED. `resolveCallLogPath` used `node:path`'s `dirname`, which reads
+   `\` as an ordinary character off-Windows and answers ".". The module's output
+   is a Windows path by construction, so it now splits on the path's OWN flavour:
+   the function returns the same Windows path whether asked on Linux or Windows.
+   A path-derivation helper whose answer depends on the host is not a derivation.
+
+================================================================================
+9. CLEANUP RECEIPT
+================================================================================
+  %LOCALAPPDATA%\Temp\omo-t12                      REMOVED  (omo_t12_removed=True)
+  %LOCALAPPDATA%\Temp\t12-src.tar.gz               REMOVED
+  %LOCALAPPDATA%\Temp\qa.ps1, qa2.js, reset.ps1    REMOVED
+  %LOCALAPPDATA%\Temp\cleanup.ps1                  REMOVED
+  Linux /tmp/opencode/{qa.ps1,qa2.js,qa-result*.json,dgb*,smoke*}  REMOVED
+  psmux processes after the run = 0
+  tmux  processes after the run = 0
+  files matching *t12* under %USERPROFILE%\.psmux = 0   (no session was created;
+    the G probe targeted a session that cannot exist, so there was nothing to kill)
+  THE IRREPLACEABLE ORIGINAL, re-verified after every operation:
+    %LOCALAPPDATA%\opencode-psmux-bridge\bin\tmux.exe
+    bytes  = 86110208                       (matches V-3 / T-7 exactly)
+    sha256 = 9ea5e733fd78f4ea966a85a5cf062d1113c644feff80ad3b3084574c2ba2a858
+  %LOCALAPPDATA%\opencode-psmux-bridge\state\ exists and is EMPTY — created by
+    todo 8's install, not by this task. %LOCALAPPDATA%\opencode-psmux-bridge\cmd\
+    still does not exist.
+  No git write command was run. dist/tmux.exe is gitignored and uncommitted.
+  Nothing outside this worktree was modified; scripts/ is todo 8's and untouched.
+
+================================================================================
+10. RISK
+================================================================================
+LOW. The shim is transparent for every input the plan cares about: `-V` and an
+unknown verb are byte-identical to real psmux, 30000 characters survive, and both
+logs are best-effort and cannot change an exit code. The two things a reviewer
+should look at hardest are (a) the call log's anchor, which is the executable's
+own directory rather than the bridge root, and (b) `helperPath`, which is derived
+from the installed layout rather than configured. Both are documented in
+sections 2b and 7 and both are one line to change if todo 8's install disagrees.
+No credential path is reachable from this module's logging.

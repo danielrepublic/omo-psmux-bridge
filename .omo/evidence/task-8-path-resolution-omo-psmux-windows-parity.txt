@@ -1,0 +1,65 @@
+TASK 8 RE-VERIFICATION - the PATH install had never taken effect; now it does
+generated_utc=2026-10-05T14:36:22.863757Z
+
+== FINDING ==
+Todos 6, 7 and 8 are checked [x] in the plan and their evidence files exist, but a read-only
+probe of the host at 2026-10-05T14:2xZ showed the installation was NOT in effect:
+  BRIDGE_BIN_NOT_ON_USER_PATH   %LOCALAPPDATA%\opencode-psmux-bridge\bin absent from user PATH
+  tmux.exe     -> C:\Users\Daniel\AppData\Local\psmux\tmux.exe  7180288 B sha256 EFE95C01A5C9...
+                i.e. psmux's OWN tmux, not the 86110208 B bridge shim
+  opencode.cmd -> C:\Users\Daniel\AppData\Roaming\npm\opencode.cmd  148 B, stock npm shim
+                i.e. todo 7's port wrapper was installed but unreachable
+  psmux.cmd    -> NOT ON PATH AT ALL, so IS-1's `cd` -> `psmux` was false
+  <root>\state\ existed and was EMPTY (files=0); <root>\bin\state\ did not exist, so the shim's
+  fixed-path call log state\shim-calls.jsonl had never been created either, corroborating that
+  the shim had never actually run through PATH resolution.
+Root cause: each of those lanes proved its artifact in a STAGING directory (C:/opencode-t13,
+C:/opencode-t14, %TEMP%\...) and never asserted PATH resolution. The acceptance criteria for
+todos 6/7/8 tested the artifact, not the installed state, so a never-run install passed.
+This is IS-11's exact failure mode - a silently missing pane - reproduced by the install itself.
+
+== ACTION ==
+Ran the delivered %LOCALAPPDATA%\opencode-psmux-bridge\bin\install.ps1 unchanged. That is its own
+job and IS-4's single declared reversible machine change. No script was edited.
+
+== RESULT ==
+user PATH entries      9 -> 10
+first entry            C:\Users\Daniel\AppData\Local\opencode-psmux-bridge\bin
+bridge bin entry count 1  (exactly one, no duplicate)
+machine PATH fingerprint EC47C1F9BB5BAFA9D193453DEF8BC242EDD1B2F5663D968EED4824BF3CA39078 len=467
+                        IDENTICAL before and after - HKLM never opened for writing
+registry value kind    String, preserved (install.ps1 refuses setx for this reason)
+WM_SETTINGCHANGE       SENDMSG_BROADCAST_OK
+
+== RESOLUTION IN A FRESH CHILD SHELL (registry PATH, not this process's inherited env) ==
+resolves tmux.exe          -> ...\opencode-psmux-bridge\bin\tmux.exe
+resolves psmux.cmd         -> ...\opencode-psmux-bridge\bin\psmux.cmd
+resolves opencode.cmd      -> ...\opencode-psmux-bridge\bin\opencode.cmd
+resolves bridge-doctor.cmd -> ...\opencode-psmux-bridge\bin\bridge-doctor.cmd
+All four now resolve INSIDE the bridge. IS-1 and IS-9 are true on the host for the first time.
+
+== IDEMPOTENCE (todo 8's stated acceptance: run twice, exactly one PATH entry) ==
+second run: RESULT=ALREADY_CORRECT  changed=no
+            user_path_sha256 before == after ==
+            48EEF2890F661355E7A43063F1C6659E657370197CFFEFFA770259A7F4441997
+            entries_after_second_run=10  bridge_bin_entry_count_after_second=1
+
+== RAW POST-INSTALL PROBE ==
+=== state dirs present (I-22 / I-6) ===
+PRESENT dir  state                    files=0
+ABSENT      bin\state
+ABSENT      bin\state\shim-calls.jsonl
+=== read-only replay of Test-DirectoryDeletable, scoped to bin (uninstall.ps1's default) ===
+scope=C:\Users\Daniel\AppData\Local\opencode-psmux-bridge\bin files=10   locked=0   procs_in_dir=0 deletable=True
+scope=C:\Users\Daniel\AppData\Local\opencode-psmux-bridge  files=55   locked=0   procs_in_dir=0 deletable=True
+=== PATH entry check (read-only; install/uninstall NOT run) ===
+user_path_entries=10
+on_path=C:\Users\Daniel\AppData\Local\opencode-psmux-bridge\bin first=True
+=== effective PATH seen by a child shell (does bin resolve?) ===
+resolves tmux.exe     -> C:\Users\Daniel\AppData\Local\opencode-psmux-bridge\bin\tmux.exe
+resolves psmux.cmd    -> C:\Users\Daniel\AppData\Local\opencode-psmux-bridge\bin\psmux.cmd
+resolves opencode.cmd -> C:\Users\Daniel\AppData\Local\opencode-psmux-bridge\bin\opencode.cmd
+
+== REVERSIBILITY ==
+uninstall.ps1 removes exactly this one entry and leaves the other nine in order. It was NOT run:
+the install must stay in place for todos 13-20 to test anything.

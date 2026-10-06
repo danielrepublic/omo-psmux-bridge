@@ -882,7 +882,9 @@ describe("translation result", () => {
       "helperCommandLine",
       "kind",
       "psmuxPath",
+      "rewriteReason",
       "rewritten",
+      "suppressionReason",
     ]);
   });
 
@@ -1226,19 +1228,32 @@ describe("layout rule 1c: `resize-pane -x` / `-y` is suppressed, not forwarded",
     expect(translation.psmuxPath).toBe(PSMUX_PATH);
   });
 
-  test("EVERY value form is suppressed, because psmux mishandles all of them", () => {
+  test("EVERY non-team value form is suppressed, because psmux mishandles all of them", () => {
     // `99` and `100` are destructive (written as percentages, absorbing the
-    // difference from a sibling floored at 1); `99%` is a percentage of a
-    // percentage; `+5` and `-20` are relative syntax psmux does not parse at all.
-    // Every measurement of every form is in the header of `src/translate.ts`.
-    const VALUES = ["99", "99%", "100", "+5", "-20", "0", "197"];
+    // difference from a sibling floored at 1); `+5` and `-20` are relative syntax
+    // psmux does not parse at all. Every measurement of every form is in the
+    // header of `src/translate.ts`.
+    //
+    // `-x <n>%` is deliberately NOT in this list any more: it is the team-resize
+    // shape and rule 1e now translates it (see the team-mode describe below). The
+    // `-y` percentage forms stay here, because the team emits `-x` only and rule
+    // 1e requires the absence of `-y`.
+    const VALUES = ["99", "100", "+5", "-20", "0", "197"];
     for (const value of VALUES) {
       for (const axis of ["-x", "-y"]) {
         const translation = translate(["resize-pane", "-t", "%1", axis, value], LAYOUT_OPTS);
 
         expect(translation.kind).toBe("suppressed");
+        expect(translation.suppressionReason).toBe("resize-cell-count-is-not-a-percentage");
         expect(translation.followUps).toEqual([]);
       }
+    }
+
+    for (const value of ["99%", "100%", "197%"]) {
+      const translation = translate(["resize-pane", "-t", "%1", "-y", value], LAYOUT_OPTS);
+
+      expect(translation.kind).toBe("suppressed");
+      expect(translation.suppressionReason).toBe("resize-cell-count-is-not-a-percentage");
     }
   });
 
@@ -1321,6 +1336,262 @@ describe("layout rule 1c: `resize-pane -x` / `-y` is suppressed, not forwarded",
   });
 });
 
+// ---------------------------------------------------------------------------
+// 11. THE TEAM-MODE RULES — rules 1d and 1e, from issue #1
+// ---------------------------------------------------------------------------
+//
+// OmO's team-mode visualization emits a different command family from the
+// subagent-pane grammar. The fixtures below are byte-exact to the bundle argv
+// (`index.js:19665-19666`, `index.js:19672`), and each rule is pinned to a psmux
+// defect: `src/server/mod.rs:3862` refuses every pane-scoped option except
+// `remain-on-exit`, and `src/server/options.rs:527-528` parses `main-pane-width`
+// as a bare `u16` that `src/layout.rs:1094-1096` reads only inside `apply_layout`.
+
+describe("team rule 1d: pane-scoped `@omo_attach_*` options are suppressed", () => {
+  test("both bundle forms are suppressed with the pane-option reason, and the argv is recorded", () => {
+    const FORMS = [
+      ["set-option", "-p", "-t", "%5", "@omo_attach_server_url", "http://127.0.0.1:7805"],
+      ["set-option", "-p", "-t", "%5", "@omo_attach_session_id", "ses_abc"],
+    ] as const;
+
+    for (const argv of FORMS) {
+      const translation = translate([...argv], OPTS);
+
+      expect(translation.kind).toBe("suppressed");
+      expect(translation.suppressionReason).toBe("psmux-refuses-pane-scoped-options");
+      // The dropped command is recorded verbatim, not erased.
+      expect(translation.argv).toEqual([...argv]);
+      expect(translation.rewritten).toBe(false);
+      expect(translation.followUps).toEqual([]);
+      expect(translation.helperCommandLine).toBeUndefined();
+      expect(translation.envSlotCount).toBe(0);
+    }
+  });
+
+  test("leading globals are preserved on the recorded argv", () => {
+    const translation = translate(
+      ["set-option", "-p", "-t", "%5", "@omo_attach_server_url", "http://127.0.0.1:7805"],
+      LAYOUT_OPTS,
+    );
+
+    expect(translation.kind).toBe("suppressed");
+    expect(translation.suppressionReason).toBe("psmux-refuses-pane-scoped-options");
+    expect(translation.argv).toEqual([
+      "-L",
+      "ns",
+      "set-option",
+      "-p",
+      "-t",
+      "%5",
+      "@omo_attach_server_url",
+      "http://127.0.0.1:7805",
+    ]);
+  });
+
+  test("`remain-on-exit` is the one pane option psmux stores, so it stays pass-through", () => {
+    const argv = ["set-option", "-p", "-t", "%5", "remain-on-exit", "on"];
+    const translation = translate(argv, OPTS);
+
+    expect(translation.kind).toBe("passthrough");
+    expect(translation.suppressionReason).toBeUndefined();
+    expect(translation.rewritten).toBe(false);
+    expect(translation.argv).toEqual(argv);
+  });
+
+  test("`set-option -g status on` is not pane-scoped and stays pass-through", () => {
+    const argv = ["set-option", "-g", "status", "on"];
+    const translation = translate(argv, OPTS);
+
+    expect(translation.kind).toBe("passthrough");
+    expect(translation.suppressionReason).toBeUndefined();
+    expect(translation.argv).toEqual(argv);
+  });
+
+  test("the same option name WITHOUT `-p` is not suppressed", () => {
+    // The rule keys on the bare `-p`, so a global set of the same name is none of
+    // its business — and it is not translated to a global user option either.
+    const argv = ["set-option", "-g", "@omo_attach_server_url", "http://127.0.0.1:7805"];
+    const translation = translate(argv, OPTS);
+
+    expect(translation.kind).toBe("passthrough");
+    expect(translation.argv).toEqual(argv);
+  });
+
+  test("a `-t` value that happens to be the option name is not mistaken for it", () => {
+    // psmux builds `non_flag_args` by excluding every `-t` value
+    // (`src/server/connection.rs:2376-2381`), so the option name here is `status`.
+    const argv = ["set-option", "-p", "-t", "@omo_attach_server_url", "status", "on"];
+    const translation = translate(argv, OPTS);
+
+    expect(translation.kind).toBe("passthrough");
+    expect(translation.argv).toEqual(argv);
+  });
+
+  test("all four set-option spellings suppress, not just `set-option`", () => {
+    // The verb gate is a set membership test, so a typo in one member — or a
+    // member added to the doc but not the code — would let that spelling through
+    // to a backend that exits 1 on it. Every spelling the contract names is
+    // pinned here rather than only the one the bundle happens to emit.
+    for (const verb of ["set-option", "set-window-option", "setw", "set"]) {
+      const argv = [verb, "-p", "-t", "%5", "@omo_attach_session_id", "ses_abc"];
+      const translation = translate(argv, OPTS);
+
+      expect(translation.kind).toBe("suppressed");
+      expect(translation.suppressionReason).toBe("psmux-refuses-pane-scoped-options");
+      expect(translation.argv).toEqual(argv);
+    }
+  });
+
+  test("an arbitrary other pane-scoped option name stays pass-through", () => {
+    // The rule is narrow by design: two `@omo_attach_*` names, not "any `-p`
+    // option psmux would refuse". A rule that caught every pane option would
+    // silently swallow calls the user meant to make.
+    const argv = ["set-option", "-p", "-t", "%5", "main-pane-width", "50"];
+    const translation = translate(argv, OPTS);
+
+    expect(translation.kind).toBe("passthrough");
+    expect(translation.suppressionReason).toBeUndefined();
+    expect(translation.argv).toEqual(argv);
+  });
+});
+
+describe("team rule 1e: the team resize becomes `main-pane-width` plus a re-layout", () => {
+  test("`resize-pane -t %5 -x 30%` becomes `set-option main-pane-width 30` + `select-layout main-vertical`", () => {
+    const translation = translate(["resize-pane", "-t", "%5", "-x", "30%"], OPTS);
+
+    expect(translation.kind).toBe("passthrough");
+    expect(translation.rewritten).toBe(true);
+    expect(translation.suppressionReason).toBeUndefined();
+    expect(translation.argv).toEqual(["set-option", "main-pane-width", "30"]);
+    expect(translation.followUps).toHaveLength(1);
+    expect(translation.followUps[0]?.reason).toBe(
+      "psmux-reads-main-pane-size-only-inside-apply-layout",
+    );
+    expect(translation.followUps[0]?.argv).toEqual(["select-layout", "main-vertical"]);
+  });
+
+  test("leading globals land on BOTH the primary and the follow-up", () => {
+    const translation = translate(["resize-pane", "-t", "%5", "-x", "30%"], LAYOUT_OPTS);
+
+    expect(translation.argv).toEqual(["-L", "ns", "set-option", "main-pane-width", "30"]);
+    expect(translation.followUps[0]?.argv).toEqual(["-L", "ns", "select-layout", "main-vertical"]);
+  });
+
+  test("the `resizep` spelling is handled identically", () => {
+    const translation = translate(["resizep", "-t", "%5", "-x", "30%"], OPTS);
+
+    expect(translation.argv).toEqual(["set-option", "main-pane-width", "30"]);
+    expect(translation.followUps).toHaveLength(1);
+  });
+
+  test("`-x 99` (cells, no `%`) stays suppressed with rule 1c's reason", () => {
+    const translation = translate(["resize-pane", "-t", "%5", "-x", "99"], OPTS);
+
+    expect(translation.kind).toBe("suppressed");
+    expect(translation.suppressionReason).toBe("resize-cell-count-is-not-a-percentage");
+    expect(translation.followUps).toEqual([]);
+  });
+
+  test("`-Z` keeps winning: `resize-pane -Z -x 99` is forwarded byte-identically", () => {
+    const argv = ["resize-pane", "-Z", "-x", "99"];
+    const translation = translate(argv, OPTS);
+
+    expect(translation.kind).toBe("passthrough");
+    expect(translation.rewritten).toBe(false);
+    expect(translation.suppressionReason).toBeUndefined();
+    expect(translation.argv).toEqual(argv);
+    expect(translation.followUps).toEqual([]);
+  });
+
+  test("`-y 30%` stays suppressed: the team emits `-x` only", () => {
+    const translation = translate(["resize-pane", "-t", "%5", "-y", "30%"], OPTS);
+
+    expect(translation.kind).toBe("suppressed");
+    expect(translation.suppressionReason).toBe("resize-cell-count-is-not-a-percentage");
+  });
+
+  test("`-x 0%` stays suppressed: a zero-width main pane is not a size", () => {
+    const translation = translate(["resize-pane", "-t", "%5", "-x", "0%"], OPTS);
+
+    expect(translation.kind).toBe("suppressed");
+    expect(translation.suppressionReason).toBe("resize-cell-count-is-not-a-percentage");
+  });
+
+  test("both axes present stays suppressed, even with a percentage on `-x`", () => {
+    const translation = translate(["resize-pane", "-t", "%5", "-x", "30%", "-y", "20%"], OPTS);
+
+    expect(translation.kind).toBe("suppressed");
+    expect(translation.suppressionReason).toBe("resize-cell-count-is-not-a-percentage");
+    expect(translation.followUps).toEqual([]);
+  });
+
+  test("two `-x` elements are not the team shape and stay suppressed", () => {
+    const translation = translate(["resize-pane", "-t", "%5", "-x", "30%", "-x", "40%"], OPTS);
+
+    expect(translation.kind).toBe("suppressed");
+    expect(translation.suppressionReason).toBe("resize-cell-count-is-not-a-percentage");
+  });
+
+  test("only a whole-number percentage rewrites; every other `-x` value stays suppressed", () => {
+    // Rule 1e's regex is `^[1-9][0-9]*%$`. Loosening it would rewrite an argv
+    // shape psmux cannot parse into a `main-pane-width` it does honour, sizing
+    // a pane wrongly with no error anywhere.
+    const NOT_A_PERCENTAGE = ["abc", "30.5%", "+30%", "-5%", "030%", "30", "%", "30%%", " 30%"];
+
+    for (const value of NOT_A_PERCENTAGE) {
+      const translation = translate(["resize-pane", "-t", "%5", "-x", value], OPTS);
+
+      expect(translation.kind).toBe("suppressed");
+      expect(translation.suppressionReason).toBe("resize-cell-count-is-not-a-percentage");
+      expect(translation.followUps).toEqual([]);
+    }
+  });
+
+  test("`0%` stays suppressed: rule 1e requires a NON-ZERO percentage", () => {
+    const translation = translate(["resize-pane", "-t", "%5", "-x", "0%"], OPTS);
+
+    expect(translation.kind).toBe("suppressed");
+    expect(translation.suppressionReason).toBe("resize-cell-count-is-not-a-percentage");
+  });
+
+  test("`-Z` wins over a percentage on `-x`, because zoom is checked first", () => {
+    // Guards gate ORDER: with `-Z` present the argv is forwarded verbatim, so the
+    // percentage gate must not be reached first and turn a zoom into a resize.
+    for (const argv of [
+      ["resize-pane", "-t", "%5", "-Z", "-x", "30%"],
+      ["resize-pane", "-t", "%5", "-x", "30%", "-Z"],
+    ]) {
+      const translation = translate(argv, OPTS);
+
+      expect(translation.kind).toBe("passthrough");
+      expect(translation.rewritten).toBe(false);
+      expect(translation.argv).toEqual(argv);
+      expect(translation.followUps).toEqual([]);
+    }
+  });
+
+  test("a percentage on `-x` is now rule 1e's shape, NOT rule 1c's suppression", () => {
+    // Behaviour change worth pinning deliberately. Under rule 1c alone `-x 99%`
+    // was suppressed; rule 1e claims every non-zero whole-number percentage, so
+    // it is now rewritten into a `main-pane-width` psmux actually honours. The
+    // old reasoning still holds — psmux converts a percentage straight back into
+    // a cell count (`src/server/mod.rs:5462`) — but the outcome is a correct
+    // layout instead of a dropped command.
+    const translation = translate(["resize-pane", "-t", "%5", "-x", "99%"], OPTS);
+
+    expect(translation.kind).toBe("passthrough");
+    expect(translation.rewritten).toBe(true);
+    expect(translation.argv).toEqual(["set-option", "main-pane-width", "99"]);
+  });
+
+  test("a dangling `-x` with no value is not the team shape and stays suppressed", () => {
+    const translation = translate(["resize-pane", "-t", "%5", "-x"], OPTS);
+
+    expect(translation.kind).toBe("suppressed");
+    expect(translation.suppressionReason).toBe("resize-cell-count-is-not-a-percentage");
+  });
+});
+
 describe("the layout rules leave every other path untouched", () => {
   test("`followUps` is empty on a plain pass-through, with and without leading globals", () => {
     for (const options of [OPTS, LAYOUT_OPTS]) {
@@ -1362,5 +1633,116 @@ describe("the layout rules leave every other path untouched", () => {
     // layout, and nothing for the resize.
     expect([layout, sizing, resize].flatMap((t) => [t, ...t.followUps])).toHaveLength(4);
     expect(sizing.followUps[0]?.argv).toEqual(["-L", "ns", "select-layout", "main-vertical"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 12. RULE D0 — the `display` / `display-message` `-F` strip (issue #1)
+// ---------------------------------------------------------------------------
+//
+// psmux's client does not recognise `-F` for `display` / `display-message` and
+// pushes it into the message text (`src/main.rs:2799-2865`), so
+// `display -p -F "#{session_id}" -t %1` prints `-F $1303` where tmux 3.7c prints
+// `$0`. OmO depends on the format spelling at bundle `index.js:19577` /
+// `index.js:19585` (`resolveCallerTmuxSession`). Dropping the `-F` element is the
+// validated spelling; every other verb's `-F` is parsed correctly by psmux and
+// must stay byte-identical.
+
+describe("rule D0: the `-F` element is dropped from `display` / `display-message`", () => {
+  test("`display -p -F #{session_id} -t %1` loses exactly the `-F` element", () => {
+    const translation = translate(["display", "-p", "-F", "#{session_id}", "-t", "%1"], OPTS);
+
+    expect(translation.argv).toEqual(["display", "-p", "#{session_id}", "-t", "%1"]);
+    expect(translation.kind).toBe("passthrough");
+    expect(translation.rewritten).toBe(true);
+    expect(translation.rewriteReason).toBe("psmux-client-treats-display-F-as-message-text");
+    expect(translation.suppressionReason).toBeUndefined();
+    expect(translation.followUps).toEqual([]);
+  });
+
+  test("`display -p -F #{session_name}:#{window_index} -t %1` loses exactly the `-F` element", () => {
+    const translation = translate(
+      ["display", "-p", "-F", "#{session_name}:#{window_index}", "-t", "%1"],
+      OPTS,
+    );
+
+    expect(translation.argv).toEqual([
+      "display",
+      "-p",
+      "#{session_name}:#{window_index}",
+      "-t",
+      "%1",
+    ]);
+    expect(translation.rewritten).toBe(true);
+    expect(translation.rewriteReason).toBe("psmux-client-treats-display-F-as-message-text");
+  });
+
+  test("the `display-message` alias is rewritten identically", () => {
+    const translation = translate(
+      ["display-message", "-p", "-F", "#{session_id}", "-t", "%1"],
+      OPTS,
+    );
+
+    expect(translation.argv).toEqual(["display-message", "-p", "#{session_id}", "-t", "%1"]);
+    expect(translation.rewritten).toBe(true);
+    expect(translation.rewriteReason).toBe("psmux-client-treats-display-F-as-message-text");
+  });
+
+  test("a `display` with no `-F` is byte-identical and carries no rewrite reason", () => {
+    const argv = ["display", "-p", "-t", "%1", "#{window_width},#{window_height}"];
+    const translation = translate(argv, OPTS);
+
+    expect(translation.argv).toEqual(argv);
+    expect(translation.rewritten).toBe(false);
+    expect(translation.rewriteReason).toBeUndefined();
+  });
+
+  test("a dangling `-F` as the last element is byte-identical", () => {
+    const argv = ["display", "-p", "-F"];
+    const translation = translate(argv, OPTS);
+
+    expect(translation.argv).toEqual(argv);
+    expect(translation.rewritten).toBe(false);
+    expect(translation.rewriteReason).toBeUndefined();
+  });
+
+  test("another verb's `-F` is parsed correctly by psmux and stays byte-identical", () => {
+    const argv = ["list-panes", "-t", "probe:0", "-F", "#{pane_id}"];
+    const translation = translate(argv, OPTS);
+
+    expect(translation.argv).toEqual(argv);
+    expect(translation.rewritten).toBe(false);
+    expect(translation.rewriteReason).toBeUndefined();
+  });
+
+  test("two `-F` elements: the FIRST non-final one goes, and the result is recorded", () => {
+    // Unspecified by the contract, which says "removes exactly the ONE non-final
+    // `-F` element" and presumes OmO's single-`-F` shape. Pinned here so the
+    // choice is deliberate rather than incidental: removing the first leaves a
+    // trailing `-F` that psmux reads as message text, which is a worse outcome
+    // than leaving both alone, but this argv does not occur in the bundle and
+    // guessing further would be inventing behaviour.
+    const translation = translate(["display", "-p", "-F", "#{session_id}", "-F"], OPTS);
+
+    expect(translation.argv).toEqual(["display", "-p", "#{session_id}", "-F"]);
+    expect(translation.rewritten).toBe(true);
+    expect(translation.rewriteReason).toBe("psmux-client-treats-display-F-as-message-text");
+  });
+
+  test("leading globals survive the `-F` rewrite", () => {
+    const translation = translate(
+      ["display", "-p", "-F", "#{session_id}", "-t", "%1"],
+      LAYOUT_OPTS,
+    );
+
+    expect(translation.argv).toEqual([
+      "-L",
+      "ns",
+      "display",
+      "-p",
+      "#{session_id}",
+      "-t",
+      "%1",
+    ]);
   });
 });

@@ -1,0 +1,135 @@
+TASK 14 EVIDENCE - parity sweep: the rebuilt shim against real psmux 3.3.8
+generated_utc=2026-10-05T16:30:21.681038Z
+
+== HEADLINE ==
+run 1: pass=64 fail=0 expected-translated=7
+run 2: pass=64 fail=0 expected-translated=7   (same corpus, same staged binary, immediately afterwards)
+negative control: pass=63 fail=1 expected-translated=7   (one expected value deliberately corrupted)
+All three observable channels compared on every case: exit code, stdout BYTES, stderr
+BYTES. 64 cases, 0 failures. No case was skipped for being inconvenient: the ones that
+cannot be observed over a non-interactive ssh are recorded as console_blocked on BOTH
+sides rather than quietly passed.
+
+== ARTIFACT UNDER TEST ==
+staged at   %TEMP%\omo-t14\bin\tmux.exe   (the corpus pin location)
+bytes       86127104
+sha256      990ad315391c5b2870c103fab8e8b49b1b6a19825ccf636bce4bf8cb5206f577
+pin match   True   (the corpus refuses to run against an unverified binary)
+built by    bun build --compile --target=bun-windows-x64 src/cli.ts --outfile dist/tmux.exe
+control     %LOCALAPPDATA%\psmux\tmux.exe
+psmux ctl   %LOCALAPPDATA%\psmux\psmux.exe
+launcher    %LOCALAPPDATA%\opencode-psmux-bridge\bin\psmux.cmd
+call log    %TEMP%\omo-t14\bin\state\shim-calls.jsonl
+
+== A REAL DEFECT FOUND AND FIXED, IN THE REBUILT SHIM ==
+Every translated case failed with classification=pass-through. Root cause: the shim did
+not know psmux's own leading global flags. `-L <namespace>` must be the FIRST argument
+(`psmux list-sessions -L ns` fails with "unknown option '-L'"), so with a namespace
+argv[0] was `-L`, the grammar matched no verb, and ALL FIVE payload shapes degraded to
+pass-through. The shim still forwarded the argv and still returned the backend's exit
+code, so nothing failed loudly.
+
+Proof, from the shim's own call log on the host, same binary path, same payload:
+  before, no -L  : classification=pass-through     argv=[... ,"<the payload verbatim>"]
+  before, with -L : classification=pass-through     verb=-L
+  after,  no -L  : classification=placeholder-split argv=[... ,"<helper-invocation>"]
+  after,  with -L : classification=placeholder-split verb=split-window
+                        argv=["-L","omo_lexp_ns","split-window",...,"<helper-invocation>"]
+
+Why this mattered more than an ordinary bug: this plan mandates a throwaway `-L`
+namespace for todos 14, 15, 16, 18, 19 and 20. Under the plan's own verification method
+the bridge would therefore have been measured ONLY in its pass-through mode, and a
+reviewer would have concluded it works without ever exercising a single translation.
+That is IS-8's "failure is loud" requirement, violated silently.
+
+Fix, test-first: splitLeadingGlobals() in src/grammar.ts recognises the three value-taking
+globals psmux 3.3.8 accepts before the verb (`-L`, `-S`, `-f`, each measured on the host),
+TranslateOptions gained leadingGlobals so they are re-emitted in front of the rewritten
+shape, and planInvocation() classifies the remainder and reports the real verb in the log.
+13 new tests, written and seen failing before the fix existed.
+bun test 214 pass / 0 fail (was 201). bun x tsc --noEmit exit 0.
+
+== THREE CORRECTIONS TO THE CORPUS ITSELF, each forced by a measurement ==
+1. payloads.placeholder and payloads.attach were escaped ONE LEVEL TOO DEEP: they held
+   `\\n` and `\\"` where src/grammar.ts PLACEHOLDER_HEAD holds `\n` and `"`, so
+   parsePayloadElement never matched. The corpus had never once exercised a translated shape.
+2. pins.version_two_line_stdout_sha256 had a hand-typed hex digit wrong at index 44:
+   `...f73e923` + `0c790a8d` where the truth is `8c790a8d`. Corrected against the observed
+   value, which the sweep had already proved byte-identical on both sides.
+3. a-big-argument-30000 referenced @BIG30000@ but no such payload existed, so the literal
+   10-byte token was passed and the argv-integrity assertion checked the wrong string.
+   Added payloads.big30000.
+
+== THE -h BRANDING DIVERGENCE, asserted rather than excluded ==
+Measured: shim -h 16034 B, real tmux.exe -h 16022 B, psmux.exe -h 16034 B, 357 lines each.
+The shim's help is BYTE-IDENTICAL to psmux.exe -h. 12 line indices differ from the real
+one: 0, 3, 340-347, 349, 350.
+
+The corpus's original rule -- "every `psmux` replaced by `tmux` must equal real" -- is
+wrong twice over, and both errors were found by measurement rather than by reading:
+  * the swap is ANCHORED at line start. psmux prints `psmux source-file ~/.psmux.conf`
+    where real prints `tmux source-file ~/.psmux.conf`; the CONFIG PATH KEEPS ITS NAME.
+  * the rule applies to the DIFFERING indices ONLY. Four lines are byte-identical on both
+    sides and still say `psmux`: 152, 178, 197, 198. psmux substitutes `tmux` in
+    COMMAND-VOCABULARY positions and keeps its own name in prose and in its own examples.
+The contract now asserted is one-directional and is the one that actually holds: for every
+line that differs, an anchored leading swap reconciles it, and the differing set is non-empty.
+
+== THE TRANSLATED CASES, from parsed call-log fields, never from wire bytes ==
+  case                          verdict  verb         classification            argc  --  envSlots
+  e-split-placeholder            PASS     split-window placeholder-split         10    False 0
+  e-new-window-placeholder       PASS     new-window   placeholder-newwindow     10    False 0
+  e-new-session-placeholder      PASS     new-session  placeholder-newsession    10    False 0
+  e-respawn-pane-placeholder     PASS     respawn-pane placeholder-respawn       8     True 0
+  e-respawn-pane-attach          PASS     respawn-pane attach-respawn            6     True 0
+  e-placeholder-missing-session  PASS     split-window placeholder-split         7     False 0
+  e-env-pair-valid               PASS     None         None                      None  None None
+
+Wire bytes are IDENTICAL for all of them, which is the point: the divergence lives at the
+EXEC BOUNDARY, so its absence on the wire is asserted too.
+
+== ACCEPTANCE CRITERIA, LINE BY LINE ==
+  sweep exits 0 with pass/fail summary ............... MET (pass=64 fail=0 expected-translated=7)
+  the known -h branding difference asserted and named  MET (see above)
+  two runs in a row produce the same result ......... MET, identical at the verdict level:
+     same summary_line, same failed_ids, same per-case ok, and the same (check name, pass)
+     pair for every check of every case. No state leakage.
+
+== QA SCENARIOS ==
+happy - the sweep run on Windows via SSH exits 0 with the expected counts: 64 cases,
+        64 pass, 0 fail, 7 of them translated.
+failure - a fixture value is deliberately corrupted and the sweep must report a failure
+          rather than passing. EXECUTED via --negative-control, which increments
+          a-version expect_stdout_bytes from 44 to 45 and changes nothing else.
+          Result: pass=63 fail=1 expected-translated=7
+          failed_ids=['a-version'], detail {expected: 45, got: 44} on expect_stdout_bytes.
+          One case, one check, the right one. The sweep is therefore observed to FAIL when
+          it should, which is what makes the 64/0 result mean something.
+
+== METHOD NOTES, all measured on this host ==
+* argv fidelity needs node spawnSync(exe, argvArray). Driving psmux through its .cmd
+  launcher hands the line to cmd.exe, which consumed a `#{session_name}|#{pane_id}` format
+  string at the `|`. A .cmd also cannot be CreateProcess'd directly: node returns status=null.
+  The launcher is therefore only invoked with metacharacter-free argv, through cmd.exe, with
+  the program path UNQUOTED; wrapping the line a second time makes cmd report that the quoted
+  path is not a command.
+* `-L <ns>` is only a global BEFORE the verb. Ordering is `-L ns VERB [opts]`.
+* Both sides use the SAME namespace name, sequentially, torn down in between. Two DIFFERENT
+  names are equally isolated but not comparable: `list-sessions` and every
+  session-not-found message print the session name, so two names made two correct sides
+  differ byte-for-byte.
+* psmux prints its `created` stamp C-style (`Tue Oct  6 00:05:00 2026`), not ISO. Masking
+  only an ISO pattern silently matched nothing and the comparison failed on a field that
+  cannot match across two runs seeded seconds apart. Both forms are now masked, on 25 cases.
+* A verb that opens or attaches to a pane needs a console. Over a non-interactive ssh there
+  is none, so such a case is killed at 9 s and BOTH sides are recorded as console_blocked.
+  That is an observation, not a pass: an empty stdout from a killed process is not evidence.
+* The sweep must be launched with Win32_Process::Create. Start-Process and cmd /c children
+  are killed when the ssh session's job object ends, which truncated the first run to nothing.
+
+== TEARDOWN ==
+Every case ends with `kill-server` in its own namespace. psmux process count on the host
+after the runs: 3 -> 0. killall.ps1 enumerates every namespace the registry knows about from
+both instances\ and servers\, because naming them by hand leaked 10 servers on the first
+attempt. Registry residue afterwards is psmux's own: instances\ and servers\ keep stale
+entries by design, and the doctor's check 2 states so.

@@ -102,20 +102,30 @@ export const CLI_CONTRACT = {
   /** Schema version on both records, so a reader can tell a line it understands
    *  from one it must not trust.
    *
-   *  BUMPED 1 -> 2 for the layout rules, and the bump is not bookkeeping: the
-   *  version is only worth carrying if a change that a v1 reader CANNOT detect
-   *  moves it. Both of these are undetectable from the line itself — a v1 reader
-   *  sees `v: 1` and has no way to know the schema moved underneath it:
+   *  BUMPED 1 -> 2 for the layout rules, and 2 -> 3 for the team-mode rules
+   *  (issue #1). The bump is not bookkeeping: the version is only worth carrying
+   *  if a change that an older reader CANNOT detect moves it. Each of these is
+   *  undetectable from the line itself — a v1 reader sees `v: 1` and a v2 reader
+   *  sees `v: 2`, and neither has a way to know the schema moved underneath it:
    *
    *   * `ShimCallRecord` gained the required key `followUps`, so a strict v1
    *     validator rejects every record this shim now writes.
    *   * `ShimOutcome` gained the member `"suppressed"`, so `outcome` can now
    *     carry a value no v1 switch has a case for — and a v1 reader sees it as an
    *     unknown string on a record it believes it understands.
+   *   * `ShimTraceRecord` gained the required key `suppressionReason`, so a
+   *     strict v2 validator rejects every record this shim now writes. The key is
+   *     required and `null` when not suppressed, so its PRESENCE is the schema
+   *     change and a v2 reader cannot infer it from any value it already reads.
+   *   * `ShimTraceRecord` gained the required key `rewriteReason` (rule D0,
+   *     issue #1), so a strict v2 validator rejects every record this shim now
+   *     writes. Like `suppressionReason` it is required and `null` when there is
+   *     no hidden rewrite, so its PRESENCE is the schema change and a v2 reader
+   *     cannot infer it from any value it already reads.
    *
    *  Leaving it at 1 would mean the version field asserts a compatibility that
    *  does not exist, which is strictly worse than having no version at all. */
-  recordVersion: 2,
+  recordVersion: 3,
 
   /** Upper bound on one logged argv element, in characters. A 30 KB argument is
    *  a legal thing to forward and a terrible thing to write to a log; the tail
@@ -425,6 +435,17 @@ export interface ShimTraceRecord {
   readonly verb: string;
   readonly classification: string;
   readonly kind: string;
+  /** Why the command was suppressed, or `null` when it was not. Required and
+   *  nullable rather than optional, so a reader can tell "not suppressed" from
+   *  "this record predates the field" — the distinction `recordVersion` exists
+   *  for. One slug per rule; see `SuppressionReason` in `src/translate.ts`. */
+  readonly suppressionReason: string | null;
+  /** Why the command was rewritten, or `null` when the rewrite's reason is not
+   *  visible from the logged argv. Required and nullable rather than optional,
+   *  for the same reason `suppressionReason` is: a reader can tell "no hidden
+   *  rewrite" from "this record predates the field". One slug per rule; see
+   *  `RewriteReason` in `src/translate.ts`. */
+  readonly rewriteReason: string | null;
   readonly rewritten: boolean;
   readonly argc: number;
   readonly dashDashInserted: boolean;
@@ -483,6 +504,8 @@ export function buildTraceRecord(context: RecordContext): ShimTraceRecord {
     verb: invocation.verb,
     classification: invocation.classification,
     kind: invocation.translation.kind,
+    suppressionReason: invocation.translation.suppressionReason ?? null,
+    rewriteReason: invocation.translation.rewriteReason ?? null,
     rewritten: invocation.translation.rewritten,
     argc: invocation.translation.argv.length,
     dashDashInserted: invocation.translation.dashDashInserted,
@@ -791,6 +814,8 @@ function degradedInvocation(
     translation: {
       argv: [...argv],
       kind: "passthrough",
+      suppressionReason: undefined,
+      rewriteReason: undefined,
       followUps: [],
       rewritten: false,
       dashDashInserted: false,

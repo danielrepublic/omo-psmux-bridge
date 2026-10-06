@@ -1,0 +1,438 @@
+TASK 10 EVIDENCE — omo-psmux-windows-parity
+Backend resolver and chain guard
+================================================================================
+Worktree : /home/daniel/omo-psmux-bridge-wt/windows-parity
+Artifacts: src/backend.ts, test/backend.test.ts
+Host     : Linux, bun 1.4.2 (production target is Windows; see §2 for how the
+           Windows-only surface was made assertable without a Windows host)
+Gates    : see §6. All four run from the worktree.
+
+
+--------------------------------------------------------------------------------
+1. TDD ORDER — THE REAL FIRST RUNNING OF THE SUITE
+--------------------------------------------------------------------------------
+test/backend.test.ts was written BEFORE src/backend.ts had any implementation.
+First run, verbatim:
+
+  $ bun test test/backend.test.ts
+  bun test v1.4.2 (744846f84)
+
+  test/backend.test.ts:
+
+  # Unhandled error between tests
+  -------------------------------
+  SyntaxError: Export named 'BACKEND_CANDIDATE_NAMES' not found in module
+  '/home/daniel/omo-psmux-bridge-wt/windows-parity/src/backend.ts'.
+  -------------------------------
+
+   0 pass
+   1 fail
+   1 error
+  Ran 1 test across 1 file. [33.00ms]
+  exit=1
+
+The suite was RED before any implementation existed. The first green run came
+only after src/backend.ts was written, and the run before it (with the
+implementation in place but incomplete) was 35 pass / 10 fail — those ten were
+real defects the tests caught, not red-green bookkeeping:
+
+  DEFECT 1  backendName was derived as BACKEND_CANDIDATE_NAMES[safe.indexOf(chosen)]
+            after `safe` had already been FILTERED, so index 0 was always right
+            and a directory holding only `tmux.exe` was reported as `psmux.exe`.
+            Caught by: "both candidate names are accepted, in the documented
+            order". Fixed by carrying {name, path} pairs through the filter.
+  DEFECT 2  after defect 1's fix, `selfCandidates` held {name, path} OBJECTS
+            where `chainGuard` expected strings. Every path-level chain-guard
+            path therefore died with `candidate.startsWith is not a function`.
+            Caught by: "the guard is case-insensitive and separator-insensitive,
+            as Windows is". Fixed by mapping to paths at the call site.
+            NOTE: this defect survived every in-process seam test and was caught
+            by the COMPILED-BINARY test in §5, which is the strongest argument
+            for that test existing.
+  DEFECT 3  normalizeWindowsPath carried `const impl = windows ? win32Path.posix
+            : win32Path.posix` — both branches identical. Dead ternary; collapsed
+            to a single normalizer.
+  DEFECT 4  describeSpawnFailure took an unused backendPath (TS6133 under
+            noUnusedLocals). Removed the parameter.
+
+Two further red-phase failures were FIXTURE defects in my own tests, not
+implementation defects, and are recorded here so the count above is not
+misleading: an "all candidates are the shim" fixture that was inexpressible
+under path identity (replaced with a symlink/junction-alias fixture driven
+through the sameFile seam), and two expectations about %VAR% expansion in which
+the expectation, not the code, was wrong.
+
+
+--------------------------------------------------------------------------------
+2. WHAT IS TESTABLE WITHOUT WINDOWS, AND THE ONE THING THAT IS NOT
+--------------------------------------------------------------------------------
+Every environment touch point is an injectable seam with a production default:
+
+  readEnv                 default process.env[name]
+  readRegistryInstallDir  default: reg.exe, spawned directly (§2.1)
+  readLocalAppData        default process.env["LOCALAPPDATA"]
+  probePath               default statSync -> "file" | "directory" | "absent"
+  currentExecutable       default process.execPath
+  sameFile                default normalised+case-folded compare, then realpath
+  spawn                   default node:child_process.spawn
+
+So all four required resolution cases and every chain-guard case are asserted
+IN-PROCESS on Linux, not deferred to a Windows host. The tests use
+Windows-shaped fixtures (C:\Users\Someone\AppData\Local\psmux) so the
+case-folding and separator handling under test is real Windows behaviour and not
+a POSIX accident of the test host.
+
+2.1  THE ONE GENUINELY WINDOWS-ONLY SEAM, AND HOW IT IS COVERED
+`readRegistryInstallDir` defaults to spawning `reg.exe`:
+
+  reg query HKCU\Software\psmux /v InstallDir
+
+`reg.exe` is a real executable, so this is spawn(exe, argv) — no `cmd /c`, no
+PowerShell wrapper, nothing that could re-interpret the value. It cannot be
+exercised on Linux, so the part of it that contains any LOGIC is factored out
+and exported as a pure function:
+
+  parseRegQueryInstallDir(stdout, readEnv?) -> string | undefined
+  expandWindowsEnvironmentReferences(value, readEnv) -> string
+
+with 2 + 2 dedicated tests over real `reg query` output shapes (REG_SZ,
+REG_EXPAND_SZ, value absent, error message, a neighbouring `InstallDirX` value
+that must NOT be mistaken for `InstallDir`, an empty value that must yield
+undefined rather than ""). Everything else about the seam is exercised by the
+precedence tests, which inject the registry read.
+
+
+--------------------------------------------------------------------------------
+3. THE FOUR REQUIRED RESOLUTION CASES, AND HOW EACH IS ASSERTED
+--------------------------------------------------------------------------------
+Ordered precedence, first match wins, documented in src/backend.ts and exported
+as RESOLUTION_CONTRACT:
+
+  1. OMO_PSMUX_INSTALL_DIR   (non-blank only)
+  2. HKCU\Software\psmux : InstallDir
+  3. %LOCALAPPDATA%\psmux
+  and NO fourth source.
+
+CASE 1 — ENV OVERRIDE WINS OVER A PRESENT REGISTRY VALUE
+  test: "case 1 - OMO_PSMUX_INSTALL_DIR wins over a present registry value"
+  Fixture: env=C:\Users\Someone\AppData\Local\psmux, registry=D:\tools\psmux-3.3.8
+           (a decoy directory that also contains a valid psmux.exe), and
+           %LOCALAPPDATA% set as a third decoy.
+  Asserted: source === "env"; installDir is the env value;
+           backendPath is the env dir's psmux.exe; AND backendPath does not
+           contain "psmux-3.3.8", i.e. the registry answer was not used even
+           though it was available and valid.
+
+CASE 2 — REGISTRY VALUE WINS WHEN THE ENV OVERRIDE IS UNSET
+  test: "case 2 - the registry value wins when the env override is unset"
+  Asserted: source === "registry"; installDir === registry value; backendPath
+           is inside the registry directory. %LOCALAPPDATA%\psmux exists in the
+           fake filesystem as a decoy and must not be chosen.
+
+CASE 3 — ABSENT REGISTRY VALUE FALLS THROUGH TO %LOCALAPPDATA%\psmux
+  test: "case 3 - an absent registry value falls through to %LOCALAPPDATA%\psmux"
+  Asserted: source === "local-app-data"; installDir ===
+           "<%LOCALAPPDATA%>\psmux" — the leaf comes from
+           RESOLUTION_CONTRACT.defaultInstallDirLeaf, not from a literal.
+  Companion test: "no source at all is its own failure mode, and never invents a
+  path" — env unset + registry absent + %LOCALAPPDATA% unset yields kind
+  "install-dir-unresolved" (NOT a guess), exit 69, and the message names all
+  three things it consulted.
+
+CASE 4 — INSTALL DIR MISSING
+  Two distinct sub-cases, both asserted:
+  (a) directory present, no backend in it -> "backend-missing", and the test
+      asserts lookedFor deep-equals BACKEND_CANDIDATE_NAMES, that the message
+      contains the install dir, that exitCode !== 0, and — the important one —
+      that the message contains NO "\Users\" segment, i.e. it did not fall back
+      to a home directory.
+  (b) directory does not exist at all -> "backend-missing" with
+      installDirKind === "absent" and a message that says "is not a directory".
+
+MALFORMED INPUT (the adversarial class), each with a defined, tested outcome:
+  OMO_PSMUX_INSTALL_DIR=""            -> IGNORED, precedence continues to registry
+  OMO_PSMUX_INSTALL_DIR="   \t "      -> IGNORED, same
+  OMO_PSMUX_INSTALL_DIR=<trailing />  -> resolves identically to the bare form
+  OMO_PSMUX_INSTALL_DIR=<nonexistent> -> backend-missing naming that directory
+  registry value = ""                 -> counted as ABSENT, falls through
+  12 hostile env values x 3 registries -> resolveBackend never throws at all
+  4 unresolvable overrides            -> never resolve, never mention a home dir
+
+
+--------------------------------------------------------------------------------
+4. THE CHAIN GUARD
+--------------------------------------------------------------------------------
+4.1  WHY IT IS CORRECT FOR BARE-NAME AND ABSOLUTE-PATH INVOCATION ALIKE
+Two OmO call sites bypass any resolver and spawn the literal string "tmux"
+(index.js:9072 findCommandPath("tmux"), plus the pane-command paths), so the shim
+is routinely entered by BARE NAME. That needs no special case, and this is the
+reason: the operating system resolves a bare name to a full path before argv[0]
+exists, so process.execPath is an absolute path to the running image either way.
+From inside the process, "bare name" and "absolute path" are indistinguishable.
+The guard therefore compares the RESOLVED CANDIDATE against process.execPath and
+needs no knowledge of how it was invoked.
+
+What DOES need care is spelling, and this is asserted:
+  - case-insensitivity, because Windows filesystems are: a lowercase-drive shim
+    path still trips the guard on a mixed-case candidate.
+  - separator equivalence: `\` vs `/`.
+  - textual `..`: `<dir>\bin\..\psmux.exe` is the shim.
+  - a symlink or Windows junction aliasing a candidate onto the running image:
+    caught by the realpath half of sameFile, i.e. by consulting the real
+    filesystem, not the strings. (Honest scope note: realpath resolves symlinks
+    and junctions; it does NOT collapse NTFS hardlinks, and nothing here claims
+    it does.)
+  - an extra caller-supplied shim path is guarded identically.
+
+4.2  THE RULE IS "SKIP THE SHIM, KEEP LOOKING", NOT "REFUSE AT THE FIRST MATCH"
+A candidate that IS the shim is never executed, but resolution CONTINUES to the
+next candidate. Exit 78 is returned only when nothing else is left to run. This
+matters in the one realistic bad install — somebody dropped the shim into the
+psmux directory next to an intact psmux.exe — where refusing outright would break
+a setup that has a perfectly good backend sitting right there. Both branches are
+tested:
+  - "a self candidate is SKIPPED and resolution continues to a real backend"
+  - "an exact self-match exits 78 with a message naming both paths"
+
+4.3  CANDIDATE ORDER: psmux.exe, THEN tmux.exe
+The shim is built as tmux.exe (todo 12), so a collision with tmux.exe is the
+EXPECTED accident; trying psmux.exe first is what keeps such an install working.
+tmux.exe is the fallback for a directory holding only the alias. Both emit the
+same two-line -V at 3.3.8 (task-1 evidence field (e): identical stdout AND
+identical exit code 0 for both), so the order costs nothing when both are present.
+
+4.4  PROMPTNESS IS ASSERTED, NOT ASSUMED  (adversarial class: hung_commands)
+The guard's whole purpose is that the failure mode is a HANG or infinite
+recursion, so every guard assertion is also a boundedness assertion:
+  - "the guard is PROMPT - a hang is the bug it prevents": asserts the guard
+    returns with elapsed < 1000 ms.
+  - "the resolver is a bounded synchronous read": asserts the result is not a
+    Promise and that at most THREE probePath calls happen (the directory plus at
+    most two candidate names) — i.e. no filesystem walk, no exec, no retry loop.
+  - "forwarding is prompt": a -V round trip asserted < 10 s, test timeout 20 s.
+  - "a real chain attempt through a compiled binary exits 78 and terminates":
+    builds a REAL `bun build --compile` binary with `bun build --compile` inside
+    the test, runs it with OMO_PSMUX_INSTALL_DIR pointing at the directory that
+    holds nothing but that binary, and asserts exit 78 with the guard message on
+    stderr. This is the end-to-end recursion proof and it found DEFECT 2 (§1).
+
+4.5  THE MESSAGE
+  omo-psmux-bridge: refusing to exec myself — the resolved backend <path> IS this
+  executable (<shimPath>, matched by path). The psmux installation at <dir>
+  (from <source>) contains no backend other than the shim. Move the bridge out of
+  the psmux directory, or reinstall psmux, or set OMO_PSMUX_INSTALL_DIR to the
+  real installation.
+
+4.6  EXIT CODES
+  78  chain guard only. sysexits EX_CONFIG — the shim's own configuration points
+      it at itself. This is the plan's fixed code and the one an operator or a
+      harness can key on.
+  69  every other resolution failure. sysexits EX_UNAVAILABLE. Invented here, and
+      documented as invented, because the plan fixes only 78.
+   0  resolved.
+Assertion: exitCodeFor(resolution) === resolution.exitCode for every
+non-resolved kind, and exitCodeFor(resolved) === 0.
+
+
+--------------------------------------------------------------------------------
+5. MANUAL QA — REAL INVOCATIONS, REAL EXIT CODES
+--------------------------------------------------------------------------------
+HAPPY — `$ bun test test/backend.test.ts 2>&1 | tail -25`
+
+   45 pass
+   0 fail
+   189 expect() calls
+  Ran 45 tests across 1 file. [330.00ms]
+  exit=0
+
+HAPPY, END TO END THROUGH TWO COMPILED BINARIES. A `backend.ts` stand-in emitting
+psmux 3.3.8's exact two-line form, compiled to bin/psmux.exe; a `driver.ts` that
+calls resolveBackend() then runBackend(), compiled to bin/driver.exe. (Both
+built outside the worktree in /tmp, since src/cli.ts belongs to todo 12 and must
+not be touched.)
+
+  $ OMO_PSMUX_INSTALL_DIR=/tmp/opencode/qa10/bin timeout 30 ./bin/driver.exe -V
+  EXIT=0
+  --- stdout, byte-exact (od -c) ---
+  0000000   t   m   u   x       3   .   3   .   8  \n   p   s   m   u   x
+  0000020       3   .   3   .   8       (   6   6   c   f   6   1   3
+  0000040   2   0   2   6   -   0   8   -   1   8   )  \n
+  0000054
+  --- stderr ---
+  (empty)
+
+  44 bytes = "tmux 3.3.8\npsmux 3.3.8 (66cf613 2026-08-18)\n" — TWO lines,
+  trailing newline included, nothing appended, nothing trimmed, stderr empty,
+  exit 0. Compared against learnings T-4 / V-2; a one-line expectation here
+  would have been a false pass, and the suite asserts
+  stdout.split("\n").length === 3 to pin that.
+
+  Direct argv, no shell, no quoting layer of this module's own:
+  $ ./bin/driver.exe new-session -d s 'a b' 'q"uote' '$HOME' 'back\slash'
+  argv=["new-session","-d","s","a b","q\"uote","$HOME","back\\slash"]
+  EXIT=0
+
+FAILURE (THE MANDATED ARM) — OMO_PSMUX_INSTALL_DIR points at a directory holding
+a COPY OF THE SHIM ITSELF. bin/driver.exe (63,487,088 bytes) copied to
+chain/psmux.exe; the install directory contains that one file and nothing else.
+
+  $ OMO_PSMUX_INSTALL_DIR=/tmp/opencode/qa10/chain timeout 30 \
+      /tmp/opencode/qa10/chain/psmux.exe -V
+  EXIT=78   elapsed_ms=41   (timeout would have reported 124 at 30000)
+  --- stdout (must be EMPTY) ---
+  0000000
+  --- stderr ---
+  omo-psmux-bridge: refusing to exec myself — the resolved backend
+  /tmp/opencode/qa10/chain/psmux.exe IS this executable
+  (/tmp/opencode/qa10/chain/psmux.exe, matched by path). The psmux installation
+  at /tmp/opencode/qa10/chain (from env) contains no backend other than the
+  shim. Move the bridge out of the psmux directory, or reinstall psmux, or set
+  OMO_PSMUX_INSTALL_DIR to the real installation.
+
+78 in 41 ms. Not infinite recursion. Not a hang. Not a fallback to some other
+binary. stdout byte-empty: nothing was exec'd at all.
+
+Bounded and leak-free — the arm repeated 5x:
+  run 1 exit=78  run 2 exit=78  run 3 exit=78  run 4 exit=78  run 5 exit=78
+  pgrep -af "psmux.exe|driver.exe"  ->  no stray processes
+(the only pgrep hit was the pgrep command line matching itself).
+
+FOUR MORE ARMS, all real runs, all bounded by `timeout 30`:
+
+  dir holds only the shim, named tmux.exe (its PRODUCTION name)
+      EXIT=78  elapsed_ms=71  stdout empty
+      -> the guard is name-independent, as 4.1 requires
+
+  dir holds shim(tmux.exe) + an intact real psmux.exe
+      EXIT=0   elapsed_ms=58  stdout "tmux 3.3.8\npsmux 3.3.8 (...)\n"
+      -> skip-self-then-continue works end to end; a working backend in the
+         install directory is used instead of a refusal
+
+  install dir exists but holds no backend
+      EXIT=69  elapsed_ms=30  stdout empty
+      ".../edge3 (from env) contains neither psmux.exe nor tmux.exe.
+       That directory is not a psmux installation."
+
+  env override names a directory that does not exist
+      EXIT=69  elapsed_ms=37  stdout empty
+      ".../nowhere-at-all (from env) is not a directory.
+       The psmux installation is missing."
+
+  no env, no registry, no %LOCALAPPDATA%
+      EXIT=69  elapsed_ms=37
+      "cannot locate the psmux installation. OMO_PSMUX_INSTALL_DIR is not set,
+       HKCU\Software\psmux\InstallDir is absent, and %LOCALAPPDATA% is not set.
+       Reinstall psmux, or set OMO_PSMUX_INSTALL_DIR to the directory holding
+       psmux.exe or tmux.exe."
+      -> names all three sources it consulted; invents no path
+
+
+--------------------------------------------------------------------------------
+6. GATES — REAL EXIT CODES
+--------------------------------------------------------------------------------
+  $ bun test test/backend.test.ts          exit 0    45 pass / 0 fail / 189 assertions
+  $ bun x tsc --noEmit                     exit 0    (no output)
+  $ bun test            (whole suite)      exit 1    120 pass / 1 fail / 1069 assertions
+  $ git status --porcelain                 exit 0
+         M src/backend.ts
+         M test/backend.test.ts
+
+  The single suite failure is test/cli.test.ts's intentional smoke test, which
+  asserts src/cli.ts exports `main` and must stay RED until todo 12. It is
+  untouched by this task. Per-file:
+         test/grammar.test.ts    35 pass   (todo 3 baseline preserved)
+         test/translate.test.ts  40 pass   (todo 9 baseline preserved)
+         test/backend.test.ts    45 pass   (this task)
+         test/cli.test.ts         1 fail   (todo 12, intentional)
+         test/descriptor.test.ts  0 tests  (todo 11 stub, untouched)
+
+  Only the two files of this task are modified:
+  src/backend.ts | 756 lines changed
+  test/backend.test.ts | 900 lines changed
+  `git diff --name-only HEAD -- src/grammar.ts src/translate.ts src/cli.ts
+   src/descriptor.ts package.json tsconfig.json CONTRACT.md` -> EMPTY.
+
+  lsp_diagnostics on src/backend.ts: no errors, no warnings. One `information`
+  from biome (assist/source/organizeImports). That diagnostic is PRE-EXISTING
+  repo-wide and also fires on the orchestrator-verified src/translate.ts and
+  test/translate.test.ts, so imports were left in the baseline's style rather
+  than introducing an import-order convention only in this file.
+
+  Constraint compliance, mechanically checked:
+  - no `as any`, no `@ts-ignore`, no `@ts-expect-error`, no non-null assertion
+  - no `cmd /c`, no shell wrapper: `BackendSpawnOptions.shell` is typed as the
+    literal `false`, and a test asserts the real options object handed to spawn
+    has shell === false, windowsHide === true, and that its JSON contains neither
+    "/c" nor "cmd"
+  - no home directory and no drive-letter literal anywhere in src/backend.ts:
+    asserted by a test that strips comments and greps for /home/[a-z],
+    [A-Za-z]:\Users\ and \\Users\\
+  - src/cli.ts, src/grammar.ts, src/translate.ts, src/descriptor.ts, package.json,
+    tsconfig.json, CONTRACT.md all unmodified
+  - the Windows host was never contacted: no ssh, no scp, this task is
+    Linux-only and every probe above is a local process
+  - no git WRITE command was run. `git status`/`git diff` only.
+  - no dependency added; tsconfig untouched, so strict + noUncheckedIndexedAccess
+    + exactOptionalPropertyTypes + isolatedModules + noUnusedLocals +
+    noUnusedParameters + noPropertyAccessFromIndexSignature all still hold
+  - OMO_PSMUX_BRIDGE_TRACE is NOT implemented here, and no correctness path
+    depends on it: resolution reads only the env override, the registry and
+    %LOCALAPPDATA%.
+
+
+--------------------------------------------------------------------------------
+7. CLEANUP RECEIPT
+--------------------------------------------------------------------------------
+Everything built for §5 lived outside the worktree, under /tmp/opencode:
+  /tmp/opencode/qa10        (backend.ts, driver.ts, bin/, chain/, edge1..edge3/,
+                             compiled binaries, captured output) — REMOVED
+  /tmp/opencode/dbg         (the minimal repro used to diagnose DEFECT 2) — REMOVED
+  /tmp/opencode/g1.txt g2.txt g3.txt (gate transcripts)                — REMOVED
+Nothing was written into the worktree except src/backend.ts,
+test/backend.test.ts and this evidence file. No temp or scratch file remains in
+the worktree; `git status --porcelain` lists exactly the two modified source
+files (this file is under the gitignored .omo/, which is the plan's intent).
+
+
+--------------------------------------------------------------------------------
+8. THE INTERFACE TODO 12 CONSUMES
+--------------------------------------------------------------------------------
+  import { resolveBackend, runBackend, exitCodeFor, describeResolution }
+    from "./backend";
+
+  const resolution = resolveBackend();          // synchronous, total, never throws
+  const code = exitCodeFor(resolution);         // 0 | 78 | 69
+  if (resolution.kind !== "resolved") {
+    process.stderr.write(describeResolution(resolution) + "\n");
+    process.exit(code);
+  }
+  const translated = translate(classifyArgv(argv), { psmuxPath: resolution.backendPath });
+  const outcome = await runBackend(resolution, translated.argv);
+  process.exit(outcome.exitCode);
+
+Shapes todo 12 must know:
+  - `resolution.backendPath` is the psmux path to feed as `TranslateOptions.psmuxPath`.
+    It is the ONLY path in the result; everything else is trace-loggable by design.
+  - `runBackend(backend, argv)` takes a ResolvedBackend, NOT a Resolution. That is
+    deliberate: it is impossible to hand runBackend something that failed the guard.
+    Resolve, check `kind === "resolved"`, narrow, then exec.
+  - `runBackend` defaults to `stdio: "inherit"` (correct for an interactive tmux
+    session). Pass `{ captureOutput: true }` for `-V`, which is the only probe that
+    needs the bytes back.
+  - `-V` wiring: `runBackend(resolved, ["-V"], { captureOutput: true })`, then
+    write outcome.stdout UNMODIFIED and exit with outcome.exitCode. Do not print
+    a banner, do not append a newline, do not forward stderr onto stdout. OmO's
+    findVerifiedTmuxPath (index.js:9071-9091) treats a non-zero exit as "no tmux"
+    and the gate at :8390-8394 then disables every tmux feature silently.
+  - For interactive verbs, inherit stdin/stdout/stderr so psmux keeps its TTY.
+    runBackend never sets `shell`, so a TTY-forwarded session is unaffected.
+  - Do NOT let anything downstream re-derive the install directory. bridge.json is
+    deliberately unread by this module; the registry is authoritative
+    (CONTRACT.md 11.5) and a JSON file in a directory the shim may itself have
+    written is one more route to pointing the shim at itself.
+
+Nothing here is awkward to consume. One judgement call worth stating explicitly:
+`exitCodeFor` returns 69 for install failures, a code the plan does not specify.
+If todo 12 or todo 13 (bridge-doctor) would rather key on a different code for
+"psmux is not installed", change INSTALL_FAILURE_EXIT_CODE in RESOLUTION_CONTRACT
+— it is a single constant and nothing else depends on the number.

@@ -107,6 +107,44 @@ Now subagent panes should open.
 
 ---
 
+## Team mode
+
+OmO's team visualization (`team_create` and friends) needs one more setting
+beyond Step 0. In the same opencode config:
+
+```json
+{
+  "team_mode": { "enabled": true, "tmux_visualization": true }
+}
+```
+
+Both default to `false`. With either off, OmO skips the team layout silently,
+exactly like subagent panes with `tmux.enabled` off. No error, no panes.
+
+What the bridge handles for team panes, once that is on:
+
+| OmO sends | The bridge |
+| --- | --- |
+| `display -p -F ...` to find your pane | Drops the `-F` (psmux reads it as message text, so the lookup would fail and the whole layout would be skipped) |
+| `set-option -p ... @omo_attach_*` per teammate pane | Absorbs it and exits 0 (psmux refuses pane-scoped options, and OmO never reads the results back) |
+| `resize-pane -t <you> -x "30%"` | Converts it to the equivalent window sizing plus a re-applied layout, so your pane lands at about 30% |
+
+Two limits you should know about:
+
+- **You need PowerShell.** psmux runs pane commands through PowerShell when it
+  is present (`pwsh` first, then `powershell`, then `cmd` as a last resort).
+  A machine with only `cmd` is unsupported: panes may start, but the attach
+  commands the bridge builds assume a PowerShell host.
+- **The stale-attach-pane sweep does not work on psmux.** OmO periodically
+  sweeps dead teammate panes the way it sweeps dead subagent panes, by reading
+  back pane options psmux never stored. Dead team panes stay listed until you
+  close them yourself, same as dead subagent panes.
+
+The full grammar, with the measured probe runs behind each row, is
+[`CONTRACT.md` §3.10](CONTRACT.md).
+
+---
+
 ## What the installer changed on your machine
 
 Exactly one persistent thing:

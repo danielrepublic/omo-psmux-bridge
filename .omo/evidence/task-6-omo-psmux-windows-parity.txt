@@ -1,0 +1,239 @@
+================================================================================
+TASK 6 EVIDENCE — Port [opencode].tmux block into Windows OmO configuration
+Plan: .omo/plans/omo-psmux-windows-parity.md (todo 6)
+Host: windows-daniel (WINDOWS-DANIEL, Windows 10 Pro for Workstations 25H2)
+Target: C:\Users\Daniel\.omo\omo.jsonc  (%USERPROFILE%\.omo\omo.jsonc)
+Date (UTC): 2026-10-05
+================================================================================
+
+--------------------------------------------------------------------------------
+0. PRE-FLIGHT: live file identity (matches todo 1 inventory)
+--------------------------------------------------------------------------------
+Fetched live file over scp to local scratch.
+  before bytes : 4412
+  before sha256: b71e79f21dfadeef720267468a768f3fca3775447a0fb449cdb75d1804e52f82
+  todo-1 field d sha256: b71e79f21dfadeef720267468a768f3fca3775447a0fb449cdb75d1804e52f82
+  => IDENTICAL. File unchanged since todo 1.
+  has_utf8_bom : False
+  line endings : LF only (0 CRLF, 206 LF)
+  indentation  : 2 spaces
+  "tmux" substring present anywhere: False  (confirmed on the live file, not assumed)
+  top-level keys: $schema, [opencode], _migrations
+  [opencode] keys (before): agents, categories, runtime_fallback
+  only "enabled" key before: runtime_fallback.enabled (untouched)
+
+--------------------------------------------------------------------------------
+1. BACKUP (created BEFORE any edit; verified readable + complete)
+--------------------------------------------------------------------------------
+Command (staged file, run with -File):
+  scp backup.ps1 windows-daniel:'C:/Users/Daniel/AppData/Local/Temp/omo-cfg-backup.ps1'
+  ssh windows-daniel 'powershell -NoProfile -ExecutionPolicy Bypass -File C:\Users\Daniel\AppData\Local\Temp\omo-cfg-backup.ps1'
+
+Output:
+  BACKUP_PATH=C:\Users\Daniel\.omo\omo.jsonc.bak-20261005T040645Z
+  SRC_BYTES=4412
+  BAK_BYTES=4412
+  SRC_SHA256=b71e79f21dfadeef720267468a768f3fca3775447a0fb449cdb75d1804e52f82
+  BAK_SHA256=b71e79f21dfadeef720267468a768f3fca3775447a0fb449cdb75d1804e52f82
+  BACKUP_VERIFIED=OK
+  exit 0
+
+Backup re-checked at end of run (still present, intact):
+  BACKUP_EXISTS=True
+  BACKUP_BYTES=4412
+  BACKUP_SHA256=b71e79f21dfadeef720267468a768f3fca3775447a0fb449cdb75d1804e52f82
+
+BACKUP PATH (KEPT — rollback artifact):
+  C:\Users\Daniel\.omo\omo.jsonc.bak-20261005T040645Z
+
+--------------------------------------------------------------------------------
+2. INSERTION — textual, not parse-and-reserialise
+--------------------------------------------------------------------------------
+Method: read raw bytes, locate the existing `"[opencode]": {` opening brace,
+insert the tmux block immediately after that brace. No JSON.parse/stringify
+round-trip; comments, key order and formatting preserved.
+
+  "[opencode]" key found at byte offset 110
+  opening brace `{` at byte offset 124
+  insertion performed at byte offset 125 (0-based), immediately after `{`
+  inserted block length: 200 bytes
+  before: 4412 bytes  ->  after: 4612 bytes  (delta +200, zero deletions)
+
+Inserted bytes (exact):
+\n    "tmux": {\n      "enabled": true,\n      "layout": "main-vertical",\n      "main_pane_size": 50,\n      "main_pane_min_width": 40,\n      "agent_pane_min_width": 40,\n      "isolation": "inline"\n    },
+
+Reconstruction proof:
+  after == before[:125] + inserted_200_bytes + before[125:]  =>  True
+  Minimal common-prefix/suffix diff: inserted region after[131:331] (200 bytes),
+  before region b[131:131] (0 bytes) => zero deletions.
+
+--------------------------------------------------------------------------------
+3. DIFF vs BACKUP (additions only, inside the one object)
+--------------------------------------------------------------------------------
+$ diff -u omo-before.jsonc omo-live.jsonc
+--- omo-before.jsonc
++++ omo-live.jsonc
+@@ -1,6 +1,14 @@
+ {
+   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json",
+   "[opencode]": {
++    "tmux": {
++      "enabled": true,
++      "layout": "main-vertical",
++      "main_pane_size": 50,
++      "main_pane_min_width": 40,
++      "agent_pane_min_width": 40,
++      "isolation": "inline"
++    },
+     "agents": {
+       "sisyphus": {
+         "models": [
+
+8 added lines, 0 removed lines, no reordering, no reformatting.
+
+--------------------------------------------------------------------------------
+4. JSONC PARSE + STRICT ASSERTION (live file, read back over ssh)
+--------------------------------------------------------------------------------
+Parser used: jsonc-parser@3.3.1 (Node), options { allowTrailingComma: true,
+disallowComments: false }. NOTE: this particular file happens to be strict JSON
+(no comments, no trailing commas) — strict JSON.parse also succeeds — but the
+JSONC-tolerant parser was used as required, and it is the same parser family the
+installed OmO bundle depends on (jsonc-parser ^3.3.1).
+
+Command: node check.cjs omo-live-final.jsonc
+Output:
+  JSONC_PARSE=OK
+  TMUX_NODE=PRESENT
+  READBACK={"enabled":true,"layout":"main-vertical","main_pane_size":50,"main_pane_min_width":40,"agent_pane_min_width":40,"isolation":"inline"}
+  ASSERT key-count OK (exactly 6)
+  ASSERT enabled OK (boolean true)
+  ASSERT layout OK (string "main-vertical")
+  ASSERT main_pane_size OK (number 50)
+  ASSERT main_pane_min_width OK (number 40)
+  ASSERT agent_pane_min_width OK (number 40)
+  ASSERT isolation OK (string "inline")
+  STRICT_ASSERT=ALL_PASS
+  exit 0
+
+JSON-pointer read of ["[opencode]"]["tmux"] returns exactly the six keys with
+exactly the required values (types asserted: enabled is boolean true, not the
+string "true"; main_pane_size is number 50, not any number).
+
+--------------------------------------------------------------------------------
+5. PROOF NOTHING ELSE MOVED (byte-identical subtrees)
+--------------------------------------------------------------------------------
+Raw subtree text extracted from before/after via jsonc-parser node offsets and
+sha256-compared:
+  agents:           identical=true  before_sha=78aaa02c4dfca184  after_sha=78aaa02c4dfca184  len=2196
+  categories:       identical=true  before_sha=a054eedcb2c0b371  after_sha=a054eedcb2c0b371  len=1547
+  runtime_fallback: identical=true  before_sha=73f6d018b66bac3e  after_sha=73f6d018b66bac3e  len=381
+  top-level keys before: $schema,[opencode],_migrations
+  top-level keys after : $schema,[opencode],_migrations
+  [opencode] keys before: agents,categories,runtime_fallback
+  [opencode] keys after : tmux,agents,categories,runtime_fallback
+=> No second [opencode] object. No second tmux key. No unrelated key touched.
+
+--------------------------------------------------------------------------------
+6. FAILURE CASE 1 — main_pane_size 999 must FAIL LOUDLY (run on LIVE file)
+--------------------------------------------------------------------------------
+Applied to live file, re-read over ssh, checked, then restored.
+  APPLY: WROTE_BYTES=4613  ONDISK_SHA256=c914c31c91fc3b810f9281bf739e5b36457c90c318febc90a96f8ba680efb6b9
+  CHECK: node check.cjs omo-live-bad999.jsonc
+    JSONC_PARSE=OK
+    TMUX_NODE=PRESENT
+    READBACK={"enabled":true,"layout":"main-vertical","main_pane_size":999,"main_pane_min_width":40,"agent_pane_min_width":40,"isolation":"inline"}
+    ASSERT key-count OK (exactly 6)
+    ASSERT enabled OK (boolean true)
+    ASSERT layout OK (string "main-vertical")
+    ASSERT main_pane_size FAIL: expected number 50, got number 999
+    ASSERT main_pane_min_width OK (number 40)
+    ASSERT agent_pane_min_width OK (number 40)
+    ASSERT isolation OK (string "inline")
+    STRICT_ASSERT=FAIL
+    exit 1
+  => Checker rejects any-number; it asserts 50 exactly.
+  RESTORE: WROTE_BYTES=4612  ONDISK_SHA256=a69a1347c33e7e35694f80cb171a3882964e0db256d0ec4b554cd80f5631760c
+  RE-VERIFY: STRICT_ASSERT=ALL_PASS  exit 0
+
+--------------------------------------------------------------------------------
+7. FAILURE CASE 2 — syntax error must be reported (run on LIVE file)
+--------------------------------------------------------------------------------
+Injected an extra top-level closing brace at EOF, re-read, checked, restored.
+  APPLY: WROTE_BYTES=4615  ONDISK_SHA256=b9f70436cc17434df60532ab65f5a281b304bc7c190b946469b3b3b22847d3c2
+  CHECK: node check.cjs omo-live-badsyntax.jsonc
+    JSONC_PARSE=FAIL
+      error EndOfFileExpected at offset 4613 length 1
+    exit 1
+  => Validator is not vacuous; it reports malformed JSONC.
+  RESTORE: WROTE_BYTES=4612  ONDISK_SHA256=a69a1347c33e7e35694f80cb171a3882964e0db256d0ec4b554cd80f5631760c
+  FINAL RE-VERIFY: STRICT_ASSERT=ALL_PASS  exit 0
+
+--------------------------------------------------------------------------------
+8. DOCTOR / INSTALLED-EQUIVALENT VALIDATION (REAL command, REAL exit code)
+--------------------------------------------------------------------------------
+No `bunx oh-my-openagent` shim is on PATH; the installed package is at
+  C:\Users\Daniel\.cache\opencode\packages\oh-my-openagent@latest\node_modules\oh-my-openagent
+  version 5.1.17, bin: bin/oh-my-opencode.js
+
+REAL command run (staged .ps1, executed with -File):
+  node C:\Users\Daniel\.cache\opencode\packages\oh-my-openagent@latest\node_modules\oh-my-openagent\bin\oh-my-opencode.js doctor
+
+REAL output (ANSI stripped):
+  oMoMoMoMo Doctor
+  ?? 3 issues found:
+  1. Loaded plugin is outdated — Loaded 5.1.17, latest 5.1.19. (Affects: plugin features)
+  2. GitHub CLI not authenticated — gh CLI is installed but not logged in. (Affects: GitHub automation)
+  3. Configured models rely on compatibility fallback — sisyphus=opencode-go/space-bunny-free (unknown), oracle=..., etc.
+  DOCTOR_EXIT=0
+
+=> exit code 0. NO config error, NO schema error, NO parse error.
+   Issue 3 lists the models read from omo.jsonc, proving doctor actually loaded
+   and parsed the modified config. (The 3 issues are pre-existing environment
+   notices, unrelated to this change.)
+
+`config` subcommand offers only `migrate` (which MUST NOT be run per upstream
+issue #8187); it was NOT run. Doctor is the installed validation.
+
+--------------------------------------------------------------------------------
+9. SCHEMA VALIDITY (confirmed against the INSTALLED bundle, not assumed)
+--------------------------------------------------------------------------------
+File: ...\oh-my-openagent\dist\index.js (5.1.17)
+  line 26718: var TmuxConfigSchema = z48.object({
+  line 26719:   enabled: z48.boolean().default(false),
+  line 26720:   layout: TmuxLayoutSchema.default("main-vertical"),
+  line 26721:   main_pane_size: z48.number().min(20).max(80).default(60),
+  line 26722:   main_pane_min_width: z48.number().min(40).default(120),
+  line 26723:   agent_pane_min_width: z48.number().min(20).default(40),
+  line 26724:   isolation: TmuxIsolationSchema.default("inline")
+  line 26725: });
+  line 8125: TMUX_LAYOUT_VALUES = ["main-horizontal","main-vertical","tiled","even-horizontal","even-vertical"]
+  line 8132: TMUX_ISOLATION_VALUES = ["inline","window","session"]
+
+Value-by-value:
+  enabled=true            -> boolean, valid
+  layout="main-vertical"  -> in enum, valid
+  main_pane_size=50       -> 20..80, valid
+  main_pane_min_width=40  -> >=40, valid (exactly at minimum; deliberately NOT "fixed" to 120)
+  agent_pane_min_width=40 -> >=20, valid
+  isolation="inline"      -> in enum, valid
+
+--------------------------------------------------------------------------------
+10. FINAL LIVE STATE
+--------------------------------------------------------------------------------
+  LIVE_BYTES=4612
+  LIVE_SHA256=a69a1347c33e7e35694f80cb171a3882964e0db256d0ec4b554cd80f5631760c
+  (matches the intended after-file exactly)
+
+--------------------------------------------------------------------------------
+11. CLEANUP RECEIPT
+--------------------------------------------------------------------------------
+- Windows TEMP scratch files removed (all staged .ps1 probes + staged omo-new.jsonc).
+- Config backup KEPT: C:\Users\Daniel\.omo\omo.jsonc.bak-20261005T040645Z
+  (rollback artifact; todo 20's backup discipline depends on preserving it).
+- No OmO migration command was run.
+- No process/session was killed (todo 5 owns process lifecycle on this host).
+- tmux.exe (sha256 9ea5e733...) was NOT touched.
+- No git write command was run in the worktree.
+- git status --porcelain in the worktree: clean (`.omo/` is gitignored via
+  .gitignore:5, so evidence files do not appear in git status).
+================================================================================

@@ -1,0 +1,142 @@
+Task 2 evidence — scaffold the rebuilt bridge as a git-tracked TypeScript project
+Worktree: /home/daniel/omo-psmux-bridge-wt/windows-parity
+Date: 2026-10-05
+Toolchain: bun 1.4.2, node v22.23.3, git 2.56.0
+
+================================================================
+1) bun install
+================================================================
+$ bun install
+bun install v1.4.2 (744846f84)
+Resolving dependencies
+Resolved, downloaded and extracted [4]
+Saved lockfile
+
++ bun-types@1.4.2
+
+3 packages installed [661.00ms]
+EXIT_CODE=0
+
+================================================================
+2) bun test (expect NON-ZERO, exactly 1 fail — the smoke test)
+================================================================
+$ bun test
+bun test v1.4.2 (744846f84)
+
+test/cli.test.ts:
+2 | // Intentionally RED until todo 12 implements the CLI entry point.
+3 | import { test, expect } from "bun:test";
+4 | import * as cli from "../src/cli";
+5 |
+6 | test("src/cli.ts exports main(argv: string[]): Promise<number>", () => {
+7 |   expect(cli).toHaveProperty("main");
+                  ^
+error: expect(received).toHaveProperty(path)
+
+Expected path: "main"
+
+Unable to find property
+
+      at <anonymous> (/home/daniel/omo-psmux-bridge-wt/windows-parity/test/cli.test.ts:7:15)
+(fail) src/cli.ts exports main(argv: string[]): Promise<number> [6.57ms]
+
+ 0 pass
+ 1 fail
+ 1 expect() calls
+Ran 1 test across 5 files. [13.00ms]
+EXIT_CODE=1
+
+Failure reason: the assertion `expect(cli).toHaveProperty("main")` fails because
+src/cli.ts does not export `main` yet — the RIGHT reason (missing export), not a
+typo, bad import path, or missing dependency. The failure message names the
+missing `main` property explicitly.
+
+================================================================
+3) bun x tsc --noEmit (expect 0)
+================================================================
+$ bun x tsc --noEmit
+(no output)
+EXIT_CODE=0
+
+Note: first run failed with TS2306 "File 'src/cli.ts' is not a module" because
+the stub had no exports. Fixed by adding `export {}` (idiomatic module marker,
+exports nothing named) to src/cli.ts. Re-run exits 0.
+
+================================================================
+4) git status --porcelain
+================================================================
+$ git status --porcelain
+ M .gitignore
+?? bun.lock
+?? package.json
+?? src/
+?? test/
+?? tsconfig.json
+
+(.omo/ is gitignored — verified: `git check-ignore .omo/evidence` exits 0.
+Concurrent workers' files under .omo/ and CONTRACT.md are not touched by me.)
+
+================================================================
+5) Manual QA — failure case (src/cli.ts moved aside)
+================================================================
+$ mv src/cli.ts /tmp/opencode/cli.ts.aside && bun test
+test/cli.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module '../src/cli' from '/home/daniel/omo-psmux-bridge-wt/windows-parity/test/cli.test.ts'
+-------------------------------
+
+
+ 0 pass
+ 1 fail
+ 1 error
+Ran 1 test across 5 files. [7.00ms]
+TEST_EXIT_NO_CLI=1
+
+Module-resolution error, NOT a vacuous pass. Restored src/cli.ts and re-ran:
+
+$ mv /tmp/opencode/cli.ts.aside src/cli.ts && bun test
+ 0 pass
+ 1 fail
+ 1 expect() calls
+Ran 1 test across 5 files. [7.00ms]
+TEST_EXIT_RESTORED=1
+
+Back to exactly 1 fail naming the missing `main` export. Temp file removed.
+
+================================================================
+Files created
+================================================================
+package.json        — name omo-psmux-bridge, "type": "module",
+                      scripts: test -> "bun test",
+                              build -> "bun build --compile src/cli.ts --outfile dist/tmux.exe"
+                      devDependencies: bun-types ^1.4.2 (type defs for the native
+                      bun:test runner; required so tsc can type-check test files)
+tsconfig.json       — strict: true, noUncheckedIndexedAccess, noImplicitOverride,
+                      noFallthroughCasesInSwitch, exactOptionalPropertyTypes,
+                      noUnusedLocals, noUnusedParameters,
+                      noPropertyAccessFromIndexSignature,
+                      forceConsistentCasingInFileNames, isolatedModules,
+                      skipLibCheck, noEmit; module ESNext / moduleResolution bundler;
+                      types: ["bun-types"]; include: src/**/*.ts, test/**/*.ts
+.gitignore          — appended (existing lines untouched): dist/ and node_modules/
+src/cli.ts          — stub, todo 12; `export {}` module marker, NO main export
+src/grammar.ts       — stub, todo 3
+src/translate.ts    — stub, todo 9
+src/backend.ts      — stub, todo 10
+src/descriptor.ts   — stub, todo 11
+test/cli.test.ts    — smoke test (intentionally RED): asserts src/cli.ts exports main
+test/grammar.test.ts    — placeholder, todo 3
+test/translate.test.ts  — placeholder, todo 9
+test/backend.test.ts    — placeholder, todo 10
+test/descriptor.test.ts — placeholder, todo 11
+bun.lock           — written by bun install
+
+================================================================
+Gate summary
+================================================================
+bun install         exit 0   PASS
+bun test            exit 1   PASS (non-zero, exactly 1 fail, names missing main)
+bun x tsc --noEmit  exit 0   PASS
+git status --porcelain       PASS (new files visible, ready to stage)

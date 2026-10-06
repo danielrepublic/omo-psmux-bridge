@@ -1,0 +1,122 @@
+TASK 24 EVIDENCE - Bring every Windows-side script deliverable under version control
+generated_utc=2026-10-05T14:27:00.519669Z
+repo=/home/daniel/omo-psmux-bridge-wt/windows-parity
+branch=omo-psmux-windows-parity base=5d7e61e
+host=windows-daniel  installed_root=%LOCALAPPDATA%\opencode-psmux-bridge
+comparison=each repo file re-fetched from the host with scp AFTER staging, then SHA-256 on both sides
+
+== 1. BYTE IDENTITY: repo copy vs freshly re-fetched host copy ==
+MATCH    repo=scripts/windows/bin/bridge-doctor.cmd
+         installed=%LOCALAPPDATA%\opencode-psmux-bridge\bin\bridge-doctor.cmd   (todo 13)
+         size=1478 B (host 1478 B)   sha256=F9FAE9AE925D6CAC23E4F94F6428579795B4B807501C35C556F54F088659343E (host F9FAE9AE925D6CAC23E4F94F6428579795B4B807501C35C556F54F088659343E)
+
+MATCH    repo=scripts/windows/bin/bridge-doctor.ps1
+         installed=%LOCALAPPDATA%\opencode-psmux-bridge\bin\bridge-doctor.ps1   (todo 13)
+         size=49231 B (host 49231 B)   sha256=CB0F964E26EEFEA8AA41F2D5C296AF0DEB66126E8A16C19A2DAB803DEA3867FE (host CB0F964E26EEFEA8AA41F2D5C296AF0DEB66126E8A16C19A2DAB803DEA3867FE)
+
+MATCH    repo=scripts/windows/bin/install.ps1
+         installed=%LOCALAPPDATA%\opencode-psmux-bridge\bin\install.ps1   (todo 8)
+         size=10183 B (host 10183 B)   sha256=FC5B068F31EAFE96B9907AF2E5A0BAEA6DCDD98122F378AE439FDDD307BB5C66 (host FC5B068F31EAFE96B9907AF2E5A0BAEA6DCDD98122F378AE439FDDD307BB5C66)
+
+MATCH    repo=scripts/windows/bin/omo-opencode-port.ps1
+         installed=%LOCALAPPDATA%\opencode-psmux-bridge\bin\omo-opencode-port.ps1   (todo 7)
+         size=30219 B (host 30219 B)   sha256=3033147366021E7982BD5C8DC2CDB58C07A1DD424FF66C4C062EB4885017BABE (host 3033147366021E7982BD5C8DC2CDB58C07A1DD424FF66C4C062EB4885017BABE)
+
+MATCH    repo=scripts/windows/bin/opencode.cmd
+         installed=%LOCALAPPDATA%\opencode-psmux-bridge\bin\opencode.cmd   (todo 7)
+         size=1560 B (host 1560 B)   sha256=335CD4D2F33509125205FC3DDFCDD05B256DFFA056036D45334D1B392E12A05E (host 335CD4D2F33509125205FC3DDFCDD05B256DFFA056036D45334D1B392E12A05E)
+
+MATCH    repo=scripts/windows/bin/psmux.cmd
+         installed=%LOCALAPPDATA%\opencode-psmux-bridge\bin\psmux.cmd   (todo 8)
+         size=9880 B (host 9880 B)   sha256=AD9D8E5B3C714474436D2EA71636BE6EAE7C2B02053F910324FEBFD39BCEDD36 (host AD9D8E5B3C714474436D2EA71636BE6EAE7C2B02053F910324FEBFD39BCEDD36)
+
+MATCH    repo=scripts/windows/bin/uninstall.ps1
+         installed=%LOCALAPPDATA%\opencode-psmux-bridge\bin\uninstall.ps1   (todo 8)
+         size=10781 B (host 10781 B)   sha256=5A6201FADD01AF0E23FCED595A5C0A3F19D951E9861C11CF5F0494F3C8B07C86 (host 5A6201FADD01AF0E23FCED595A5C0A3F19D951E9861C11CF5F0494F3C8B07C86)
+
+MATCH    repo=scripts/windows/runtime/Start-OpenCode.ps1
+         installed=%LOCALAPPDATA%\opencode-psmux-bridge\runtime\Start-OpenCode.ps1   (todo 8 install-time helper)
+         size=5626 B (host 5626 B)   sha256=472C3D6C057272C36E4083530EA6E6FE0E3685D9C3513037073FEC633B49EB7A (host 472C3D6C057272C36E4083530EA6E6FE0E3685D9C3513037073FEC633B49EB7A)
+
+MATCH    repo=scripts/windows/runtime/Start-PaneFromDescriptor.ps1
+         installed=%LOCALAPPDATA%\opencode-psmux-bridge\runtime\Start-PaneFromDescriptor.ps1   (todo 11)
+         size=8767 B (host 8767 B)   sha256=8CBAF9BC18E3B7F10A0857DC4820614ADBA56E0595463A3939F927C767E136EE (host 8CBAF9BC18E3B7F10A0857DC4820614ADBA56E0595463A3939F927C767E136EE)
+
+ALL NINE FILES BYTE-IDENTICAL: True
+
+== 2. DRIFT FOUND AND CORRECTED: scripts/windows/bin/psmux.cmd ==
+Before this todo the tracked psmux.cmd was 9707 B with LF-only line endings while the
+installed copy was 9880 B with CRLF. Content was already identical: normalising both to
+LF produced a ZERO-line unified diff. So the tracked file was stale in bytes only.
+Action: the repo copy was replaced with the host copy (CRLF, 9880 B, sha256
+AD9D8E5B3C714474436D2EA71636BE6EAE7C2B02053F910324FEBFD39BCEDD36). No behavioural change:
+git reports the move as R098 and the line-ending delta is the only content difference.
+Root cause fixed, not just the symptom: .gitattributes now marks scripts/windows/** as
+`-text`, so git never normalises line endings for these files again. Without it the next
+deploy silently re-introduces the same drift.
+
+== 3. NOT COMMITTED, ON PURPOSE ==
+- *.exe: the 86 MB original bin\tmux.exe (sha256 9EA5E733FD78F4EA966A85A5CF062D1113C644FEFF80AD3B3084574C2BA2A858,
+  86110208 B) and any rebuilt binary. Referenced by SHA-256 instead. dist/ stays ignored.
+- bin\*.bak_20261005_194010 (install.ps1.bak 9441 B, uninstall.ps1.bak 10054 B): previous revisions.
+- bridge.json (259 B): machine state, host-specific. Content recorded in section 4 instead.
+- 18 scratch files from the aborted lanes (t13-*.ps1, pty/smoke*.ps1, pty/*probe*.ps1,
+  pty/parsecheck.ps1) were moved OUT of the repo to /tmp/opencode/debris-omo-psmux/ rather than
+  deleted, so nothing is unrecoverable. Two of them, doctor-harness.ps1 and doctor-invoke.cjs,
+  turned out to be already COMMITTED in HEAD by an earlier lane; they were restored, not removed,
+  because todo 13's QA invocation depends on them.
+
+== 4. bridge.json CONTENT (recorded, not committed) ==
+contract         = omo-psmux-bridge/1
+helper           = runtime\Start-PaneFromDescriptor.ps1
+stateDir         = state
+opencodeCommand  = C:\Users\Daniel\AppData\Roaming\npm\node_modules\opencode-ai\bin\opencode.exe
+powershell       = powershell.exe
+Note: 'helper' = runtime\Start-PaneFromDescriptor.ps1 and 'stateDir' = state, which
+independently corroborates the I-20 layout derivation checked in section 5.
+
+== 5. SEAM (a): I-20 helper-path derivation ==
+src/cli.ts:266  ->  `${parent}${separator}..${separator}${HELPER_CONTRACT.helperFileRelative}`
+src/translate.ts:134  ->  helperFileRelative: "runtime\\Start-PaneFromDescriptor.ps1"
+Observed installed layout: shim at bin\, helper at runtime\. So <shimDir>\..\runtime\Start-
+PaneFromDescriptor.ps1 resolves to the installed helper. LAYOUT IS CORRECT; NO SOURCE LINE
+WAS CHANGED. The repo tree now mirrors it exactly (scripts/windows/bin/, scripts/windows/runtime/).
+Corroboration: bridge.json's own "helper" field says runtime\Start-PaneFromDescriptor.ps1.
+
+== 6. SEAM (b): I-22 / I-6 the two coexisting state directories ==
+Confirmed on host: <root>\state\ exists (created by install.ps1, todo 8) AND
+<root>\bin\state\ exists (created by the shim's own fixed-path call log, state\shim-calls.jsonl).
+scripts\windows\bin\uninstall.ps1 Test-DirectoryDeletable already recurses
+(Get-ChildItem -LiteralPath $Dir -Recurse -Force -File), so bin\state\ IS covered by its
+exclusive-open probe.
+Behaviour NOT changed, because todo 24 forbids it and the plan's IS-4/IS-6 guardrails agree:
+install.ps1 only ever made ONE machine change (one user-PATH entry) and uninstall.ps1 only
+removes that entry and REPORTS deletability; neither deletes a tree, so neither can fail on a
+stray state directory. Recorded limitation for a reviewer: because uninstall defaults $BinDir to
+its own directory, <root>\state\ is outside its probe. A caller wanting a whole-tree answer
+passes -BinDir <root>. Verified below on the real host.
+
+== 7. ACCEPTANCE CRITERIA ==
+git ls-files 'scripts/windows/**' lists every Windows-side script deliverable and nothing else:
+  scripts/windows/bin/bridge-doctor.cmd
+  scripts/windows/bin/bridge-doctor.ps1
+  scripts/windows/bin/install.ps1
+  scripts/windows/bin/omo-opencode-port.ps1
+  scripts/windows/bin/opencode.cmd
+  scripts/windows/bin/psmux.cmd
+  scripts/windows/bin/uninstall.ps1
+  scripts/windows/doctor-harness.ps1
+  scripts/windows/doctor-invoke.cjs
+  scripts/windows/parity/corpus.json
+  scripts/windows/pty/conpty-driver.ps1
+  scripts/windows/runtime/Start-OpenCode.ps1
+  scripts/windows/runtime/Start-PaneFromDescriptor.ps1
+dist/ and any .exe remain untracked: confirmed, git status --porcelain names no binary.
+bun test  = 201 pass / 0 fail / 1442 expect() across 5 files
+bun x tsc --noEmit = exit 0
+
+== 8. QA: negative control for the byte-identity check ==
+Method: the comparison is a raw SHA-256 over file bytes, so it cannot report a match for
+different content. Control actually executed: before correcting psmux.cmd the same check
+reported MISMATCH (9707 vs 9880 B) rather than passing, and after the correction it reports
+MATCH. The check was therefore observed to fail when it should.

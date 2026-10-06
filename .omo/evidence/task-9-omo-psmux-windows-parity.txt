@@ -1,0 +1,467 @@
+================================================================================
+TASK 9 EVIDENCE — argv translator (TDD)
+plan: .omo/plans/omo-psmux-windows-parity.md, todo 9 (lines 205-213)
+worktree: /home/daniel/omo-psmux-bridge-wt/windows-parity
+HEAD: 08ce27e58d2b0e9c060778c1ff2fab581fabf85a
+bun 1.4.2 (744846f84), node v22.23.3, Linux x64
+artefacts under test:
+  src/translate.ts      608 lines  sha256 51338c40ed46554028089519e29282909bf4cae24b28f71111a55f926e10281a
+  test/translate.test.ts 944 lines  sha256 b95e2a244e61a7fb0c714fb8e8404a9186f56d0f0561d859ef6a106e58115724
+================================================================================
+
+0. WHAT THIS TAKEOVER CHANGED
+--------------------------------------------------------------------------------
+The previous worker wrote a substantially complete src/translate.ts (608 lines)
+and test/translate.test.ts (936 lines) but left three defects. All three were
+fixed. src/translate.ts was NOT modified by this takeover — the hash above is
+the previous worker's file, byte-identical to what it wrote. Every fix is in the
+test file, and in each case the TEST was the defective side. Details in §1.
+
+================================================================================
+1. THE THREE DEFECTS: ROOT CAUSE AND WHICH SIDE WAS WRONG
+================================================================================
+
+--------------------------------------------------------------------------------
+DEFECT 1 — `(fail) -- insertion > the emitted respawn argv is verb, flags, `--`,
+command line — nothing after`
+Symptom: `error: expect(received).toHaveLength(expected)  Expected length: 5
+Received length: 6` at test/translate.test.ts:444.
+
+ROOT CAUSE: an off-by-one in the test's own expectation, self-contradictory
+within its own body. The test fed `["respawn-pane","-k","-t","%7", AT_PLAIN]`
+(5 input elements) and asserted BOTH:
+    expect(translation.argv).toHaveLength(5);   <-- contradicted the six below
+    expect(translation.argv[0]).toBe("respawn-pane");
+    expect(translation.argv[1]).toBe("-k");
+    expect(translation.argv[2]).toBe("-t");
+    expect(translation.argv[3]).toBe("%7");
+    expect(translation.argv[4]).toBe("--");
+    expect(translation.argv[5]).toBe(translation.helperCommandLine);
+An assertion on index 5 REQUIRES six elements. The literal 5 was the only
+inconsistent statement in the test.
+
+THE ARITHMETIC, against CONTRACT.md 7.1 (`src/server/connection.rs:2102-2103`:
+the respawn command is read only from `args.iter().position(|a| *a == "--")`
+then `args[i+1..].join(" ")`):
+  * The payload element is REPLACED one-for-one by the command operand. One
+    element in, one element out: the count does not change.
+  * `--` is INSERTED, not substituted. +1 element.
+  => verb, -k, -t, %7, --, command line = SIX. Which is what src/translate.ts
+     emits (`[verb, ...flags, ...(dashDash ? ["--"] : []), commandLine]`,
+     src/translate.ts:258).
+
+VERDICT: FIXED THE TEST, NOT THE IMPLEMENTATION. The implementation was already
+correct on every clause of the contract — `--` immediately before the operand,
+nothing after it — and the suite's other, stronger assertions independently
+confirm it and were passing before this fix:
+  * test/translate.test.ts:415 `argv[argv.length - 2] === "--"` — PASSED before.
+  * test/translate.test.ts:926-935 the `--` tail is exactly ONE element — PASSED.
+  * test/translate.test.ts:459-466 head is exactly `[verb, ...flags]` — PASSED.
+Relaxing the length to match output was NOT an option and was not done; the
+assertion was made STRONGER, not weaker: it now pins the whole array by
+deep-equality against a literal, and additionally asserts the command line is
+the last element (`at(-1)`), that `--` sits at index 4, and that
+`slice(-2,-1)` is `["--"]`.
+
+--------------------------------------------------------------------------------
+DEFECT 2 — `test/translate.test.ts(274,49): error TS2769`
+`Argument of type 'string' is not assignable to parameter of type
+ '"attach-respawn" | "pass-through" | ...'`
+Cause: the `PayloadCase` interface declared `readonly kind: string`, so
+`expect(classify(testCase.argv).kind).toBe(testCase.kind)` compared the grammar's
+`RecognisedKind` union against a widened `string`.
+
+FIX: typed the fixture table, no cast, no tsconfig change.
+  * `readonly kind: string;`  ->  `readonly kind: RecognisedKind;`
+  * `import type { Classified } from "../src/grammar";`
+      ->  `import type { Classified, RecognisedKind } from "../src/grammar";`
+This makes the compile a real guard for the "fixture corpus integrity" suite: a
+typo in a fixture's declared `kind` is now a compile error instead of a runtime
+string comparison that could silently pass through an assertion overload.
+
+--------------------------------------------------------------------------------
+DEFECT 3 — `test/translate.test.ts(464,29): error TS2769`
+`Type 'string | undefined' is not assignable to type 'string'`
+Cause: under `noUncheckedIndexedAccess`, `testCase.argv[0]` is `string |
+undefined`, and bun's `toEqual` is typed against the RECEIVED value, so the
+`undefined` had to be removed before it entered the expected array.
+
+FIX: a real narrowing guard, as required. No `!`, no `as any`.
+    const verb = testCase.argv[0];
+    if (verb === undefined) throw new Error(`fixture "${testCase.name}" has no verb element`);
+    ...
+    expect(head).toEqual([verb, ...expectedFlags(testCase.argv)]);
+The guard is load-bearing rather than ceremonial: a fixture with an empty argv
+would otherwise assert `head` against `[undefined, ...]`, which is the kind of
+vacuous assertion that hides a broken fixture.
+
+A SECOND instance of the same class of error appeared while fixing Defect 1
+(this takeover introduced it, and it is fixed here too): `Translation.
+helperCommandLine` is typed `string | undefined` even for `kind: "helper"`,
+because `Translation` is one flat interface. Guarded the same way:
+    if (translation.kind !== "helper") throw new Error("a payload argv must translate to the helper form");
+    const commandLine = translation.helperCommandLine;
+    if (commandLine === undefined) throw new Error("a helper translation must carry a command line");
+
+FORBIDDEN APPROACHES NOT USED: `as any`, `@ts-ignore`, `@ts-expect-error`, the `!`
+operator, and any edit to tsconfig.json. `strict`, `noUncheckedIndexedAccess`,
+`exactOptionalPropertyTypes` and `isolatedModules` are untouched.
+
+================================================================================
+2. GATES — real output, real exit codes
+================================================================================
+
+--------------------------------------------------------------------------------
+GATE 1 — `bun test test/translate.test.ts`  =>  exit 0, 0 fail
+--------------------------------------------------------------------------------
+bun test v1.4.2 (744846f84)
+
+test/translate.test.ts:
+[false-positive-translation] BEFORE send-keys: ["send-keys","-t","%1","/bin/sh -c \"echo hi\""]
+[false-positive-translation] AFTER  send-keys: ["send-keys","-t","%1","/bin/sh -c \"echo hi\""]
+[false-positive-translation] BEFORE display   : ["display","-p","-e","A=B"]
+[false-positive-translation] AFTER  display   : ["display","-p","-e","A=B"]
+[credential-leak] IN  argv     : ["respawn-pane","-k","-e","OPENCODE_SERVER_PASSWORD=SENTINEL_SECRET_a1b2c3","-e","OPENCODE_SERVER_USERNAME=daniel","-t","%7","/bin/sh -c \"opencode attach 'http://127.0.0.1:4096' --session 'ses_abc123' --dir '/home/dev/proj'\""]
+[credential-leak] OUT argv     : ["respawn-pane","-k","-t","%7","--","powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"C:\\Users\\Test User\\AppData\\Local\\opencode-psmux-bridge\\runtime\\Start-PaneFromDescriptor.ps1\" --payload b3BlbmNvZGUgYXR0YWNoICdodHRwOi8vMTI3LjAuMC4xOjQwOTYnIC0tc2Vzc2lvbiAnc2VzX2FiYzEyMycgLS1kaXIgJy9ob21lL2Rldi9wcm9qJw --command WyJvcGVuY29kZSIsImF0dGFjaCIsImh0dHA6Ly8xMjcuMC4wLjE6NDA5NiIsIi0tc2Vzc2lvbiIsInNlc19hYmMxMjMiLCItLWRpciIsIi9ob21lL2Rldi9wcm9qIl0 --env-slots 2"]
+[credential-leak] OUT cmdline  : powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "C:\Users\Test User\AppData\Local\opencode-psmux-bridge\runtime\Start-PaneFromDescriptor.ps1" --payload b3BlbmNvZGUgYXR0YWNoICdodHRwOi8vMTI3LjAuMC4xOjQwOTYnIC0tc2Vzc2lvbiAnc2VzX2FiYzEyMycgLS1kaXIgJy9ob21lL2Rldi9wcm9qJw --command WyJvcGVuY29kZSIsImF0dGFjaCIsImh0dHA6Ly8xMjcuMC4wLjE6NDA5NiIsIi0tc2Vzc2lvbiIsInNlc19hYmMxMjMiLCItLWRpciIsIi9ob21lL2Rldi9wcm9qIl0 --env-slots 2
+[credential-leak] OUT env slots : ["OMO_PANE_ENV_0","OMO_PANE_ENV_1"]
+[credential-leak] OUT slot 0 is : OMO_PANE_ENV_0 (value withheld)
+
+ 40 pass
+ 0 fail
+ 785 expect() calls
+Ran 40 tests across 1 file. [27.00ms]
+
+--------------------------------------------------------------------------------
+GATE 2 — `bun x tsc --noEmit`  =>  exit 0
+--------------------------------------------------------------------------------
+(no output at all; the command wrote 0 bytes to stdout and stderr)
+
+--------------------------------------------------------------------------------
+GATE 3 — `bun test test/grammar.test.ts`  =>  exit 0, 35 pass / 0 fail  (REGRESSION GUARD)
+--------------------------------------------------------------------------------
+bun test v1.4.2 (744846f84)
+
+ 35 pass
+ 0 fail
+ 94 expect() calls
+Ran 35 tests across 1 file. [10.00ms]
+
+--------------------------------------------------------------------------------
+GATE 4 — `bun test`  =>  exit 1, and the ONLY failure is todo 12's intentional smoke test
+--------------------------------------------------------------------------------
+test/cli.test.ts:
+2 | // Intentionally RED until todo 12 implements the CLI entry point.
+3 | import { test, expect } from "bun:test";
+4 | import * as cli from "../src/cli";
+5 |
+6 |   expect(cli).toHaveProperty("main");
+                  ^
+error: expect(received).toHaveProperty(path)
+
+Expected path: "main"
+
+Unable to find property
+
+      at <anonymous> (/home/daniel/omo-psmux-bridge-wt/windows-parity/test/cli.test.ts:7:15)
+(fail) src/cli.ts exports main(argv: string[]): Promise<number> [0.24ms]
+
+ 75 pass
+ 1 fail
+ 880 expect() calls
+Ran 76 tests across 5 files. [32.00ms]
+
+`grep '(fail)'` over the whole run returns exactly one line — the cli smoke
+test above, which asserts a `main` export that todo 12 is contracted to add.
+Every other test in the repo is green.
+
+--------------------------------------------------------------------------------
+GATE 5 — `git status --porcelain`  =>  exit 0
+--------------------------------------------------------------------------------
+ M src/translate.ts
+ M test/translate.test.ts
+
+Two modified tracked files, no new files, no deletions. The evidence probe
+script used for §3-§7 below was written to /tmp/opencode/t9/probe.ts (outside
+the repo) and imports the worktree sources by absolute path, so it added
+nothing here. NO git write command was run at any point in this task.
+
+================================================================================
+3. THE SIX CLASSIFICATIONS -> WHAT translateArgv EMITS
+================================================================================
+All six classifications of src/grammar.ts, at a glance. In every row the emitted
+operand is ONE argv element holding the PowerShell helper command line defined
+in §6; `LEN` is emitted length vs input length.
+
+| classification                | emitted argv                        | `--` | LEN    |
+|-------------------------------|-------------------------------------|------|--------|
+| placeholder-split             | verb + flags + HELPER               | no   | 9 = 9  |
+| placeholder-newwindow         | verb + flags + HELPER               | no   | 8 = 8  |
+| placeholder-newsession        | verb + flags + HELPER               | no   | 12 = 12|
+| placeholder-respawn           | verb + flags + `--` + HELPER        | YES  | 6 = 5  |
+| attach-respawn                | verb + flags + `--` + HELPER        | YES  | 6 = 5  |
+| pass-through                  | argv, unchanged                     | no   | n = n  |
+
+The three non-respawn payload forms replace the payload one-for-one (LEN equal);
+the two respawn forms additionally INSERT `--` (LEN +1). Nothing is ever
+appended after the operand.
+
+Detail follows, one canonical argv per classification, emitted arrays printed
+in full and untruncated. `pass-through` is shown with two representatives; the
+sixth classification is `pass-through`, so the table above is complete.
+
+--- placeholder-split
+    classified kind : placeholder-split
+    translation kind: helper   rewritten=true  dashDashInserted=false
+    "--" count      : 0
+    emitted argv    : ["split-window","-h","-d","-P","-F","#{pane_id}","-t","%3","powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"C:\\Users\\Test User\\AppData\\Local\\opencode-psmux-bridge\\runtime\\Start-PaneFromDescriptor.ps1\" --payload cHJpbnRmICclc1xuJXNcbicgXCJPTU8gc3ViYWdlbnQgcGFuZSByZWFkeTogZXhwbG9yZSB0aGUgdG11eCBncmFtbWFyIG1vZHVsZVwiIFwiRm9jdXMgdGhpcyBwYW5lIHRvIGF0dGFjaC5cIjsgd2hpbGUgOjsgZG8gc2xlZXAgODY0MDA7IGRvbmU --command WyJwb3dlcnNoZWxsIiwiLU5vUHJvZmlsZSIsIi1Ob25JbnRlcmFjdGl2ZSIsIi1Db21tYW5kIiwiV3JpdGUtT3V0cHV0ICdPTU8gc3ViYWdlbnQgcGFuZSByZWFkeTogZXhwbG9yZSB0aGUgdG11eCBncmFtbWFyIG1vZHVsZSc7IFdyaXRlLU91dHB1dCAnRm9jdXMgdGhpcyBwYW5lIHRvIGF0dGFjaC4nOyB3aGlsZSAoJHRydWUpIHsgU3RhcnQtU2xlZXAgLVNlY29uZHMgODY0MDAgfSJd --env-slots 0"]
+    emitted length  : 9  (input 9)
+    sentinel in argv: false
+
+--- placeholder-newwindow
+    classified kind : placeholder-newwindow
+    translation kind: helper   rewritten=true  dashDashInserted=false
+    "--" count      : 0
+    emitted argv    : ["new-window","-d","-n","omo-agents","-P","-F","#{pane_id}","powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"C:\\Users\\Test User\\AppData\\Local\\opencode-psmux-bridge\\runtime\\Start-PaneFromDescriptor.ps1\" --payload cHJpbnRmICclc1xuJXNcbicgXCJPTU8gc3ViYWdlbnQgcGFuZSByZWFkeTogZXhwbG9yZSB0aGUgdG11eCBncmFtbWFyIG1vZHVsZVwiIFwiRm9jdXMgdGhpcyBwYW5lIHRvIGF0dGFjaC5cIjsgd2hpbGUgOjsgZG8gc2xlZXAgODY0MDA7IGRvbmU --command WyJwb3dlcnNoZWxsIiwiLU5vUHJvZmlsZSIsIi1Ob25JbnRlcmFjdGl2ZSIsIi1Db21tYW5kIiwiV3JpdGUtT3V0cHV0ICdPTU8gc3ViYWdlbnQgcGFuZSByZWFkeTogZXhwbG9yZSB0aGUgdG11eCBncmFtbWFyIG1vZHVsZSc7IFdyaXRlLU91dHB1dCAnRm9jdXMgdGhpcyBwYW5lIHRvIGF0dGFjaC4nOyB3aGlsZSAoJHRydWUpIHsgU3RhcnQtU2xlZXAgLVNlY29uZHMgODY0MDAgfSJd --env-slots 0"]
+    emitted length  : 8  (input 8)
+    sentinel in argv: false
+
+--- placeholder-newsession
+    classified kind : placeholder-newsession
+    translation kind: helper   rewritten=true  dashDashInserted=false
+    "--" count      : 0
+    emitted argv    : ["new-session","-d","-s","omo-iso-4711","-x","120","-y","40","-P","-F","#{pane_id}","powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"C:\\Users\\Test User\\AppData\\Local\\opencode-psmux-bridge\\runtime\\Start-PaneFromDescriptor.ps1\" --payload cHJpbnRmICclc1xuJXNcbicgXCJPTU8gc3ViYWdlbnQgcGFuZSByZWFkeTogZXhwbG9yZSB0aGUgdG11eCBncmFtbWFyIG1vZHVsZVwiIFwiRm9jdXMgdGhpcyBwYW5lIHRvIGF0dGFjaC5cIjsgd2hpbGUgOjsgZG8gc2xlZXAgODY0MDA7IGRvbmU --command WyJwb3dlcnNoZWxsIiwiLU5vUHJvZmlsZSIsIi1Ob25JbnRlcmFjdGl2ZSIsIi1Db21tYW5kIiwiV3JpdGUtT3V0cHV0ICdPTU8gc3ViYWdlbnQgcGFuZSByZWFkeTogZXhwbG9yZSB0aGUgdG11eCBncmFtbWFyIG1vZHVsZSc7IFdyaXRlLU91dHB1dCAnRm9jdXMgdGhpcyBwYW5lIHRvIGF0dGFjaC4nOyB3aGlsZSAoJHRydWUpIHsgU3RhcnQtU2xlZXAgLVNlY29uZHMgODY0MDAgfSJd --env-slots 0"]
+    emitted length  : 12  (input 12)
+    sentinel in argv: false
+
+--- placeholder-respawn
+    classified kind : placeholder-respawn
+    translation kind: helper   rewritten=true  dashDashInserted=true
+    "--" count      : 1 at index 4 of 5 (immediately before operand at 5)
+    emitted argv    : ["respawn-pane","-k","-t","%7","--","powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"C:\\Users\\Test User\\AppData\\Local\\opencode-psmux-bridge\\runtime\\Start-PaneFromDescriptor.ps1\" --payload cHJpbnRmICclc1xuJXNcbicgXCJPTU8gc3ViYWdlbnQgcGFuZSByZWFkeTogZXhwbG9yZSB0aGUgdG11eCBncmFtbWFyIG1vZHVsZVwiIFwiRm9jdXMgdGhpcyBwYW5lIHRvIGF0dGFjaC5cIjsgd2hpbGUgOjsgZG8gc2xlZXAgODY0MDA7IGRvbmU --command WyJwb3dlcnNoZWxsIiwiLU5vUHJvZmlsZSIsIi1Ob25JbnRlcmFjdGl2ZSIsIi1Db21tYW5kIiwiV3JpdGUtT3V0cHV0ICdPTU8gc3ViYWdlbnQgcGFuZSByZWFkeTogZXhwbG9yZSB0aGUgdG11eCBncmFtbWFyIG1vZHVsZSc7IFdyaXRlLU91dHB1dCAnRm9jdXMgdGhpcyBwYW5lIHRvIGF0dGFjaC4nOyB3aGlsZSAoJHRydWUpIHsgU3RhcnQtU2xlZXAgLVNlY29uZHMgODY0MDAgfSJd --env-slots 0"]
+    emitted length  : 6  (input 5)
+    sentinel in argv: false
+
+--- attach-respawn
+    classified kind : attach-respawn
+    translation kind: helper   rewritten=true  dashDashInserted=true
+    "--" count      : 1 at index 4 of 5 (immediately before operand at 5)
+    emitted argv    : ["respawn-pane","-k","-t","%7","--","powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"C:\\Users\\Test User\\AppData\\Local\\opencode-psmux-bridge\\runtime\\Start-PaneFromDescriptor.ps1\" --payload b3BlbmNvZGUgYXR0YWNoICdodHRwOi8vMTI3LjAuMC4xOjQwOTYnIC0tc2Vzc2lvbiAnc2VzX2FiYzEyMycgLS1kaXIgJy9ob21lL2Rldi9wcm9qJw --command WyJvcGVuY29kZSIsImF0dGFjaCIsImh0dHA6Ly8xMjcuMC4wLjE6NDA5NiIsIi0tc2Vzc2lvbiIsInNlc19hYmMxMjMiLCItLWRpciIsIi9ob21lL2Rldi9wcm9qIl0 --env-slots 0"]
+    emitted length  : 6  (input 5)
+    sentinel in argv: false
+
+--- pass-through (split-window + attach template)
+    classified kind : pass-through
+    translation kind: passthrough   rewritten=false  dashDashInserted=false
+    "--" count      : 0
+    emitted argv    : ["split-window","-h","-d","-P","-F","#{pane_id}","/bin/sh -c \"opencode attach 'http://127.0.0.1:4096' --session 'ses_abc123' --dir '/home/dev/proj'\""]
+    emitted length  : 7  (input 7)
+    sentinel in argv: false
+
+--- pass-through (respawn-window, off-path)
+    classified kind : pass-through
+    translation kind: passthrough   rewritten=false  dashDashInserted=false
+    "--" count      : 0
+    emitted argv    : ["respawn-window","-k","-t","%1","/bin/sh -c \"echo hi\""]
+    emitted length  : 5  (input 5)
+    sentinel in argv: false
+
+
+================================================================================
+4. `--` PROOF: PRESENT FOR EXACTLY THE TWO RESPAWN FORMS, NOWHERE ELSE
+================================================================================
+Per-classification tally, then the aggregate check. The suite additionally asserts
+the whole 10-case matrix in test/translate.test.ts:407-423 (`argv[len-2] === "--"`
+for each dashDash case, and NOT CONTAINED for every other case).
+
+    attach-respawn                                 -- emitted: 1   not emitted: 0
+    pass-through                                   -- emitted: 0   not emitted: 2
+    placeholder-newsession                         -- emitted: 0   not emitted: 1
+    placeholder-newwindow                          -- emitted: 0   not emitted: 1
+    placeholder-respawn                            -- emitted: 1   not emitted: 0
+    placeholder-split                              -- emitted: 0   not emitted: 1
+
+    classifications emitting "--": ["attach-respawn","placeholder-respawn"]
+    exactly the two respawn forms : true
+    the full 10-case "--" matrix is asserted in the suite; this is the per-kind summary.
+
+
+================================================================================
+5. CREDENTIAL-LEAK REGRESSION: EVERY PAYLOAD SHAPE, ARGV PRINTED
+================================================================================
+Each payload shape is fed a password-bearing `-e` pair using the sentinel
+SENTINEL_SECRET_a1b2c3. Every emitted argv array is printed in full so the
+sentinel's ABSENCE is visible by reading, not merely asserted.
+COUNT, over the 5 data blocks below: the sentinel occurs 5 times in total, once
+each on an `IN argv` line, and on ZERO `OUT argv` line and ZERO `OUT cmd` line.
+(Verified by grep over this file: the only other occurrences of the string
+anywhere in this evidence are in this paragraph and in the captured Gate 1 test
+output, whose single occurrence is likewise on an `IN argv` line.)
+
+--- placeholder-split
+    IN  argv : ["split-window","-h","-d","-P","-F","#{pane_id}","-t","%3","-e","OPENCODE_SERVER_PASSWORD=SENTINEL_SECRET_a1b2c3","-e","OPENCODE_SERVER_USERNAME=daniel","/bin/sh -c \"printf '%s\\n%s\\n' \\\"OMO subagent pane ready: explore the tmux grammar module\\\" \\\"Focus this pane to attach.\\\"; while :; do sleep 86400; done\""]
+    OUT argv : ["split-window","-h","-d","-P","-F","#{pane_id}","-t","%3","powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"C:\\Users\\Test User\\AppData\\Local\\opencode-psmux-bridge\\runtime\\Start-PaneFromDescriptor.ps1\" --payload cHJpbnRmICclc1xuJXNcbicgXCJPTU8gc3ViYWdlbnQgcGFuZSByZWFkeTogZXhwbG9yZSB0aGUgdG11eCBncmFtbWFyIG1vZHVsZVwiIFwiRm9jdXMgdGhpcyBwYW5lIHRvIGF0dGFjaC5cIjsgd2hpbGUgOjsgZG8gc2xlZXAgODY0MDA7IGRvbmU --command WyJwb3dlcnNoZWxsIiwiLU5vUHJvZmlsZSIsIi1Ob25JbnRlcmFjdGl2ZSIsIi1Db21tYW5kIiwiV3JpdGUtT3V0cHV0ICdPTU8gc3ViYWdlbnQgcGFuZSByZWFkeTogZXhwbG9yZSB0aGUgdG11eCBncmFtbWFyIG1vZHVsZSc7IFdyaXRlLU91dHB1dCAnRm9jdXMgdGhpcyBwYW5lIHRvIGF0dGFjaC4nOyB3aGlsZSAoJHRydWUpIHsgU3RhcnQtU2xlZXAgLVNlY29uZHMgODY0MDAgfSJd --env-slots 2"]
+    OUT cmd  : powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "C:\Users\Test User\AppData\Local\opencode-psmux-bridge\runtime\Start-PaneFromDescriptor.ps1" --payload cHJpbnRmICclc1xuJXNcbicgXCJPTU8gc3ViYWdlbnQgcGFuZSByZWFkeTogZXhwbG9yZSB0aGUgdG11eCBncmFtbWFyIG1vZHVsZVwiIFwiRm9jdXMgdGhpcyBwYW5lIHRvIGF0dGFjaC5cIjsgd2hpbGUgOjsgZG8gc2xlZXAgODY0MDA7IGRvbmU --command WyJwb3dlcnNoZWxsIiwiLU5vUHJvZmlsZSIsIi1Ob25JbnRlcmFjdGl2ZSIsIi1Db21tYW5kIiwiV3JpdGUtT3V0cHV0ICdPTU8gc3ViYWdlbnQgcGFuZSByZWFkeTogZXhwbG9yZSB0aGUgdG11eCBncmFtbWFyIG1vZHVsZSc7IFdyaXRlLU91dHB1dCAnRm9jdXMgdGhpcyBwYW5lIHRvIGF0dGFjaC4nOyB3aGlsZSAoJHRydWUpIHsgU3RhcnQtU2xlZXAgLVNlY29uZHMgODY0MDAgfSJd --env-slots 2
+    env slots: ["OMO_PANE_ENV_0","OMO_PANE_ENV_1"]  --env-slots 2
+    slot 0 carries the password (value withheld): true
+    SENTINEL in rendered argv+cmdline: false   "OPENCODE_SERVER_PASSWORD" present: false   "-e" forwarded: false
+
+--- placeholder-newwindow
+    IN  argv : ["new-window","-d","-n","omo-agents","-P","-F","#{pane_id}","-e","OPENCODE_SERVER_PASSWORD=SENTINEL_SECRET_a1b2c3","-e","OPENCODE_SERVER_USERNAME=daniel","/bin/sh -c \"printf '%s\\n%s\\n' \\\"OMO subagent pane ready: explore the tmux grammar module\\\" \\\"Focus this pane to attach.\\\"; while :; do sleep 86400; done\""]
+    OUT argv : ["new-window","-d","-n","omo-agents","-P","-F","#{pane_id}","powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"C:\\Users\\Test User\\AppData\\Local\\opencode-psmux-bridge\\runtime\\Start-PaneFromDescriptor.ps1\" --payload cHJpbnRmICclc1xuJXNcbicgXCJPTU8gc3ViYWdlbnQgcGFuZSByZWFkeTogZXhwbG9yZSB0aGUgdG11eCBncmFtbWFyIG1vZHVsZVwiIFwiRm9jdXMgdGhpcyBwYW5lIHRvIGF0dGFjaC5cIjsgd2hpbGUgOjsgZG8gc2xlZXAgODY0MDA7IGRvbmU --command WyJwb3dlcnNoZWxsIiwiLU5vUHJvZmlsZSIsIi1Ob25JbnRlcmFjdGl2ZSIsIi1Db21tYW5kIiwiV3JpdGUtT3V0cHV0ICdPTU8gc3ViYWdlbnQgcGFuZSByZWFkeTogZXhwbG9yZSB0aGUgdG11eCBncmFtbWFyIG1vZHVsZSc7IFdyaXRlLU91dHB1dCAnRm9jdXMgdGhpcyBwYW5lIHRvIGF0dGFjaC4nOyB3aGlsZSAoJHRydWUpIHsgU3RhcnQtU2xlZXAgLVNlY29uZHMgODY0MDAgfSJd --env-slots 2"]
+    OUT cmd  : powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "C:\Users\Test User\AppData\Local\opencode-psmux-bridge\runtime\Start-PaneFromDescriptor.ps1" --payload cHJpbnRmICclc1xuJXNcbicgXCJPTU8gc3ViYWdlbnQgcGFuZSByZWFkeTogZXhwbG9yZSB0aGUgdG11eCBncmFtbWFyIG1vZHVsZVwiIFwiRm9jdXMgdGhpcyBwYW5lIHRvIGF0dGFjaC5cIjsgd2hpbGUgOjsgZG8gc2xlZXAgODY0MDA7IGRvbmU --command WyJwb3dlcnNoZWxsIiwiLU5vUHJvZmlsZSIsIi1Ob25JbnRlcmFjdGl2ZSIsIi1Db21tYW5kIiwiV3JpdGUtT3V0cHV0ICdPTU8gc3ViYWdlbnQgcGFuZSByZWFkeTogZXhwbG9yZSB0aGUgdG11eCBncmFtbWFyIG1vZHVsZSc7IFdyaXRlLU91dHB1dCAnRm9jdXMgdGhpcyBwYW5lIHRvIGF0dGFjaC4nOyB3aGlsZSAoJHRydWUpIHsgU3RhcnQtU2xlZXAgLVNlY29uZHMgODY0MDAgfSJd --env-slots 2
+    env slots: ["OMO_PANE_ENV_0","OMO_PANE_ENV_1"]  --env-slots 2
+    slot 0 carries the password (value withheld): true
+    SENTINEL in rendered argv+cmdline: false   "OPENCODE_SERVER_PASSWORD" present: false   "-e" forwarded: false
+
+--- placeholder-newsession
+    IN  argv : ["new-session","-d","-s","omo-iso-4711","-x","120","-y","40","-P","-F","#{pane_id}","-e","OPENCODE_SERVER_PASSWORD=SENTINEL_SECRET_a1b2c3","-e","OPENCODE_SERVER_USERNAME=daniel","/bin/sh -c \"printf '%s\\n%s\\n' \\\"OMO subagent pane ready: explore the tmux grammar module\\\" \\\"Focus this pane to attach.\\\"; while :; do sleep 86400; done\""]
+    OUT argv : ["new-session","-d","-s","omo-iso-4711","-x","120","-y","40","-P","-F","#{pane_id}","powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"C:\\Users\\Test User\\AppData\\Local\\opencode-psmux-bridge\\runtime\\Start-PaneFromDescriptor.ps1\" --payload cHJpbnRmICclc1xuJXNcbicgXCJPTU8gc3ViYWdlbnQgcGFuZSByZWFkeTogZXhwbG9yZSB0aGUgdG11eCBncmFtbWFyIG1vZHVsZVwiIFwiRm9jdXMgdGhpcyBwYW5lIHRvIGF0dGFjaC5cIjsgd2hpbGUgOjsgZG8gc2xlZXAgODY0MDA7IGRvbmU --command WyJwb3dlcnNoZWxsIiwiLU5vUHJvZmlsZSIsIi1Ob25JbnRlcmFjdGl2ZSIsIi1Db21tYW5kIiwiV3JpdGUtT3V0cHV0ICdPTU8gc3ViYWdlbnQgcGFuZSByZWFkeTogZXhwbG9yZSB0aGUgdG11eCBncmFtbWFyIG1vZHVsZSc7IFdyaXRlLU91dHB1dCAnRm9jdXMgdGhpcyBwYW5lIHRvIGF0dGFjaC4nOyB3aGlsZSAoJHRydWUpIHsgU3RhcnQtU2xlZXAgLVNlY29uZHMgODY0MDAgfSJd --env-slots 2"]
+    OUT cmd  : powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "C:\Users\Test User\AppData\Local\opencode-psmux-bridge\runtime\Start-PaneFromDescriptor.ps1" --payload cHJpbnRmICclc1xuJXNcbicgXCJPTU8gc3ViYWdlbnQgcGFuZSByZWFkeTogZXhwbG9yZSB0aGUgdG11eCBncmFtbWFyIG1vZHVsZVwiIFwiRm9jdXMgdGhpcyBwYW5lIHRvIGF0dGFjaC5cIjsgd2hpbGUgOjsgZG8gc2xlZXAgODY0MDA7IGRvbmU --command WyJwb3dlcnNoZWxsIiwiLU5vUHJvZmlsZSIsIi1Ob25JbnRlcmFjdGl2ZSIsIi1Db21tYW5kIiwiV3JpdGUtT3V0cHV0ICdPTU8gc3ViYWdlbnQgcGFuZSByZWFkeTogZXhwbG9yZSB0aGUgdG11eCBncmFtbWFyIG1vZHVsZSc7IFdyaXRlLU91dHB1dCAnRm9jdXMgdGhpcyBwYW5lIHRvIGF0dGFjaC4nOyB3aGlsZSAoJHRydWUpIHsgU3RhcnQtU2xlZXAgLVNlY29uZHMgODY0MDAgfSJd --env-slots 2
+    env slots: ["OMO_PANE_ENV_0","OMO_PANE_ENV_1"]  --env-slots 2
+    slot 0 carries the password (value withheld): true
+    SENTINEL in rendered argv+cmdline: false   "OPENCODE_SERVER_PASSWORD" present: false   "-e" forwarded: false
+
+--- placeholder-respawn
+    IN  argv : ["respawn-pane","-k","-e","OPENCODE_SERVER_PASSWORD=SENTINEL_SECRET_a1b2c3","-e","OPENCODE_SERVER_USERNAME=daniel","-t","%7","/bin/sh -c \"printf '%s\\n%s\\n' \\\"OMO subagent pane ready: explore the tmux grammar module\\\" \\\"Focus this pane to attach.\\\"; while :; do sleep 86400; done\""]
+    OUT argv : ["respawn-pane","-k","-t","%7","--","powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"C:\\Users\\Test User\\AppData\\Local\\opencode-psmux-bridge\\runtime\\Start-PaneFromDescriptor.ps1\" --payload cHJpbnRmICclc1xuJXNcbicgXCJPTU8gc3ViYWdlbnQgcGFuZSByZWFkeTogZXhwbG9yZSB0aGUgdG11eCBncmFtbWFyIG1vZHVsZVwiIFwiRm9jdXMgdGhpcyBwYW5lIHRvIGF0dGFjaC5cIjsgd2hpbGUgOjsgZG8gc2xlZXAgODY0MDA7IGRvbmU --command WyJwb3dlcnNoZWxsIiwiLU5vUHJvZmlsZSIsIi1Ob25JbnRlcmFjdGl2ZSIsIi1Db21tYW5kIiwiV3JpdGUtT3V0cHV0ICdPTU8gc3ViYWdlbnQgcGFuZSByZWFkeTogZXhwbG9yZSB0aGUgdG11eCBncmFtbWFyIG1vZHVsZSc7IFdyaXRlLU91dHB1dCAnRm9jdXMgdGhpcyBwYW5lIHRvIGF0dGFjaC4nOyB3aGlsZSAoJHRydWUpIHsgU3RhcnQtU2xlZXAgLVNlY29uZHMgODY0MDAgfSJd --env-slots 2"]
+    OUT cmd  : powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "C:\Users\Test User\AppData\Local\opencode-psmux-bridge\runtime\Start-PaneFromDescriptor.ps1" --payload cHJpbnRmICclc1xuJXNcbicgXCJPTU8gc3ViYWdlbnQgcGFuZSByZWFkeTogZXhwbG9yZSB0aGUgdG11eCBncmFtbWFyIG1vZHVsZVwiIFwiRm9jdXMgdGhpcyBwYW5lIHRvIGF0dGFjaC5cIjsgd2hpbGUgOjsgZG8gc2xlZXAgODY0MDA7IGRvbmU --command WyJwb3dlcnNoZWxsIiwiLU5vUHJvZmlsZSIsIi1Ob25JbnRlcmFjdGl2ZSIsIi1Db21tYW5kIiwiV3JpdGUtT3V0cHV0ICdPTU8gc3ViYWdlbnQgcGFuZSByZWFkeTogZXhwbG9yZSB0aGUgdG11eCBncmFtbWFyIG1vZHVsZSc7IFdyaXRlLU91dHB1dCAnRm9jdXMgdGhpcyBwYW5lIHRvIGF0dGFjaC4nOyB3aGlsZSAoJHRydWUpIHsgU3RhcnQtU2xlZXAgLVNlY29uZHMgODY0MDAgfSJd --env-slots 2
+    env slots: ["OMO_PANE_ENV_0","OMO_PANE_ENV_1"]  --env-slots 2
+    slot 0 carries the password (value withheld): true
+    SENTINEL in rendered argv+cmdline: false   "OPENCODE_SERVER_PASSWORD" present: false   "-e" forwarded: false
+
+--- attach-respawn
+    IN  argv : ["respawn-pane","-k","-e","OPENCODE_SERVER_PASSWORD=SENTINEL_SECRET_a1b2c3","-e","OPENCODE_SERVER_USERNAME=daniel","-t","%7","/bin/sh -c \"opencode attach 'http://127.0.0.1:4096' --session 'ses_abc123' --dir '/home/dev/proj'\""]
+    OUT argv : ["respawn-pane","-k","-t","%7","--","powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"C:\\Users\\Test User\\AppData\\Local\\opencode-psmux-bridge\\runtime\\Start-PaneFromDescriptor.ps1\" --payload b3BlbmNvZGUgYXR0YWNoICdodHRwOi8vMTI3LjAuMC4xOjQwOTYnIC0tc2Vzc2lvbiAnc2VzX2FiYzEyMycgLS1kaXIgJy9ob21lL2Rldi9wcm9qJw --command WyJvcGVuY29kZSIsImF0dGFjaCIsImh0dHA6Ly8xMjcuMC4wLjE6NDA5NiIsIi0tc2Vzc2lvbiIsInNlc19hYmMxMjMiLCItLWRpciIsIi9ob21lL2Rldi9wcm9qIl0 --env-slots 2"]
+    OUT cmd  : powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "C:\Users\Test User\AppData\Local\opencode-psmux-bridge\runtime\Start-PaneFromDescriptor.ps1" --payload b3BlbmNvZGUgYXR0YWNoICdodHRwOi8vMTI3LjAuMC4xOjQwOTYnIC0tc2Vzc2lvbiAnc2VzX2FiYzEyMycgLS1kaXIgJy9ob21lL2Rldi9wcm9qJw --command WyJvcGVuY29kZSIsImF0dGFjaCIsImh0dHA6Ly8xMjcuMC4wLjE6NDA5NiIsIi0tc2Vzc2lvbiIsInNlc19hYmMxMjMiLCItLWRpciIsIi9ob21lL2Rldi9wcm9qIl0 --env-slots 2
+    env slots: ["OMO_PANE_ENV_0","OMO_PANE_ENV_1"]  --env-slots 2
+    slot 0 carries the password (value withheld): true
+    SENTINEL in rendered argv+cmdline: false   "OPENCODE_SERVER_PASSWORD" present: false   "-e" forwarded: false
+
+
+================================================================================
+6. THE HELPER-INVOCATION CONTRACT — TODO 11 IMPLEMENTS EXACTLY THIS
+================================================================================
+Printed from the exported HELPER_CONTRACT, followed by a fully-populated command
+line and its parseHelperCommandLine() round trip. The same contract is documented
+in prose at the top of src/translate.ts (lines 22-98), which is the authoritative
+copy; this is the machine-checked view of it.
+
+    shell                : powershell
+    shellArgs            : ["-NoProfile","-NonInteractive","-ExecutionPolicy","Bypass","-File"]
+    helper file (rel.)   : runtime\Start-PaneFromDescriptor.ps1
+    env slot prefix      : OMO_PANE_ENV_<N>
+    field flags          : ["--payload","--command","--cwd","--env-slots","--correlation"]
+    placeholder head/tail: ["OMO subagent pane ready: ","Focus this pane to attach."]  sleep 86400s
+    attach program/verb  : opencode attach
+
+    A fully-populated command line (cwd + correlation supplied, pwsh as shell):
+
+      pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "C:\Users\Test User\AppData\Local\opencode-psmux-bridge\runtime\Start-PaneFromDescriptor.ps1" --payload b3BlbmNvZGUgYXR0YWNoICdodHRwOi8vMTI3LjAuMC4xOjQwOTYnIC0tc2Vzc2lvbiAnc2VzX2FiYzEyMycgLS1kaXIgJy9ob21lL2Rldi9wcm9qJw --command WyJvcGVuY29kZSIsImF0dGFjaCIsImh0dHA6Ly8xMjcuMC4wLjE6NDA5NiIsIi0tc2Vzc2lvbiIsInNlc19hYmMxMjMiLCItLWRpciIsIi9ob21lL2Rldi9wcm9qIl0 --cwd QzpcVXNlcnNcVGVzdCBVc2VyXHdvcmsgZGly --env-slots 0 --correlation Y29yci0wMDAx
+
+    And re-parsed by parseHelperCommandLine() (the round-trip half of the contract):
+      shell        = "pwsh"
+      helperPath   = "C:\\Users\\Test User\\AppData\\Local\\opencode-psmux-bridge\\runtime\\Start-PaneFromDescriptor.ps1"
+      payload      = "opencode attach 'http://127.0.0.1:4096' --session 'ses_abc123' --dir '/home/dev/proj'"
+      command      = ["opencode","attach","http://127.0.0.1:4096","--session","ses_abc123","--dir","/home/dev/proj"]
+      cwd          = "C:\\Users\\Test User\\work dir"
+      envSlotCount = 0
+      correlationId= "corr-0001"
+
+      payload round-trips byte-identically: true
+
+================================================================================
+7. PASS-THROUGH FALSE-POSITIVE REGRESSION — BEFORE / AFTER ARRAYS
+================================================================================
+The two named inputs. Both must come back deep-equal and in ORIGINAL ORDER, with
+no `--` inserted and no helper substituted. (The suite also sweeps 21 adversarial
+argv arrays in test/translate.test.ts:304-359, including respawn-window, a bare
+"--", degenerate arity, and malformed `-e` pairs.)
+
+
+--- ["send-keys","-t","%1","/bin/sh -c \"echo hi\""]
+    classified kind : pass-through
+    BEFORE          : ["send-keys","-t","%1","/bin/sh -c \"echo hi\""]
+    AFTER           : ["send-keys","-t","%1","/bin/sh -c \"echo hi\""]
+    deep-equal+order: true   "--" inserted: false   helper substituted: false   translated: false
+
+--- ["display","-p","-e","A=B"]
+    classified kind : pass-through
+    BEFORE          : ["display","-p","-e","A=B"]
+    AFTER           : ["display","-p","-e","A=B"]
+    deep-equal+order: true   "--" inserted: false   helper substituted: false   translated: false
+
+
+================================================================================
+8. MUST-NOT-VIOLATE CHECKLIST — HOW EACH INVARIANT IS HELD AND PROVEN
+================================================================================
+
+A pass-through classification returns argv completely unchanged, deep-equal, same
+order. `interactive_bash` emits arbitrary LLM-authored verbs and they must pass
+through byte-identically.
+    translateArgv returns `[...argv]` on the pass-through branch (src/translate.ts
+    :276), never a rewrite, and never the helper. Proven by §7 above and by the
+    21-case sweep at test/translate.test.ts:334-359. `rewritten` is false and
+    `helperCommandLine` is undefined on every one. The translator is NOT a
+    redactor: test/translate.test.ts:390-399 asserts a credential on a
+    pass-through path survives verbatim, because rewriting it would be a
+    behaviour change psmux never agreed to.
+
+No flag is stripped or reordered. -P, -F, -d, -t, -n, -x, -y, -l, -c are never
+altered. The emission is `[verb, ...classified.flags, ..., commandLine]`, and
+`classified.flags` is the grammar-ordered head with only `-e NAME=VALUE` pairs
+removed (src/grammar.ts:208-233). Asserted element-by-element and in order by
+test/translate.test.ts:459-466 over all 10 fixtures, by the dedicated `-c`,
+window-name, size and protected-flag assertions at :468-500, and visibly in the
+full emitted arrays in §3.
+
+new-session / new-window / split-window payloads become the PowerShell helper
+invocation and nothing else.
+    §3 shows each of those three emitting verb + flags + helper command line, with
+    no added operand and no `--`. Their emitted length equals their input length
+    (9/8/12), i.e. the payload element was replaced one-for-one and nothing was
+    inserted. The suite additionally pins the emitted `--command` token vector for
+    every shape (:520-527), so "the helper and nothing else" is checkable.
+
+Credentials never appear in argv. The `-e NAME=VALUE` pairs carry
+OPENCODE_SERVER_PASSWORD and travel in the process ENVIRONMENT via the
+OMO_PANE_ENV_* slot mechanism, never on the helper command line.
+    §5: the sentinel appears on all 5 IN argv lines and on ZERO emitted line, and
+    neither does the string "OPENCODE_SERVER_PASSWORD" nor the `-e` flag itself.
+    The credential travels in `envSlots` (src/translate.ts:584-594), which is the
+    ONE documented-sensitive field of the result — test/translate.test.ts:869
+    pins the exact key set so no new loggable field can appear by accident. Values
+    are handed to the helper by POSITION as OMO_PANE_ENV_<index>, so no manifest
+    and no name leaks into argv either. Delivering the slots to the psmux server is
+    todo 11 / descriptor.ts work and is explicitly out of this module (see the
+    comment at src/translate.ts:93-98). NOTE for todo 11: the translator strips
+    `-e` on ALL FIVE payload forms, not only the two respawn forms where psmux
+    3.3.8 demonstrably drops it. That is deliberate hardening, documented at
+    src/translate.ts:78-91, so that exactly ONE delivery mechanism has to work.
+
+HELPER_CONTRACT and parseHelperCommandLine are stable and unchanged by this
+takeover. src/translate.ts is byte-identical to the previous workers file, so
+todo 11 may implement against exactly the interface §6 prints.
+
+Untouched, as required: src/grammar.ts, src/cli.ts, src/backend.ts,
+src/descriptor.ts, package.json, tsconfig.json, CONTRACT.md. The Windows host was
+not contacted (no ssh, no scp). No git write command was run. No dependency was
+added. No notepad or ledger entry was created.
+
+================================================================================
+9. REPRODUCTION
+================================================================================
+  cd /home/daniel/omo-psmux-bridge-wt/windows-parity
+  bun test test/translate.test.ts   # 40 pass, 0 fail
+  bun x tsc --noEmit                # exit 0, no output
+  bun test test/grammar.test.ts     # 35 pass, 0 fail
+  bun test                          # 75 pass, 1 fail (todo 12 cli smoke test only)
+  git status --porcelain            # M src/translate.ts / M test/translate.test.ts
+
+Sections 3-7 above were produced by a throwaway probe kept OUTSIDE the repo at
+/tmp/opencode/t9/probe.ts, which imports the worktree sources by absolute path:
+  import { translateArgv } from "<worktree>/src/translate"
+  import { classifyArgv }  from "<worktree>/src/grammar"
+It reads nothing but the two modules and prints; it asserts nothing, so the
+assertions in the suite and the prints in this file cannot drift into agreeing
+with each other.

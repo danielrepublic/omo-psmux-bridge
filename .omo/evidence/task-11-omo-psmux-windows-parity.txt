@@ -1,0 +1,548 @@
+TASK 11 EVIDENCE — omo-psmux-windows-parity
+Panel descriptor, credential delivery, consume-once, correlation id, attach retry
+================================================================================
+Worktree : /home/daniel/omo-psmux-bridge-wt/windows-parity
+Artifacts: src/descriptor.ts (37449 B), test/descriptor.test.ts (35665 B)
+Host     : Linux, bun 1.4.2 (744846f84). The production target is Windows; the
+           Windows-only I/O is behind the DescriptorStore seam and is NOT
+           exercised here. See §7 for what that means for the claims below.
+Gates    : §1. All four run from the worktree, output captured to files.
+
+Every test name quoted in §3-§6 is quoted verbatim from
+test/descriptor.test.ts. If a property is not named there, it is not claimed.
+
+--------------------------------------------------------------------------------
+1. GATE OUTPUT — CAPTURED VERBATIM
+--------------------------------------------------------------------------------
+
+1.1  bun test test/descriptor.test.ts          (exit 0)
+
+  bun test v1.4.2 (744846f84)
+
+  test/descriptor.test.ts:
+  56 pass
+  0 fail
+  239 expect() calls
+  Ran 56 tests across 1 file. [37.00ms]
+  EXIT=0
+
+  (The 56 tests run silently under `bun test`'s default reporter — it prints
+   only the summary for a fully-passing file. 56 test cases / 239 assertions.)
+
+1.2  bun x tsc --noEmit                      (exit 0)
+
+  (no output at all — tsc is silent on success)
+  EXIT=0
+
+1.3  bun test                                (exit 1 — ONE failure, owned by todo 12)
+
+  bun test v1.4.2 (744846f84)
+
+  test/grammar.test.ts:
+  ...
+  test/translate.test.ts:
+  [false-positive-translation] BEFORE send-keys: ["send-keys","-t","%1","/bin/sh -c \"echo hi\""]
+  [false-positive-translation] AFTER  send-keys: ["send-keys","-t","%1","/bin/sh -c \"echo hi\""]
+  [false-positive-translation] BEFORE display   : ["display","-p","-e","A=B"]
+  [false-positive-translation] AFTER  display   : ["display","-p","-e","A=B"]
+  [credential-leak] IN  argv     : ["respawn-pane","-k","-e","OPENCODE_SERVER_PASSWORD=SENTINEL_SECRET_a1b2c3","-e","OPENCODE_SERVER_USERNAME=daniel","-t","%7","/bin/sh -c \"opencode attach 'http://127.0.0.1:4096' --session 'ses_abc123' --dir '/home/dev/proj'\""]
+  [credential-leak] OUT argv     : ["respawn-pane","-k","-t","%7","--","powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"C:\Users\Test User\AppData\Local\opencode-psmux-bridge\runtime\Start-PaneFromDescriptor.ps1\" --payload b3BlbmNvZGUgYXR0YWNoICdodHRwOi8vMTI3LjAuMC4xOjQwOTYnIC0tc2Vzc2lvbiAnc2VzX2FiYzEyMycgLS1kaXIgJy9ob21lL2Rldi9wcm9qJw --command WyJvcGVuY29kZSIsImF0dGFjaCIsImh0dHA6Ly8xMjcuMC4wLjE6NDA5NiIsIi0tc2Vzc2lvbiIsInNlc19hYmMxMjMiLCItLWRpciIsIi9ob21lL2Rldi9wcm9qIl0 --env-slots 2"]
+  [credential-leak] OUT cmdline  : powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "C:\Users\Test User\AppData\Local\opencode-psmux-bridge\runtime\Start-PaneFromDescriptor.ps1" --payload b3BlbmNvZGUgYXR0YWNoICdodHRwOi8vMTI3LjAuMC4xOjQwOTYnIC0tc2Vzc2lvbiAnc2VzX2FiYzEyMycgLS1kaXIgJy9ob21lL2Rldi9wcm9qJw --command WyJvcGVuY29kZSIsImF0dGFjaCIsImh0dHA6Ly8xMjcuMC4wLjE6NDA5NiIsIi0tc2Vzc2lvbiIsInNlc19hYmMxMjMiLCItLWRpciIsIi9ob21lL2Rldi9wcm9qIl0 --env-slots 2
+  [credential-leak] OUT env slots : ["OMO_PANE_ENV_0","OMO_PANE_ENV_1"]
+  [credential-leak] OUT slot 0 is : OMO_PANE_ENV_0 (value withheld)
+
+  test/cli.test.ts:
+  2 | // Intentionally RED until todo 12 implements the CLI entry point.
+  3 | import { test, expect } from "bun:test";
+  4 | import * as cli from "../src/cli";
+  5 |
+  6 | test("src/cli.ts exports main(argv: string[]): Promise<number>", () => {
+  7 |   expect(cli).toHaveProperty("main");
+                    ^
+  error: expect(received).toHaveProperty(path)
+
+  Expected path: "main"
+
+  Unable to find property
+
+        at <anonymous> (/home/daniel/omo-psmux-bridge-wt/windows-parity/test/cli.test.ts:7:15)
+  (fail) src/cli.ts exports main(argv: string[]): Promise<number> [0.18ms]
+
+   176 pass
+   1 fail
+   1308 expect() calls
+  Ran 177 tests across 5 files. [433.00ms]
+  EXIT=1
+
+  Per-file breakdown, captured separately so each count is attributable:
+
+    grammar      35 pass   0 fail
+    translate    40 pass   0 fail
+    backend      45 pass   0 fail
+    descriptor   56 pass   0 fail
+    cli           0 pass   1 fail     <- todo 12, intentional RED
+
+  35 + 40 + 45 + 56 + 1 = 177. Matches the whole-suite total exactly.
+
+  The single failure is test/cli.test.ts's `"src/cli.ts exports
+  main(argv: string[]): Promise<number>"`, whose own second line reads
+  "Intentionally RED until todo 12 implements the CLI entry point." It is a
+  missing-export assertion against src/cli.ts, which todo 11 must not and did
+  not touch. No other test in the suite fails. Todo 11's own file is 56/0.
+
+  The [credential-leak] and [false-positive-translation] lines above are
+  console.log noise emitted BY the translate tests as part of their own
+  assertions — they are the before/after evidence, not failures.
+
+1.4  git status --porcelain                  (exit 0)
+
+   M src/descriptor.ts
+   M test/descriptor.test.ts
+  EXIT=0
+
+  Two modified, nothing untracked, nothing staged. Both are todo 11's own
+  artifacts. No git write command was run.
+
+--------------------------------------------------------------------------------
+2. HOW `-e NAME=VALUE` REACHES THE CHILD WITHOUT APPEARING IN argv
+--------------------------------------------------------------------------------
+
+The credential does not travel in the command line at all. It travels in the
+helper's PROCESS ENVIRONMENT, in numbered slots, and the command line carries
+only the COUNT.
+
+The mechanism, in three steps:
+
+(a) src/translate.ts classifies the incoming argv and STRIPS the `-e` pairs.
+    `translate()` returns `envSlots` (src/translate.ts:209) and `envSlotCount`
+    (:211), and the emitted argv does not contain the pairs.
+    `buildEnvSlots` names slot i as `OMO_PANE_ENV_<i>`
+    (src/translate.ts:589, prefix from HELPER_CONTRACT.envSlotPrefix at :137).
+
+(b) The emitted helper command line carries `--env-slots <n>` and nothing more
+    about the values. It is assembled at src/translate.ts:316
+    (`parts.push(HELPER_CONTRACT.envSlotsFlag, String(input.envSlotCount))`),
+    and `parseHelperCommandLine` reads exactly one integer back out at :390-395.
+    The N is the ONLY thing about the credential on the command line.
+
+(c) The helper (runtime/Start-PaneFromDescriptor.ps1) sets OMO_PANE_ENV_0 ..
+    OMO_PANE_ENV_<n-1> in its own environment, then applies them to the pane.
+    src/descriptor.ts's job is the parts around that: the delivery ORDER.
+
+src/descriptor.ts does not invent this. Its header (lines 16-21) says it extends
+the mechanism translate.ts already owns, and DESCRIPTOR_CONTRACT re-exports
+`envSlotPrefix: HELPER_CONTRACT.envSlotPrefix` (:85) rather than restating the
+string, so there is one owner for the name.
+
+THE DELIVERY ORDER (src/descriptor.ts:768 `loadAssignments`), and it is all-or-none
+at each step:
+
+  1. The helper's own process environment, slots 0..n-1, each split on its
+     FIRST `=` (:779-799). If every slot is present, that is the answer and no
+     file is touched (:801).
+     All-or-none is a deliberate decision (:756-757): a pane with the password
+     but not the username is a DIFFERENT failure from a pane with neither, and
+     only the second is one the bridge can fix. A gap therefore never yields a
+     partial delivery.
+
+  2. The restricted-ACL fallback file, used ONLY when step 1 found a gap
+     (:803). This is the normal case on the respawn path, because psmux's
+     long-lived server owns the pane's environment, not the shim's
+     (src/translate.ts:94-96, and CONTRACT.md 11). The file is read once
+     (:803), its bytes verified (see §3's digest note below), then deleted
+     IMMEDIATELY and the deletion VERIFIED (:822). An unverified deletion is a
+     FAILURE with exit code 71 and NO assignment is handed on — nothing may be
+     applied while the credential cannot be proven destroyed.
+
+  3. Neither source: exit non-zero, 66 (EX_NOINPUT), naming both the missing
+     slot variables and the file path (:804-814). A pane is never launched
+     without the credential.
+
+WHERE THE FILE LIVES, and why not somewhere more convenient
+(DESCRIPTOR_CONTRACT:102-105): `%USERPROFILE%\.omo-pane-env\state\desc-<id>.env`,
+built by `descriptorFilePathFor` (:607). Never `%TEMP%` (world-readable on a
+default Windows install) and never inside the bridge tree (visible to the shim,
+psmux and every pane). The ACL it must carry is named in the contract as
+`"current-user-only"` (:112) with inheritance disabled.
+
+The file format is JSON, not line-oriented, deliberately (:409-415): a credential
+may contain a newline and a line-oriented format would silently split one value
+into two. `{v, digest, count, assignments}` from `serializeSlotPayload` (:417).
+
+The digest is explicitly NOT a security control — the module says so at :64-67.
+A same-user process can read the password out of the pane's environment anyway.
+It is a COMPLETENESS check: it proves the bytes decoded are the bytes written,
+so a truncated fallback file is rejected rather than half-applied.
+`parseSlotPayload` (:440) enforces, in order: JSON-object shape, `v === 1`,
+string-only assignments, self-consistent `count`, `count === expectedCount`
+(where expectedCount is the `--env-slots` value from ARGV, which the helper has
+and the file cannot be trusted to agree with — :436-438), and finally the
+digest (:478-481). Every failure is a distinct reason
+(`"unreadable" | "digest-mismatch" | "slot-count-mismatch"`, :422) and a
+non-zero exit; nothing is ever half-applied.
+
+Splitting is on the FIRST `=` only (`applySlotAssignment` :370-374), matching
+src/grammar.ts, so a password containing `=` survives whole. An assignment with
+no `=` or with an empty name is REFUSED (returns undefined) rather than applying
+an empty variable.
+
+TESTS THAT PROVE IT:
+
+  "no generated argv element carries a NAME=VALUE pair with a sensitive name"
+      — runs a test-side detector over both translations and expects [].
+  "the sentinel value itself is absent from every generated argv element"
+      — the value string itself, checked against each element, the helper
+        command line, and all elements joined.
+  "the credential lives in exactly one place: the numbered env slots"
+      — asserts envSlots[0].variable === "OMO_PANE_ENV_0", the assignment
+        equals `OPENCODE_SERVER_PASSWORD=SENTINEL`, and that argv does not even
+        contain the `-e` flag.
+  "POSITIVE CONTROL: the test-side detector really does find a leaked pair"
+      — the detector is fed a deliberately leaked argv and MUST find it, and
+        fed a benign one and must find nothing. This is what stops the first
+        assertion from passing vacuously.
+  "every slot is read from the helper's own process environment"
+      — mechanism is "environment", both assignments come back, and
+        descriptorFileUsed is false.
+  "an assignment splits on the FIRST `=` only, so a hostile value survives"
+  "an assignment with no `=`, or with no name, is rejected"
+  "a hostile value round-trips byte-for-byte through BOTH mechanisms"
+      — the hostile fixture is `"a=b 'c\"d\\e\nf  "` (:108): embedded `=`, both
+        quote characters, a backslash, a newline, a trailing space.
+  "a missing slot never yields a PARTIAL delivery"
+  "no descriptor file is needed, and none is read, when the environment has the
+   slots"
+  "the file lives under the user's profile: not TEMP, not the bridge tree"
+  "the filename is derived from the correlation id, so it is predictable and
+   bounded"
+  "the on-disk format is documented and pinned: version, digest, count,
+   assignments"
+  "serialise then parse returns the assignments unchanged"
+  "a corrupted payload is REJECTED by digest, before any value is used"
+  "a payload whose slot COUNT disagrees with --env-slots is rejected"
+  "an unparseable payload is rejected rather than half-applied"
+  "an ABSENT descriptor file exits non-zero with a message, and launches
+   nothing"
+  "after a successful fallback read the file is GONE and that is verified"
+  "a deletion that cannot be verified is a FAILURE, not a warning"
+  "the NORMAL empty -e case needs no slots and no fallback file"
+  "redactArgv masks a sensitive assignment for logging"
+
+--------------------------------------------------------------------------------
+3. CONSUME-ONCE
+--------------------------------------------------------------------------------
+
+THE MARKER IS THE TRACE FILE. There is no separate lock file.
+
+`claimDescriptor` (:700-728) composes the opening trace line and then calls
+`store.write(descriptor.traceFilePath, opening, /* exclusive */ true)`. A single
+exclusive create is the claim. That is one file per pane, created once, holding
+no credential, and it is already the artefact an operator reads to find out what
+the pane did (:690-693).
+
+ATOMICITY. `exclusive` is a filesystem primitive — O_EXCL on POSIX,
+FileMode.CreateNew on Windows — not a `Test-Path` followed by a write. The
+module says so at :696-698 and the store contract makes it the definition of
+"this path already exists" (:634-635): `createMemoryDescriptorStore.write`
+returns false when `exclusive && files.has(path)` (:660). So two helpers racing
+on one descriptor cannot both win. This is check-then-act made into one
+operation, not a promise.
+
+THE SECOND CONSUME IS REFUSED, NOT MERELY IGNORED. A failed exclusive create
+returns (:720-726):
+
+  outcome    : "already-consumed"
+  exitCode   : 67  (EX_NOUSER — the sysexits numbering in DESCRIPTOR_CONTRACT:139-146,
+                    disjoint from the chain guard's 78 and from EX_OK)
+  message    : `descriptor <correlationId> was already consumed; refusing to
+                launch a second pane for it`
+
+The descriptor module is a pure planner, so it does not itself call `exit`. It
+returns the outcome and the exit code; the helper performs the exit. Nothing is
+executed on the refused path.
+
+SCOPE. The key is the correlation id, and it is per-descriptor. Two DIFFERENT
+correlation ids are two different claims and do not interfere — a pane with id
+`corr-a` cannot block `corr-b`, and re-claiming `corr-a` afterwards is refused.
+
+TESTS THAT PROVE IT:
+
+  "the first consume claims it; the second is refused without re-executing"
+      — the whole property in one test: first.claimed === true, the
+        credential is loaded and `exec()` is called ONCE; then the second claim
+        returns claimed === false, outcome "already-consumed", exitCode
+        DESCRIPTOR_CONTRACT.exitCodes.consumed, and a message containing the
+        correlation id — and `expect(executions).toBe(1)`. That last assertion
+        is the "does not re-execute" half.
+  "consume-once holds for the EMPTY -e case too"
+      — consume-once is not conditional on there being a credential.
+  "two DIFFERENT descriptors do not interfere"
+      — corr-a claimed, corr-b claimed, corr-a refused.
+  "the claim marker IS the trace file, and it carries no credential"
+      — after the claim the file exists, does not contain the sentinel, does
+        not even contain the string "OPENCODE_SERVER_PASSWORD=", and its first
+        line parses as JSON whose correlationId is the descriptor's. This is
+        what licenses the design choice of using the trace file as the lock.
+  "the exit-code family is disjoint, non-zero, and never the chain guard's 78"
+      — 64/65/66/67/71 all non-zero and clear of 78.
+
+--------------------------------------------------------------------------------
+4. THE CORRELATION ID
+--------------------------------------------------------------------------------
+
+WHERE IT IS CARRIED, and how it is used as the single key.
+
+It is generated by the CALLER (todo 12, src/cli.ts), not by this module, and it
+arrives over the existing `--correlation` flag that HELPER_CONTRACT already owns.
+src/descriptor.ts's header (:31-36) states the reasoning: a descriptor with no id
+is REFUSED rather than given an invented one, because the trace file, the
+consume-once marker and the fallback file are all named by it, and a made-up id
+would silently collide with another pane's.
+
+`planDescriptor` (:562-600) reads it from `options.correlationId ?? 
+invocation.correlationId` (:577), validates it with `isSafeCorrelationId`
+(:578), and returns `undefined` if it is absent or unsafe. It never throws and
+never guesses.
+
+`newCorrelationId(nowMs, nonce)` (:168) takes the clock and the nonce as
+PARAMETERS rather than reading `Date.now()` and `Math.random()` (:159-162), so
+the module stays pure and its output is assertable rather than merely
+observable. The result is `pane-<base36 clock>-<8 hex of sha256(nonce)>`, which
+is lower-case and matches `CORRELATION_ID_PATTERN = /^[a-z0-9-]+$/` (:152).
+Length is capped at 64 (:155) so a hostile id cannot become a long path.
+
+It is the ONE key that names all three artefacts (:520-522):
+
+  trace file      <bridgeRoot>\state\pane-<id>.jsonl      traceFilePathFor :617
+  fallback file   <profileDir>\.omo-pane-env\state\desc-<id>.env
+                                                           descriptorFilePathFor :607
+  consume-once    the exclusive creation of that same trace file (§3)
+
+Note both paths are derived from the HELPER'S OWN LOCATION, not from anything
+the caller passes, so no path ever has to travel in argv (:114-116).
+
+HOW A TRACE LINE NAMES THE PANE COMMAND IT HANDLED.
+
+`traceLine(descriptor, event)` (:948-979) emits exactly one JSON object with:
+  correlationId     the key (:963)
+  kind              "attach" | "placeholder" | "other" (:965)
+  program           argv[0] of the command, and nothing more (:966, :916)
+  verb              argv[1] for attach, "-Command" for a placeholder, else ""
+                    (:967, :953-959). The placeholder needs the special case
+                    because the translator emits
+                    `<shell> ... -Command <script>`, so the verb is not at
+                    index 1 — the discriminator is the shell plus the presence
+                    of -Command.
+  envMechanism      "environment" | "file" | "pending" (:968)
+  slotCount, slotNames   NAMES ONLY (:969-970, :922-923)
+  descriptorFileUsed, deleteVerified     (:971-972)
+  attachRetryApplies, attachWaitMs, attachRetries, exitCode, outcome (:973-977)
+
+So a trace line says "this pane ran `opencode attach`, its credential came from
+the environment, its slots were named A and B, and the attach retry did not
+apply" — without naming the URL, the session, the directory or any value.
+
+WHAT IS DELIBERATELY ABSENT, and why (:933-947): every `-e` VALUE (CONTRACT.md
+2.2 — the slot NAMES are kept because "which variables did this pane get" is the
+useful half and the harmless half); the attach URL (it is a bearer URL in
+OpenCode's own scheme, and a trace file is exactly the artefact that gets
+attached to a bug report); the session id and the directory (same reasoning, and
+an operator can read both off the pane); and the payload body (provenance for
+the shim's own trace, not for this).
+
+TESTS THAT PROVE IT:
+
+  "it carries the correlation id, the wait and the retry count"
+      — correlationId, attachWaitMs 5000, attachRetries 1,
+        attachRetryApplies true, kind "attach", program "opencode", verb
+        "attach", slotNames both variables, slotCount 2, outcome, exitCode.
+  "it carries NO value, no URL, no session id and no directory"
+      — the rendered line is asserted not to contain the sentinel, not to
+        contain "OPENCODE_SERVER_PASSWORD=", not "127.0.0.1:4096", not
+        "ses_abc123", not "/home/dev/proj".
+  "it is ONE JSON object and names a placeholder command correctly"
+      — no newline in the rendered line; the placeholder is classified by
+        shell + -Command as "placeholder" with program "powershell" and
+        attachRetryApplies false.
+  "the trace path is under <bridgeRoot>\state and is derived from the
+   correlation id"
+      — ends with `pane-corr-0001.jsonl`.
+  "a generated correlation id cannot escape the state directory"
+      — both paths stay under their roots and contain no "..".
+  "a SUPPLIED correlation id that is not path-safe is REFUSED, not sanitised"
+      — `..\..\evil`, `a/b`, `A B`, `""`, a 65-char id and `corr;rm` all make
+        planDescriptor return undefined. Refusal, not repair: a sanitised id
+        would not be the id the caller believes it passed.
+  "are lowercase, filename-safe, bounded, and distinct per seed"
+  "the id survives the round trip through the helper command line"
+      — parseHelperCommandLine(translation.helperCommandLine).correlationId
+        equals the id the descriptor holds, i.e. the id really is on the wire
+        in the flag translate.ts owns.
+  "a helper translation with no correlation id has no descriptor either"
+  "a pass-through translation has NO descriptor at all"
+  "the trace path is under ... " / "the fields an operator keys on are frozen"
+
+--------------------------------------------------------------------------------
+5. THE `opencode attach` READINESS RETRY
+--------------------------------------------------------------------------------
+
+Purpose, stated at :41-45 and in the test file's header: `opencode attach`
+waits for its session to become attachable, and a pane that starts before its
+session is ready does not silently vanish (upstream OpenCode issue #3505). So
+there is a bounded wait, and ONE retry on a non-zero exit.
+
+THE BOUNDED WAIT.
+
+DESCRIPTOR_CONTRACT (:121-125): `attachReadyWaitMs: 5000`,
+`attachPollIntervalMs: 250`. That is 20 polls — bounded, and short enough that a
+dead session does not hold the pane hostage.
+
+The arithmetic is in `attachRetryPolicy` (:229-248). `readyWaitMs` is rounded
+DOWN to a whole number of poll intervals by `roundsDownTo` (:992-994), with the
+comment "so maxPolls never promises more polls than the wait affords".
+`maxPolls = trunc(readyWaitMs / pollIntervalMs)` (:244) is therefore always an
+honest integer.
+
+Crucially, `readyWaitMs` is ZERO when the policy does not apply (:235-237). A
+non-attach command does not wait for readiness at all.
+
+No new flag was added to the command line for any of this (:53-57). The
+parameters are CONSTANTS carried in DESCRIPTOR_CONTRACT so the helper reads the
+same numbers; adding a flag would have changed the exact flag sequence
+test/translate.test.ts pins, and the correlation id already arrives by
+`--correlation`.
+
+THE RETRY-ONCE LIMIT.
+
+DESCRIPTOR_CONTRACT.maxAttachRetries: 1 (:132), with the comment "One. It is a
+constant, not an option, so no caller — including todo 12 — can raise it."
+
+The state machine is `nextAttachAction(policy, state)` (:277-298), a total
+function over three inputs:
+
+  attemptsRun <= 0                     -> { kind: "run",        waitMs: readyWaitMs,
+                                         attempt: 1 }
+  exhausted (attemptsRun >= 1+maxRetries) -> { kind: "stop" }
+  not applies, or lastExitCode === 0     -> { kind: "stop" }
+  otherwise                            -> { kind: "retry-once", waitMs: retryWaitMs,
+                                         attempt: attemptsRun+1 }
+
+There is NO branch that can produce a third `run` (:272-275). That is the whole
+of the guarantee: the cap is structural, not a counter that could be
+mis-incremented.
+
+Note the retry gate requires all three of: the policy applies, the exit was
+NON-ZERO, and the budget is not exhausted. A zero exit stops immediately (:288).
+
+WHICH COMMANDS GET IT. `isAttachCommand` (:218-223) matches exactly
+`command[0] === "opencode" && command[1] === "attach"`, and the module is
+explicit that this is byte-exact rather than a basename match (:208-217):
+`opencode.exe attach` is NOT matched, and neither is a PowerShell script whose
+TEXT mentions `opencode attach`. The rule "never retry anything that is not
+`opencode attach`" is judged worth more than the convenience.
+
+HOW THE WAIT AND THE RETRY COUNT ARE RECORDED SO THE BEHAVIOUR IS OBSERVABLE.
+
+Two places, deliberately:
+
+1. As a policy value, before anything runs. `PanelDescriptor.attachRetry`
+   (:538) carries `{applies, readyWaitMs, pollIntervalMs, maxPolls, retryWaitMs,
+   maxRetries}`, computed at :592-595. So "this pane will wait at most 5 s and
+   retry at most once" is a value a caller can read.
+
+2. As an OBSERVED outcome, after it ran. `DescriptorTraceEvent` (:896-908)
+   carries `attachWaitMs` — "how long the helper ACTUALLY waited" — and
+   `attachRetries` — "how many retries it ACTUALLY performed: 0 or 1". Both
+   flow into `traceLine` (:974-975) and land in the pane's trace file. The
+   opening line written by the claim hard-codes both to 0 (:712-713) with
+   `mechanism: "pending"` and `outcome: "opened"`, because that line is written
+   before the delivery mechanism and the attempt are known (:892-894). The
+   distinction between the 0/0 of the opening line and the real figures of the
+   final line is why `outcome` is a field rather than something inferred.
+
+   `traceLine` also carries `attachRetryApplies` (:973), so a reader can see the
+   policy verdict AND the observed count in one line, and tell "no retry applied"
+   from "retry applied, count 0, first attempt succeeded".
+
+`simulateAttach` (:316-351) exists to make this assertable without real
+processes: it drives the same state machine over a list of MODELLED exit codes
+and returns `{attemptsRun, retries, outcome, finalExitCode, totalWaitMs,
+actions}` — the "two failures must exit rather than spin" assertion as a value
+rather than a promise (:309-315). It also accumulates `totalWaitMs` and the
+`actions` list, so the wait schedule is inspectable and not just the count.
+
+TESTS THAT PROVE IT:
+
+  "isAttachCommand matches exactly `opencode attach` and nothing else"
+      — true for opencode+attach; false for `["opencode"]`,
+        `["opencode","run"]`, `["opencode.exe","attach"]`,
+        `["powershell","-Command","opencode attach x"]`, and `[]`.
+  "the policy is bounded and capped at ONE retry"
+      — applies true, maxRetries === 1, readyWaitMs > 0 AND <= 30_000,
+        retryWaitMs > 0, readyWaitMs % pollIntervalMs === 0, and
+        maxPolls === readyWaitMs / pollIntervalMs. That last pair is the
+        rounding-down property.
+  "a caller may shorten the waits but may NOT raise the retry cap"
+      — readyWaitMs 1000 and retryWaitMs 500 are honoured, and maxRetries is
+        STILL 1. The cap is not an override.
+  "a non-attach command gets no retry at all"
+      — applies false; the comment notes the cap is global but simply not
+        reached.
+  "before the first run: run, having waited for readiness"
+      — kind "run", waitMs === readyWaitMs, pollIntervalMs === pollIntervalMs.
+  "a zero exit stops immediately"
+  "a non-zero exit schedules EXACTLY ONE retry"
+      — kind "retry-once", waitMs === retryWaitMs.
+  "two failures STOP: the simulation never runs a third time"
+      — simulateAttach(policy, [1,1]): attemptsRun 2, retries 1, outcome
+        "exhausted", finalExitCode 1, actions exactly
+        ["run","retry-once","stop"], totalWaitMs === readyWaitMs + retryWaitMs.
+  "a first failure then a success is the recovery case IS-3 asks for"
+      — [1,0]: attemptsRun 2, retries 1, outcome "succeeded", finalExitCode 0.
+  "success on the first run never retries"
+      — [0]: attemptsRun 1, retries 0, actions ["run","stop"].
+  "a NON-attach command is run once and never retried, however it fails"
+      — [1,1,1] against powershell: applies false, attemptsRun 1, retries 0.
+  "the simulation is total: no exit codes, or far too many, still terminate"
+      — [] terminates (attemptsRun 0); 50 failures still stop at attemptsRun 2.
+        This is the totality assertion: no input can make it spin.
+  "it carries the correlation id, the wait and the retry count"
+      — the observability half: attachWaitMs 5000 and attachRetries 1 both
+        present in the rendered line.
+  "a descriptor for an attach carries the retry; one for a placeholder does
+   not"
+      — the descriptor-level plumbing of the policy.
+  "the exit-code family is disjoint, non-zero, and never the chain guard's 78"
+
+--------------------------------------------------------------------------------
+6. WHAT IS *NOT* CLAIMED
+--------------------------------------------------------------------------------
+
+Stated plainly, because the evidence file is only worth its claims.
+
+  * NO WINDOWS EXECUTION HAPPENS IN §1-§5. src/descriptor.ts performs no file
+    I/O at all (:59-62: "No file is written by this module"; the write, the ACL,
+    the read-once and the verified delete are the PowerShell helper's job).
+    `DescriptorStore` (:637-642) is the seam, and `createMemoryDescriptorStore`
+    (:651) is the in-memory implementation the 56 tests use. So "consume-once is
+    atomic" is proven against a store whose `exclusive` is a Map lookup, and the
+    comment at :696-698 is what asserts the real store must use O_EXCL /
+    FileMode.CreateNew. The real PowerShell helper's exclusive create, ACL and
+    verified delete are UNVERIFIED by this task. §7 is the attempt to verify
+    them for real.
+
+  * `src/cli.ts` is not implemented and its test is red on purpose (todo 12).
+    §1.3 is that, and only that.
+
+  * The digest is a completeness check, not a confidentiality control, by the
+    module's own statement (:64-67). A same-user process can read the password
+    out of the pane's environment regardless.
+
+  * Nothing here was reviewed for security beyond the credential properties the
+    tests name.
+
+--------------------------------------------------------------------------------
+7. WINDOWS CHECK — real attempt
+--------------------------------------------------------------------------------
+
+STATUS: see the appended section at the end of this file.

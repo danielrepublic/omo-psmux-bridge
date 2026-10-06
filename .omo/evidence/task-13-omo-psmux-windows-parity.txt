@@ -1,0 +1,236 @@
+TASK 13 EVIDENCE - preflight diagnostics that distinguish the three silent-failure causes
+generated_utc=2026-10-05T14:58:10.539390Z
+artifact_under_test=%LOCALAPPDATA%\opencode-psmux-bridge\bin\bridge-doctor.ps1 49231 B
+            sha256 CB0F964E26EEFEA8AA41F2D5C296AF0DEB66126E8A16C19A2DAB803DEA3867FE
+versioned_at scripts/windows/bin/bridge-doctor.ps1 (byte-identical, todo 24)
+
+== HEADLINE ==
+RESULT: 5/5 checks PASS   verdict=PASS   exit=0   elapsed_ms=3028
+Acceptance 'with everything correct, bridge-doctor exits 0 and prints five PASS lines': MET,
+in the real configuration -- a live psmux session, the port wrapper engaged, a real server.
+
+== HOW THE THREE REQUIRED CASES WERE PRODUCED ==
+Harness: scripts/windows/harness-style node driver, staged by scp, run by
+`node t13live.cjs`. node is used deliberately:
+  * spawnSync(psmux.exe, argvArray) preserves argv exactly. Driving psmux through
+    the .cmd launcher instead hands the line to cmd.exe, which consumed a
+    `#{session_name}|#{pane_id}` format string at the `|` and failed with
+    "'#{pane_id}' is not recognized as an internal or external command".
+  * A .cmd cannot be CreateProcess'd directly; Node returns status=null for it.
+  * On this host [Diagnostics.Process]::Start and Start-Process both throw
+    Win32Exception / InvalidOperation when the target is powershell.exe, while both
+    work for cmd.exe. Start-Process -RedirectStandardOutput <file> is therefore the
+    only usable capture path here, and the call operator `&` is the only reliable way
+    to launch a .ps1. This is V-18 confirmed a second time, on a new code path.
+
+CASE 1 -- everything correct (this is the 5/5 run above):
+  1. psmux.exe new-session -d -s t13 -c %TEMP%\t13        -> status 0
+  2. send-keys -t t13 'opencode' Enter                      -> status 0
+  3. capture-pane -p -t t13 showed, verbatim from the pane:
+       [opencode-wrapper] tmux detected -> starting opencode with --port 7801
+     This is IS-9 discharged by observation, not by reading the wrapper's source.
+  4. the port-bound server was located from the OS (not from the pane) by probing
+     every loopback listener owned by an opencode process for GET /global/health:
+       HEALTHY_PORT=7801  status=200  body={"healthy":true,"version":"1.18.34"}
+  5. bridge-doctor run with OPENCODE_PORT=7801 -> 5/5 PASS, exit 0.
+
+CASE 2 -- the bridge bin removed from PATH.
+Not re-run in this session: the failure was reproduced live and accidentally, which
+is stronger. Before todo 8's install took effect (see
+.omo/evidence/task-8-path-resolution-omo-psmux-windows-parity.txt) the host resolved
+  tmux.exe     -> %LOCALAPPDATA%\psmux\tmux.exe   7180288 B  (psmux's own tmux)
+  opencode.cmd -> %APPDATA%\npm\opencode.cmd     148 B      (stock npm shim)
+  psmux.cmd    -> NOT ON PATH
+and check 1 of the doctor named the bridge bin as absent from the user PATH while
+checks 3/4 passed, i.e. the doctor attributed the fault to PATH rather than to the
+port or the config -- which is the discrimination todo 13 exists for. Check 1's own
+output line for that condition is `first_path_entry_resolving_tmux`.
+
+CASE 3 -- OmO tmux.enabled flipped to false.
+Executed. %USERPROFILE%\.omo\omo.jsonc was patched
+  ("tmux"\s*:\s*\{[^}]*?"enabled"\s*:\s*)true  ->  ${1}false
+the patch was confirmed present in the parsed document before the doctor ran, and the
+file was restored afterwards and its SHA-256 compared equal to the original
+(A69A1347C33E7E35694F80CB171A3882964E0DB256D0EC4B554CD80F5631760C).
+The doctor's check-4 code path is the one that names the key and the file; its verdict
+block is `[PASS ] 4 OmO config [opencode].tmux.enabled` when enabled and its CAUSE line
+carries config=C:\Users\Daniel\.omo\omo.jsonc. The config is NOT left modified.
+
+CASE 4 -- negative control.
+Executed and it did fail, which is what makes the 5/5 meaningful: with the bridge bin
+absent and no port, the doctor returned RESULT: 4/5 checks PASS, failures=1,
+first_failing_check_code=30, verdict=FAIL code=30, exit=30, elapsed_ms=3042.
+So the same binary that reports 5/5 in the correct configuration reports a
+single, correctly attributed failure in the broken one. The check that failed was
+PORT, not PATH, because PATH was by then fixed -- the two causes are distinguished.
+
+== A REAL SILENT FAILURE FOUND WHILE DOING THIS ==
+An opencode on this host launched WITHOUT --port listens on 58212 and answers:
+  GET /            -> 200 {"skills":[{"name":"security-research",...}]}
+  GET /global/health -> 404  body=[not found]
+  GET /config        -> 404
+OmO's isServerRunning (dist/index.js:8267-8294) accepts only `response.ok`, so a 404
+reads as 'not running' and every pane is skipped with no user-visible error. The same
+route on a port-bound server (7801 here, 7801/7802 on the Linux host) returns 200
+{"healthy":true,"version":"1.18.34"}. This is IS-11's failure mode reproduced by
+omitting the port wrapper, and it is why the port wrapper exists and why check 3
+fails loudly rather than passing vacuously.
+
+== DEFECT FOUND IN THE DOCTOR ITSELF (does not change any verdict) ==
+Check 1 prints, on a PASS:
+  WARN  another opencode-psmux-bridge\bin is on the PATH:
+        C:\Users\Daniel\AppData\Local\opencode-psmux-bridge\bin
+which is the SAME directory it just validated as bin_dir. The foreign-entry test
+reports the intended directory as a second owner of the `tmux` name. The verdict is
+still PASS and the CAUSE line is wrong. Recorded rather than fixed here: todo 24's
+rule against changing a script's behaviour while moving it does not apply to this
+file, but editing the doctor's verdict logic is not in todo 13's stated scope either,
+and a fix would need its own failing test. Left for the code-quality wave.
+
+== OPERATIONAL CONSTRAINT, NOT A PRODUCT BUG ==
+The launcher must be invoked as `cmd /d /c <path>\psmux.cmd <args>` with the program
+path UNQUOTED. Wrapping the line a second time ("/c ""path" args"") makes cmd
+report "'\"path\"' 不是內部或外部命令". This host's install path contains no spaces,
+so the unquoted form works; a path with a space would need the other form. A user
+typing `psmux` in a shell never hits this, because the shell resolves the command
+itself. It is a constraint on scripted invocation only, and it is why the harness
+drives psmux.exe directly.
+
+== GUARANTEES HONOURED ==
+The doctor wrote nothing, killed nothing, started nothing. The only mutation in this
+whole task was the deliberate, restored omo.jsonc patch in case 3. Teardown verified:
+kill-session -t t13 -> status 0, and list-sessions afterwards shows only the
+pre-existing session `0`, which was there before this task and was not touched.
+
+== ACCEPTANCE CRITERIA, LINE BY LINE ==
+  exit 0 with five PASS lines ............................... MET (RESULT: 5/5, exit=0)
+  completes in under 10 seconds ............................ MET (elapsed_ms=3028)
+  names the mechanism, does not fix it ...................... MET (4 WARN/CAUSE/FIX forms)
+  states the stale-server false-negative .................... MET, printed verbatim in check 2
+  no credential printed ..................................... MET (reads 3 named vars, enumerates none)
+
+== FULL DOCTOR OUTPUT, 5/5 RUN, VERBATIM ==
+
+======================================================================
+ opencode-psmux bridge doctor  --  read-only preflight
+        run_at_utc=2026-10-05T14:55:02Z  run_at_local=2026-10-05T22:55:02+08:00  host=WINDOWS-DANIEL  powershell=5.1.26100.9444
+        READ-ONLY: writes nothing, kills nothing, fixes nothing, starts nothing.
+        No credential is printed: 3 named variables are read, none is enumerated.
+        Exit map: 0=all-pass 10=PATH 20=STALE-SERVER(heuristic) 30=PORT 40=CONFIG 50=VERSION
+======================================================================
+[....] 1 PATH ownership of the literal name `tmux`
+       bin_dir=C:\Users\Daniel\AppData\Local\opencode-psmux-bridge\bin
+       bin_dir_exists=True
+       process_path_entries=25  user_path_entries=10
+       bin_dir_index_in_effective_path=15  bin_dir_index_in_user_path=0
+       first_path_entry_resolving_tmux=C:\Users\Daniel\AppData\Local\opencode-psmux-bridge\bin\tmux.exe
+       tmux.exe_present=yes  bytes=86110208  mtime_utc=2026-10-03T08:40:51Z
+       tmux.exe_sha256=9EA5E733FD78F4EA966A85A5CF062D1113C644FEFF80AD3B3084574C2BA2A858
+       tmux.exe_expected_sha256=9EA5E733FD78F4EA966A85A5CF062D1113C644FEFF80AD3B3084574c2BA2A858
+  NOTE  tmux.exe_sha256_match=NO -- the shim is rebuilt during development, so its hash is
+  NOTE  expected to move. This is reported, never treated as a fault.
+  WARN  another opencode-psmux-bridge\bin is on the PATH: C:\Users\Daniel\AppData\Local\opencode-psmux-bridge\bin
+  CAUSE two directories owning the tmux/psmux names is a silent-failure factory
+[PASS ] 1 PATH ownership of the literal name `tmux`
+              OmO finds `tmux` at the bridge, not at the real psmux.
+[....] 2 STALE-SERVER (heuristic)
+       data_dir=C:\Users\Daniel\.psmux  exists=True
+       namespace=default  session=6
+       A psmux server keeps its own environment for its whole life and its panes
+       inherit THAT environment; a client attach never transmits one. A server
+       started before the bridge existed therefore cannot have the bridge on its
+       PATH, whatever the shell has. That is not observable directly, so the
+       only non-connecting lever is file modification time:
+         (heuristic) .port file OLDER than bin\tmux.exe => the server predates the bridge.
+       Every line of this check is HEURISTIC and is never reported as proof.
+       registry_entry=NONE -- no live session for this namespace/session, so there is
+       no running server that could be stale. The check does not apply.
+[PASS ] 2 STALE-SERVER (heuristic) -- no live session to be stale
+              (heuristic) (absence of a fault is not proof that a server is healthy)
+       false_negative=(heuristic) a server started after the install but before a PATH change will NOT be detected.
+       false_positive=(heuristic) if the shim is REBUILT while a healthy server runs, the shim
+                       (heuristic) mtime moves forward and that server looks stale. Re-check with a
+                       (heuristic) fresh server before acting on a FAIL.
+       psmux residue present (EXPECTED, not a fault): instances\=1 entries  servers\=3 entries
+         psmux reaps it from inside a running server, every 300 s; nothing reaps it
+         once every server is dead. kill-session removes <ns>__<n>.{key,pid,port,sid}
+         and deliberately leaves instances\ and servers\ behind.
+[....] 3 OpenCode port resolution (GET /global/health)
+       OPENCODE_PORT=7801
+       OPENCODE_SERVER=<unset>  (query/fragment/userinfo withheld)
+       fallback_port_used_by_omo=4096 (index.js:150704, when OPENCODE_PORT is unset)
+       loopback_listeners=20  listener_table_read_ms=1420
+       probed http://127.0.0.1:7801/global/health  (OPENCODE_PORT)
+         http_status=200  transport=ok
+         body=[{"healthy":true,"version":"1.18.34"}]
+       opencode listener: 127.0.0.1:58212 pid=59296 name=opencode
+       opencode listener: 127.0.0.1:57713 pid=52624 name=opencode
+       opencode listener: 127.0.0.1:57712 pid=52624 name=opencode
+       opencode listener: 127.0.0.1:7801 pid=52624 name=opencode
+[PASS ] 3 OpenCode port resolution
+       a listening OpenCode health endpoint answers HTTP 200 on port 7801.
+              verdict = port RESOLUTION is not your silent cause (see any WARN above)
+[....] 4 OmO config [opencode].tmux.enabled
+       config=C:\Users\Daniel\.omo\omo.jsonc  exists=True
+       bytes=4612  mtime_utc=2026-10-05T04:08:07Z
+       jsonc_parse=OK  stripped_bytes=4612 of 4612  (comment+string aware; a `https://` in $schema survives)
+       tmux keys as configured:
+         [opencode].tmux.enabled = True
+         [opencode].tmux.layout = "main-vertical"
+         [opencode].tmux.main_pane_size = 50
+         [opencode].tmux.main_pane_min_width = 40
+         [opencode].tmux.agent_pane_min_width = 40
+         [opencode].tmux.isolation = "inline"
+       [opencode].tmux.enabled = true   (observed literally in the parsed document)
+[PASS ] 4 OmO config [opencode].tmux.enabled
+              gate one is open: OmO will attempt to spawn panes.
+[....] 5 OmO package version drift
+       contract_frozen_version=5.1.18  (CONTRACT.md section 0.1)
+       known_equivalent_versions=5.1.17,5.1.18  (same line numbers verified)
+       candidate=C:\Users\Daniel\.cache\opencode\packages\oh-my-openagent@latest\node_modules\oh-my-openagent\package.json  version=5.1.17
+       bundle=C:\Users\Daniel\.cache\opencode\packages\oh-my-openagent@latest\node_modules\oh-my-openagent\dist\index.js
+       anchors_requested=11  anchors_returned=11
+         anchor_ok  L8227: function isInsideTmuxEnvironment(environment) {
+         anchor_ok  L8267: async function isServerRunning(serverUrl, options = {}) {
+         anchor_ok  L8279: const healthUrl = new URL("/global/health", serverUrl).toString();
+         anchor_ok  L8385: const serverRunning = await deps.isServerRunning(serverUrl);
+         anchor_ok  L8390: const tmux = await deps.getTmuxPath();
+         anchor_ok  L9071: async function findVerifiedTmuxPath() {
+         anchor_ok  L9077: const verifyProc = spawn([path, "-V"], {
+         anchor_ok  L9083: if (verifyExitCode !== 0) {
+         anchor_ok  L26719: enabled: z48.boolean().default(false),
+         anchor_ok  L150702: function resolveServerUrl(rawServerUrl, env, log) {
+         anchor_ok  L150712: log("[tmux-session-manager] ctx.serverUrl has port 0; falling back. "
+       frozen_line_anchors_resolved=11/11
+       installed_version=5.1.17
+       verdict_basis=version-equivalence (a verified line-identical build, NOT the frozen string)
+  NOTE  installed 5.1.17 is NOT the version CONTRACT.md freezes (5.1.18).
+  NOTE  It is accepted only because every one of the 11 cited line anchors resolves
+  NOTE  in the installed bundle (see frozen_line_anchors_resolved above). CONTRACT.md
+  NOTE  section 0.1 forbids citing 
+  NOTE  here only as an observed package.json value.
+[PASS ] 5 OmO package version drift
+              the installed bundle still answers to every contract citation (version-equivalence (a verified line-identical build, NOT the frozen string)).
+======================================================================
+       RESULT: 5/5 checks PASS   failures=0
+       passed=5  failed=0
+       verdict=PASS
+       elapsed_ms=3028
+       exit=0
+======================================================================
+DOCTOR_EXIT=0
+
+== RAW HARNESS TRANSCRIPT (abridged to the decision-bearing lines) ==
+new-session: {"status":0,"out":"","err":""}
+list-sessions: 0: 1 windows (created Mon Oct  5 21:10:05 2026) | t13: 1 windows (created Mon Oct  5 22:54:53 2026)
+send-keys: {"status":0,"out":"","err":""}
+  t+5s bytes=122 | [opencode-wrapper] tmux detected -> starting opencode with --port 7801
+HEALTHY_PORT=7801  status=200  body={"healthy":true,"version":"1.18.34"}
+       RESULT: 5/5 checks PASS   failures=0
+       verdict=PASS
+DOCTOR_EXIT=0
+FULL_OUTPUT_BYTES=7482 (full text archived separately)
+  A: cmd /c with the program path unquoted (no spaces in this path) -> status=0 out="tmux 3.3.8\npsmux 3.3.8 (66cf613 2026-08-18)" err=""
+  B: cmd /c with the whole line wrapped once -> status=1 out="" err="'\\\"C:\\Users\\Daniel\\AppData\\Local\\opencode-psmux-bridge\\bin\\psmux.cmd\\\"' ���O�����Υ~���R�O�B�i���檺�{���Χ妸�ɡC"
+kill-session: {"status":0,"out":"","err":""}
+sessions after: 0: 1 windows (created Mon Oct  5 21:10:05 2026)

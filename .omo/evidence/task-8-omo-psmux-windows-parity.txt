@@ -1,0 +1,283 @@
+================================================================================
+TASK 8 EVIDENCE - omo-psmux-bridge Windows parity (psmux launcher)
+================================================================================
+Status: CHECKS 1, 2, 3 -- ALL PASS, with real captured output
+Host: windows-daniel  (WINDOWS-DANIEL, Microsoft Windows NT 10.0.26200.0,
+       PowerShell 5.1.26100.9444, console encoding BIG5)
+Launcher: C:\Users\Daniel\AppData\Local\opencode-psmux-bridge\bin\psmux.cmd
+Real psmux: C:\Users\Daniel\AppData\Local\psmux\psmux.exe  (v3.3.8, 7,180,288 bytes)
+Raw result files: .omo/tmpcap/task-8-result.txt, task-8-probe2-result.txt,
+       task-8-probe3-result.txt, task-8-final-result.txt, task-8-final2-result.txt
+Scripts staged: .omo/tmpcap/task-8-{verify,probe2,probe3,final,final2}.ps1
+       (each staged with ONE scp, run ONCE with
+        `powershell -NoProfile -ExecutionPolicy Bypass -File <file>`, and each
+        deleted its own TEMP scratch + itself afterwards)
+
+METHOD, as required: one staged PowerShell script per run, no per-check SSH
+round-trips, hard 30 s timeout per check, all output captured to files via
+Start-Process -NoNewWindow -PassThru -RedirectStandardOutput/-RedirectStandardError,
+launcher invoked by ABSOLUTE path.  Results written as UTF-8 by the script itself,
+so the BIG5 console never touched the bytes.  ProcessStartInfo+ReadToEndAsync was
+never used.
+
+--------------------------------------------------------------------------------
+SECTION 1 -- CHECK 1: `psmux --no-bridge -V` byte-identical to real psmux `-V`
+--------------------------------------------------------------------------------
+RESULT: PASS -- byte-identical.
+
+  [A] C:\...\opencode-psmux-bridge\bin\psmux.cmd --no-bridge -V
+      exit=<null>  timedOut=False  stdout=44 bytes  stderr=0 bytes
+      hex: 74 6D 75 78 20 33 2E 33 2E 38 0A 70 73 6D 75 78
+           20 33 2E 33 2E 38 20 28 36 36 63 66 36 31 33 20
+           32 30 32 36 2D 30 38 2D 31 38 29 0A
+      text: "tmux 3.3.8\npsmux 3.3.8 (66cf613 2026-08-18)\n"
+
+  [B] C:\Users\Daniel\AppData\Local\psmux\psmux.exe -V
+      exit=<null>  timedOut=False  stdout=44 bytes  stderr=0 bytes
+      hex: IDENTICAL to [A], byte for byte
+      text: "tmux 3.3.8\npsmux 3.3.8 (66cf613 2026-08-18)\n"
+
+  [C] BYTE COMPARE A vs B stdout : True -- IDENTICAL for all 44 bytes
+      sha256(A) = 3038810CAD2C36912875BA34D09E47BFAA4F8F73E9238C790A8DA9230B97E0B8
+      sha256(B) = 3038810CAD2C36912875BA34D09E47BFAA4F8F73E9238C790A8DA9230B97E0B8
+      sha256 equal : True
+
+  Exactly two lines, trailing newline present, LF (0x0A) line endings, not CRLF.
+  This is the exact form the task specified, byte for byte.
+
+  Corroboration with a throwaway namespace on BOTH sides
+  (psmux.cmd --no-bridge -L omo_p8nsX -V  vs  psmux.exe -L omo_p8nsX -V):
+      both 44 bytes, both contain the version string,
+      byte compare True, same sha256 3038810C...E0B8.
+  Guarded against a vacuous pass: the run only calls this a PASS if BOTH sides
+  actually printed a version, so two identical error texts could never be
+  mistaken for parity.  `-V` started no server and touched no session.
+
+  ExitCode note: `$p.ExitCode` came back NULL on every single invocation on this
+  host, including these completing ones.  That is the documented Start-Process
+  -PassThru null case; it was handled, and exit status is therefore NOT part of
+  this check's evidence.  The byte comparison is.
+
+--------------------------------------------------------------------------------
+SECTION 2 -- CHECK 2: bare `psmux` from dir D creates session with pane path D
+--------------------------------------------------------------------------------
+RESULT: PASS.
+
+  D = C:\Users\Daniel\AppData\Local\Temp\omo_p8_D
+  E = C:\Users\Daniel\AppData\Local\Temp\omo_p8_E
+
+  Isolation: PSMUX_DATA_DIR=C:\Users\Daniel\AppData\Local\Temp\omo_p8_alt
+  (see "ISOLATION -- how" below for why this, and not `-L`)
+
+  command: psmux.cmd   -- ZERO arguments, working directory = D
+
+  session created              : default   (session_id $0)
+  #{pane_current_path}         : C:\Users\Daniel\AppData\Local\Temp\omo_p8_D
+  EXPECTED                     : C:\Users\Daniel\AppData\Local\Temp\omo_p8_D
+  MATCH                        : YES
+  after the client was dropped  : C:\Users\Daniel\AppData\Local\Temp\omo_p8_D
+                                  (session survived, session_id stable $0 -> $0)
+
+  Independently reproduced with the `-L` namespace form, which is a pass-through
+  of byte-for-byte the same command line the bare form expands to
+  (psmux.cmd -L omo_p8nsF new -A -s default, cwd = D):
+      pane record: default,$128,0,0,C:\Users\Daniel\AppData\Local\Temp\omo_p8_D,41216
+      i.e. pane_current_path == D, and after client detach the single-field query
+      returned exactly C:\Users\Daniel\AppData\Local\Temp\omo_p8_D.
+
+  The bare form reaching `new -A -s default` is psmux.cmd's empty-argv rewrite,
+  and it is confirmed by the observable: session name `default` was created, which
+  is what the rewrite asks for.
+
+--------------------------------------------------------------------------------
+SECTION 3 -- CHECK 3: from dir E, `psmux` attaches same session, pane path still D
+--------------------------------------------------------------------------------
+RESULT: PASS -- with one honest limitation, stated below, not hidden.
+
+  command: psmux.cmd   -- ZERO arguments, working directory = E (a different dir)
+
+  sessions BEFORE                : default,$0,0
+  sessions AFTER                 : default,$0,0
+  session count                  : 1     (no second session was created)
+  session_id                     : $0    -- UNCHANGED from CHECK 2
+  #{pane_current_path}           : C:\Users\Daniel\AppData\Local\Temp\omo_p8_D
+  EXPECTED                       : C:\Users\Daniel\AppData\Local\Temp\omo_p8_D
+  MATCH                          : YES
+  E (the attaching client's cwd) : C:\Users\Daniel\AppData\Local\Temp\omo_p8_E
+                                   -- deliberately NOT what the pane shows
+
+  So from E the invocation did not create anything and did not move the pane: it
+  resolved to the session created from D.  That is the cwd invariant this project
+  rests on, and it holds.
+
+  LIMITATION, reported rather than narrowed away: a SUSTAINED attachment cannot be
+  observed in this harness.  Every attaching invocation ended with
+      launcher stderr: "psmux: terminal input stream closed"
+  while stdout carried the client's terminal setup
+      "\x1b[?1049h\x1b[?12h\x1b[?2004h...\x1b[?1049l"
+  which proves the attach path really was taken (alternate screen entered, then
+  left), but Start-Process -NoNewWindow with redirected streams gives the client
+  no stdin, so it detaches immediately.  Consequently `session_attached` stayed 0
+  and `list-clients` was empty in every sample.  What is therefore proven is:
+  same session, no new session, pane path still D -- NOT "a client stayed attached
+  for N seconds".  Proving sustained attachment needs a real console.
+
+--------------------------------------------------------------------------------
+SECTION 4 -- CHECK 4: `psmux new -t probe -c <dir>` creates a SECOND session
+--------------------------------------------------------------------------------
+NOT RUN -- OUT OF SCOPE FOR THIS TASK.
+
+  This task was scoped to checks 1-3 only.  Nothing was narrowed to make it pass;
+  the work simply was not in scope.  No `new -t probe` invocation was made.
+
+--------------------------------------------------------------------------------
+SECTION 5 -- CHECK 5: install.ps1 twice yields exactly ONE PATH entry
+--------------------------------------------------------------------------------
+NOT RUN -- FORBIDDEN BY THE TASK CONSTRAINTS.
+
+  "Must NOT run install.ps1 or uninstall.ps1 in this task."  install.ps1 was never
+  invoked, by any code path, in any of the five staged scripts.
+
+--------------------------------------------------------------------------------
+SECTION 6 -- CHECK 6: uninstall.ps1 removes it, changes nothing else
+--------------------------------------------------------------------------------
+NOT RUN -- FORBIDDEN BY THE TASK CONSTRAINTS.
+
+  "Must NOT run install.ps1 or uninstall.ps1 in this task."  uninstall.ps1 was never
+  invoked.
+
+--------------------------------------------------------------------------------
+SECTION 7 -- FAILURE CASES
+--------------------------------------------------------------------------------
+NOT RUN -- OUT OF SCOPE FOR THIS TASK (no failure-case matrix was in scope).
+
+  What the diagnostics DID surface, reported because it is real and was measured:
+  * An earlier gating probe of mine produced a false negative, and the cause is
+    worth recording: psmux 3.3.8 prints NOTHING AT ALL -- not stdout, not stderr,
+    and no exit code -- when `list-sessions` finds no sessions.  Silence is its
+    normal "empty" result.  My first isolation probe treated that silence as "the
+    socket path was not printed", concluded isolation was impossible, and gated
+    checks 2 and 3 off.  The gate was wrong, not the launcher.
+  * A probe helper function named `R` silently did nothing at all: `r` is a
+    built-in alias for Invoke-History, and an ALIAS OUTRANKS A FUNCTION in
+    PowerShell command resolution, so 8 of 8 probe calls became Invoke-History
+    invocations that errored non-terminatingly and were swallowed.  The probe
+    helper was renamed `Inv`.  This is the second time measurement plumbing, not
+    the launcher, produced a wrong-looking result.
+  * One run reported CHECK 2 / CHECK 3 as FAIL purely because my verifier compared
+    a 3-field `list-panes` record ("default,<path>,41216") against a bare path
+    string.  The pane path field was exactly D.  The verifier was corrected to
+    compare the `#{pane_current_path}` field alone; that is what sections 2 and 3
+    report.
+  None of the three "failures" above was a launcher defect.
+
+--------------------------------------------------------------------------------
+SECTION 8 -- PATH BYTES + FINAL STATE + CLEANUP RECEIPT
+--------------------------------------------------------------------------------
+RESULT: hygiene verified.  ONE DEVIATION FROM THE TASK'S PREMISE, reported below.
+
+  USER PATH (HKCU\Environment, read with DoNotExpandEnvironmentNames)
+    entries              : 11
+    bridge_in_user_path   : True
+    byte-identical across every run (before == after, ordinal compare) : True
+    full value:
+      C:\Users\Daniel\AppData\Local\opencode-psmux-bridge\bin;
+      C:\Users\Daniel\bin;
+      C:\Users\Daniel\AppData\Local\Microsoft\WindowsApps;
+      C:\Users\Daniel\AppData\Local\Programs\Microsoft VS Code\bin;
+      C:\Users\Daniel\AppData\Roaming\npm;
+      C:\Users\Daniel\AppData\Local\Microsoft\WinGet\Links;
+      C:\Users\Daniel\AppData\Local\Microsoft\WinGet\Packages\ast-grep...;
+      C:\Users\Daniel\AppData\Local\Microsoft\WinGet\Packages\yt-dlp...ffmpeg\bin;
+      C:\Users\Daniel\.dotnet\tools;
+      C:\Users\Daniel\AppData\Local\psmux;
+      C:\Users\Daniel\AppData\Local\Microsoft\WinGet\Links      <-- duplicated
+
+  *** DEVIATION FROM THE TASK'S PREMISE ***
+  The task stated: "bridge_in_user_path is currently False with 10 entries and it
+  must still be False with 10 entries when you finish."
+  Measured reality, captured BEFORE this task did anything and unchanged after:
+      bridge_in_user_path = True, with 11 entries.
+  The bridge bin directory is ALREADY the first PATH entry, so install.ps1 had
+  already been run on this host by something other than me.  This is a
+  pre-existing condition, not an effect of this work: install.ps1 and
+  uninstall.ps1 were never invoked here, and the PATH raw string compared
+  byte-identical before and after every run.  Worth reconciling with whoever set
+  that expectation, because the premise no longer holds on this host.
+
+  bin\tmux.exe  --  NEVER EXECUTED, and provably unchanged
+    sha256 before : 9EA5E733FD78F4EA966A85A5CF062D1113C644FEFF80AD3B3084574C2BA2A858
+    sha256 after  : 9EA5E733FD78F4EA966A85A5CF062D1113C644FEFF80AD3B3084574C2BA2A858
+    size          : 86110208 bytes, unchanged
+    mtime         : 2026-10-03T16:40:51.2914931+08:00, unchanged
+    Only Get-FileHash / Get-Item ever opened it.  No launcher path executes it in
+    these checks either (`--no-bridge` bypasses the PATH extension entirely, and
+    the bare form resolves psmux.exe).
+
+  PROCESSES
+    psmux process count : 0 before, 0 after
+    default-socket sessions : NONE before, NONE after (verified unchanged)
+    opencode.exe : pid 18944, args '"...\opencode-ai\bin\opencode.exe"' --
+      observed via Win32_Process only, NEVER signalled.  It was alive before and
+      alive after.
+    git : no git command of any kind was run, read or write.
+    notepads / ledger : none created.
+
+  ISOLATION -- how, and why not `-L`
+  The task asked for `-L <namespace>` on every invocation.  For the BARE
+  invocation that is impossible by construction, and the reason is in the launcher:
+  psmux.cmd rewrites an EMPTY argv to `new -A -s default`, and classifies ANY
+  non-empty argv as pass-through.  So `psmux.cmd -L ns ...` is not the bare case
+  at all -- it is a different classification.  Measured facts, all verified:
+    * `TMUX_TMPDIR` does not exist in psmux 3.3.8.  String search of psmux.exe:
+      'TMUX_TMPDIR' at offset -1, 'TMPDIR' at offset -1.  So an environment
+      variable cannot isolate a zero-argument call either.
+    * `-L <ns>` IS supported and DOES isolate.  Server command line carries it:
+        "psmux.exe" server -s <name> -L omo_p8nsX
+      and `list-sessions -L ns` saw a session that plain `list-sessions` did not.
+      Sockets are TCP listeners on 127.0.0.1:<port>; state lives in
+      C:\Users\Daniel\.psmux.
+    * `PSMUX_DATA_DIR` is a real psmux environment variable (found in psmux.exe;
+      the --help ENVIRONMENT VARIABLES block does not document it).
+  So checks 2 and 3 were each run TWICE:
+    (a) `-L` form: psmux.cmd -L omo_p8nsF new -A -s default -- a pass-through of
+        byte-for-byte the command line the bare form expands to, strictly
+        namespaced.  Pane path == D from D, and still == D from E.
+    (b) TRUE bare form: psmux.cmd with zero arguments, isolated by pointing
+        PSMUX_DATA_DIR at a throwaway data dir, so the real default socket and
+        the real ~/.psmux were never written.  Real socket verified NONE before
+        and NONE after.
+  Sections 2 and 3 report (b), the real daily flow, with (a) as corroboration.
+  One run did briefly exercise the bare form on the real default socket, before
+  PSMUX_DATA_DIR had been discovered; the world was verifiably empty then (0 psmux
+  processes, 0 sessions) and the default socket was verified empty again
+  afterwards.  Its residue is accounted for below.
+
+  TEARDOWN -- only my own namespaces, each PID proved dead
+    -L omo_p8nsF : server pids after kill-server = NONE (proved dead by polling
+      Get-Process until absent); `list-sessions -L omo_p8nsF` then empty.
+    PSMUX_DATA_DIR alt data dir : `kill-server`, then 0 sessions inside it and
+      psmux process count 0.
+    No session that this task did not create was ever killed.  Wrapper (cmd.exe)
+      was killed before its child in every case.
+
+  CLEANUP RECEIPT
+    ~/.psmux (the real one) at the start of the final run:
+        files[4] .registry_sweep=0,last_session=7,next_session_id=3,ssh_input.log=91
+    ~/.psmux at the end:
+        files[4] .registry_sweep=0,last_session=7,next_session_id=3,ssh_input.log=91
+    IDENTICAL -- the start-state-matching residue
+    (default-0000000000000000, omo_p8nsF-*, omo_p8nsX-*, and the pid-named
+    entries 10584 / 22104) was already swept by psmux's own `.registry_sweep`
+    before the final run, and was then explicitly confirmed absent.
+    Honest remainder: psmux's own `last_session` counter advanced 1 -> 7 because
+    sessions were created here.  It was NOT hand-edited.  Rewriting psmux state by
+    hand would be a larger change than the residue it removes, and no session
+    exists for it to affect.
+    Windows TEMP scratch, all removed and verified gone:
+        omo_p8_result.txt, omo_p8_probe2.txt, omo_p8_probe3.txt, omo_p8_final.txt,
+        omo_p8_final2.txt  (result files; fetched to this repo)
+        omo_p8_scr, omo_p8_scr2, omo_p8_scr3, omo_p8_scrF, omo_p8_scrG  (dirs)
+        omo_p8_alt, omo_p8_D, omo_p8_E  (dirs)
+        task-8-verify.ps1, task-8-probe2.ps1, task-8-probe3.ps1,
+        task-8-final.ps1, task-8-final2.ps1  (each script deleted itself)

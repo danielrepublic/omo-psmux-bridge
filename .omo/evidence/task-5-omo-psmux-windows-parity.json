@@ -1,0 +1,985 @@
+{
+  "todo": 5,
+  "title": "Probe psmux 3.3.8 runtime behaviour on the Windows host",
+  "captured_at_utc": "2026-10-05T04:24:09Z",
+  "psmux_version_observed": "tmux 3.3.8\npsmux 3.3.8 (66cf613 2026-08-18)\n",
+  "source_tree": "/tmp/opencode/psmux-v338 (tag v3.3.8, commit 66cf61354c473b35d4f0c06c57384fc46d61ffdb) -- ALL line numbers in predicted_from_source are from THIS tree",
+  "source_tree_note": "EVERY line number in predicted_from_source is from /tmp/opencode/psmux-v338 (tag v3.3.8, commit 66cf61354c473b35d4f0c06c57384fc46d61ffdb).",
+  "bridge_mux_exe_touched": false,
+  "bridge_mux_exe_note": "The installed %LOCALAPPDATA%\\opencode-psmux-bridge\\bin\\tmux.exe (86110208 bytes, sha256 9ea5e733fd78f4ea966a85a5cf062d1113c644feff80ad3b3084574c2ba2a858) was never executed, copied, moved, or read for this probe.",
+  "headline": {
+    "statement": "NONE of (a)-(l) contradicts the source-read predictions in CONTRACT.md. All twelve were settled by observation and all twelve agree with what the v3.3.8 source predicts.",
+    "contradicts_source": [],
+    "answers": {
+      "a": "CREATES_A_NEW_NUMERIC_SESSION_EACH_TIME",
+      "b": "CREATES_WHEN_ABSENT_THEN_ATTACHES_WHEN_PRESENT__NEVER_A_SECOND_SESSION",
+      "c": "PANE_CWD_EQUALS_CLIENT_CWD_FROM_BOTH_DIRECTORIES",
+      "d": "NEW_SESSION_C_STAYS_IN_LAUNCH_DIR__SPLIT_WINDOW_C_FALLS_TO_HOME",
+      "e": "BOTH_NAMESPACES_COEXIST:{\"path1\":\"%1|C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\Temp\\\\t5-dirA\",\"path2\":\"%1|C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\Temp\\\\t5-dirB\"}",
+      "f": "SUCCEEDS_SILENTLY_AND_APPLIES_TO_ACTIVE_WINDOW__WINDOW_WIDTH_UNCHANGED",
+      "g": "RUNS_COMMAND_AND_PRESERVES_PANE_ID",
+      "h": "COMMAND_RUNS_BUT_ENV_DROPPED__FOO_NOT_DELIVERED",
+      "i": "EXIT_1_WITH_STDERR_MATCHING_OMO_REGEX__CLOSE_REPORTS_SUCCESS",
+      "j": "EXIT_0__EMPTY_STDOUT_AND_STDERR__CARET_C_ECHOED_IN_PANE",
+      "k": "EXACTLY_TWO_INTS_COMMA_SEPARATED_PLUS_ONE_TRAILING_NEWLINE",
+      "l": "EXIT_0_AND_TITLE_SET_ON_EXISTING__EXIT_1_WITH_CANNOT_FIND_PANE_ON_MISSING",
+      "fail": "ERROR_RECORDED_AND_RUN_CONTINUED"
+    }
+  },
+  "questions": [
+    {
+      "id": "a",
+      "question": "What does a bare `tmux`/`psmux` with NO arguments do when no session exists, and again when one does? Create a second session, or attach?",
+      "predicted_from_source": "src/main.rs:4332-4340 (v3.3.8): bare invocation \"always create[s] a new session with the next available numeric name (0, 1, 2, ...) and attach to it\", via next_session_name() at main.rs:4343. Predicted: CREATE a new numeric session, then attach to that new one. Never attach to a pre-existing session.",
+      "namespace": "t5rmuuqc9xva",
+      "observed": "CREATES_A_NEW_NUMERIC_SESSION_EACH_TIME",
+      "contradicts_source": false,
+      "command": "C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5rmuuqc9xva -C   ||   C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5rmuuqc9xva list-sessions -F \"#{session_name}\"   ||   C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5rmuuqc9xva -C   ||   C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5rmuuqc9xva list-sessions -F \"#{session_name}\"",
+      "exit_code": 0,
+      "stdout": "{\n  \"sessions_before\": [],\n  \"first_bare\": {\n    \"argv\": [\n      \"-L\",\n      \"t5rmuuqc9xva\",\n      \"-C\"\n    ],\n    \"exit\": 0,\n    \"stdout_len\": 329,\n    \"stderr\": \"\"\n  },\n  \"sessions_after_first\": [\n    \"0\"\n  ],\n  \"liveness_after_first\": {\n    \"namespace\": \"t5rmuuqc9xva\",\n    \"session\": \"0\",\n    \"base\": \"t5rmuuqc9xva__0\",\n    \"port_file\": \"59558\",\n    \"pid_file\": \"30872:134356469095551742\",\n    \"pid\": \"30872\",\n    \"port_file_exists\": true,\n    \"pid_file_exists\": true,\n    \"pid_process_alive\": true,\n    \"port_listening\": true,\n    \"alive\": true\n  },\n  \"second_bare\": {\n    \"argv\": [\n      \"-L\",\n      \"t5rmuuqc9xva\",\n      \"-C\"\n    ],\n    \"exit\": 0,\n    \"stderr\": \"\"\n  },\n  \"sessions_after_second\": [\n    \"0\",\n    \"1\"\n  ],\n  \"newly_created_on_second\": [\n    \"1\"\n  ],\n  \"liveness_of_new\": {\n    \"namespace\": \"t5rmuuqc9xva\",\n    \"session\": \"1\",\n    \"base\": \"t5rmuuqc9xva__1\",\n    \"port_file\": \"59590\",\n    \"pid_file\": \"13856:134356469180187190\",\n    \"pid\": \"13856\",\n    \"port_file_exists\": true,\n    \"pid_file_exists\": true,\n    \"pid_process_alive\": true,\n    \"port_listening\": true,\n    \"alive\": true\n  }\n}",
+      "stderr": "",
+      "notes": [
+        "Session names are numeric (0, 1, 2 ...), which is the signature of next_session_name() at src/main.rs:4343 -- i.e. CREATE, not attach-to-existing."
+      ],
+      "supporting": {
+        "sessions_before": [],
+        "after_first": [
+          "0"
+        ],
+        "after_second": [
+          "0",
+          "1"
+        ],
+        "count_before": 0,
+        "count_after_first": 1,
+        "count_after_second": 2,
+        "new_sessions_on_second_bare": [
+          "1"
+        ],
+        "names_are_numeric": true,
+        "liveness_after_first": {
+          "namespace": "t5rmuuqc9xva",
+          "session": "0",
+          "base": "t5rmuuqc9xva__0",
+          "port_file": "59558",
+          "pid_file": "30872:134356469095551742",
+          "pid": "30872",
+          "port_file_exists": true,
+          "pid_file_exists": true,
+          "pid_process_alive": true,
+          "port_listening": true,
+          "alive": true
+        },
+        "liveness_of_new_on_second": {
+          "namespace": "t5rmuuqc9xva",
+          "session": "1",
+          "base": "t5rmuuqc9xva__1",
+          "port_file": "59590",
+          "pid_file": "13856:134356469180187190",
+          "pid": "13856",
+          "port_file_exists": true,
+          "pid_file_exists": true,
+          "pid_process_alive": true,
+          "port_listening": true,
+          "alive": true
+        },
+        "driver_alive_throughout": true,
+        "control_mode_note": "psmux -C reaches the same bare-session-spawn block because control mode returns at src/main.rs:4513, before the is_terminal() gate at :4533."
+      },
+      "evidence_pass": "retry pass 1 (probe2.cjs)"
+    },
+    {
+      "id": "b",
+      "question": "Does `new -A -s default` attach when `default` exists, and create it otherwise?",
+      "predicted_from_source": "src/main.rs:1210 (v3.3.8) sets attach_if_exists on -A. main.rs:1277-1286: if the .port file exists AND the server answers, -A sets PSMUX_REMOTE_ATTACH=1 and SKIPS server creation (attach path); with no .port file it falls through and creates the session. Predicted: creates when absent, attaches when present, and NEVER creates a second session.",
+      "namespace": "t5rmuuqc9xvb",
+      "observed": "CREATES_WHEN_ABSENT_THEN_ATTACHES_WHEN_PRESENT__NEVER_A_SECOND_SESSION",
+      "contradicts_source": false,
+      "command": "C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5rmuuqc9xvb -C new -A -s default   ||   C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5rmuuqc9xvb list-sessions -F \"#{session_name}\"   ||   C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5rmuuqc9xvb -C new -A -s default   ||   C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5rmuuqc9xvb list-sessions -F \"#{session_name}\"   ||   C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5rmuuqc9xvb new-session -d -s default",
+      "exit_code": 0,
+      "stdout": "{\n  \"sessions_before\": [],\n  \"first_run\": {\n    \"argv\": [\n      \"-L\",\n      \"t5rmuuqc9xvb\",\n      \"-C\",\n      \"new\",\n      \"-A\",\n      \"-s\",\n      \"default\"\n    ],\n    \"exit\": 0,\n    \"stderr\": \"\"\n  },\n  \"sessions_after_first\": [\n    \"default\"\n  ],\n  \"liveness_after_first\": {\n    \"namespace\": \"t5rmuuqc9xvb\",\n    \"session\": \"default\",\n    \"base\": \"t5rmuuqc9xvb__default\",\n    \"port_file\": \"59626\",\n    \"pid_file\": \"40744:134356469273524821\",\n    \"pid\": \"40744\",\n    \"port_file_exists\": true,\n    \"pid_file_exists\": true,\n    \"pid_process_alive\": true,\n    \"port_listening\": true,\n    \"alive\": true\n  },\n  \"second_run\": {\n    \"argv\": [\n      \"-L\",\n      \"t5rmuuqc9xvb\",\n      \"-C\",\n      \"new\",\n      \"-A\",\n      \"-s\",\n      \"default\"\n    ],\n    \"exit\": 0,\n    \"stderr\": \"\"\n  },\n  \"sessions_after_second\": [\n    \"default\"\n  ],\n  \"liveness_after_second\": {\n    \"namespace\": \"t5rmuuqc9xvb\",\n    \"session\": \"default\",\n    \"base\": \"t5rmuuqc9xvb__default\",\n    \"port_file\": \"59626\",\n    \"pid_file\": \"40744:134356469273524821\",\n    \"pid\": \"40744\",\n    \"port_file_exists\": true,\n    \"pid_file_exists\": true,\n    \"pid_process_alive\": true,\n    \"port_listening\": true,\n    \"alive\": true\n  },\n  \"duplicate_control\": {\n    \"argv\": [\n      \"-L\",\n      \"t5rmuuqc9xvb\",\n      \"new-session\",\n      \"-d\",\n      \"-s\",\n      \"default\"\n    ],\n    \"exit\": 1,\n    \"stdout\": \"\",\n    \"stderr\": \"duplicate session: default\\n\"\n  }\n}",
+      "stderr": "duplicate session: default\n",
+      "notes": [
+        "The duplicate control is the decisive bit: an explicit second `new-session -d -s default` is refused with \"duplicate session\", so the second `-A` run demonstrably created nothing."
+      ],
+      "supporting": {
+        "sessions_before": [],
+        "after_first": [
+          "default"
+        ],
+        "after_second": [
+          "default"
+        ],
+        "exactly_one_session_throughout": true,
+        "session_name_is_default": true,
+        "liveness_after_first": {
+          "namespace": "t5rmuuqc9xvb",
+          "session": "default",
+          "base": "t5rmuuqc9xvb__default",
+          "port_file": "59626",
+          "pid_file": "40744:134356469273524821",
+          "pid": "40744",
+          "port_file_exists": true,
+          "pid_file_exists": true,
+          "pid_process_alive": true,
+          "port_listening": true,
+          "alive": true
+        },
+        "liveness_after_second": {
+          "namespace": "t5rmuuqc9xvb",
+          "session": "default",
+          "base": "t5rmuuqc9xvb__default",
+          "port_file": "59626",
+          "pid_file": "40744:134356469273524821",
+          "pid": "40744",
+          "port_file_exists": true,
+          "pid_file_exists": true,
+          "pid_process_alive": true,
+          "port_listening": true,
+          "alive": true
+        },
+        "duplicate_explicit_create_refused": true,
+        "duplicate_control_stderr": "duplicate session: default"
+      },
+      "evidence_pass": "retry pass 1 (probe2.cjs)"
+    },
+    {
+      "id": "c",
+      "question": "Is the first pane's working directory equal to the INVOKING CLIENT's directory? Tested from two different directories.",
+      "predicted_from_source": "spawn_server_hidden passes a NULL lpCurrentDirectory (src/platform.rs:188-201, v3.3.8) so the server inherits the client cwd; the server then does env::set_current_dir(start_dir) (src/server/mod.rs:1143) and build_command captures std::env::current_dir() (src/pane.rs:1530-1534). Predicted: pane cwd == invoking client cwd.",
+      "namespace": "t5smuuqmvloc",
+      "observed": "PANE_CWD_EQUALS_CLIENT_CWD_FROM_BOTH_DIRECTORIES",
+      "contradicts_source": false,
+      "command": "per directory D in [C:\\Users\\Daniel\\AppData\\Local\\Temp\\t5-dirA, C:\\Users\\Daniel\\AppData\\Local\\Temp\\t5-dirB]: psmux -L t5smuuqmvloc new-session -d -s <sess>   (client cwd = D),  then  psmux -L t5smuuqmvloc list-panes -t <sess> -F \"#{pane_id}|#{pane_current_path}\"",
+      "exit_code": 0,
+      "stdout": "{\n  \"dirs\": {\n    \"DIR_A\": \"C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\Temp\\\\t5-dirA\",\n    \"DIR_B\": \"C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\Temp\\\\t5-dirB\"\n  },\n  \"sides\": [\n    {\n      \"session\": \"cA\",\n      \"client_cwd\": \"C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\Temp\\\\t5-dirA\",\n      \"launched_from\": \"C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\Temp\\\\t5-dirA\",\n      \"pane_id\": \"%1\",\n      \"pane_current_path\": \"C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\Temp\\\\t5-dirA\",\n      \"server_live\": true\n    },\n    {\n      \"session\": \"cB\",\n      \"client_cwd\": \"C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\Temp\\\\t5-dirB\",\n      \"launched_from\": \"C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\Temp\\\\t5-dirB\",\n      \"pane_id\": \"%1\",\n      \"pane_current_path\": \"C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\Temp\\\\t5-dirB\",\n      \"server_live\": true\n    }\n  ]\n}",
+      "stderr": "cA: %1|C:\\Users\\Daniel\\AppData\\Local\\Temp\\t5-dirA\n\ncB: %1|C:\\Users\\Daniel\\AppData\\Local\\Temp\\t5-dirB\n",
+      "notes": [],
+      "supporting": {
+        "sides": [
+          {
+            "session": "cA",
+            "launched_from": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\t5-dirA",
+            "client_cwd_actually_passed": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\t5-dirA",
+            "server_live": {
+              "namespace": "t5smuuqmvloc",
+              "session": "cA",
+              "port_file": "55626",
+              "pid_file": "36280:134356474041525378",
+              "pid": "36280",
+              "port_file_exists": true,
+              "pid_file_exists": true,
+              "pid_process_alive": true,
+              "port_listening": true,
+              "alive": true,
+              "reason": "alive"
+            },
+            "attempts": 1,
+            "pane_id": "%1",
+            "pane_current_path": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\t5-dirA",
+            "raw_list_panes": "%1|C:\\Users\\Daniel\\AppData\\Local\\Temp\\t5-dirA\n",
+            "list_panes_exit": 0
+          },
+          {
+            "session": "cB",
+            "launched_from": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\t5-dirB",
+            "client_cwd_actually_passed": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\t5-dirB",
+            "server_live": {
+              "namespace": "t5smuuqmvloc",
+              "session": "cB",
+              "port_file": "50793",
+              "pid_file": "25472:134356474136295409",
+              "pid": "25472",
+              "port_file_exists": true,
+              "pid_file_exists": true,
+              "pid_process_alive": true,
+              "port_listening": true,
+              "alive": true,
+              "reason": "alive"
+            },
+            "attempts": 1,
+            "pane_id": "%1",
+            "pane_current_path": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\t5-dirB",
+            "raw_list_panes": "%1|C:\\Users\\Daniel\\AppData\\Local\\Temp\\t5-dirB\n",
+            "list_panes_exit": 0
+          }
+        ],
+        "match_per_side": [
+          true,
+          true
+        ],
+        "all_servers_live": true,
+        "distinct_result_paths": true
+      },
+      "capture_pane_samples": [
+        {
+          "client_cwd": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\t5-dirA",
+          "pane_id": "%1",
+          "pane_current_path": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\t5-dirA",
+          "capture_pane": {
+            "pane": "%1",
+            "exit": 0,
+            "text": "PS C:\\Users\\Daniel\\AppData\\Local\\Temp\\t5-dirA>\n",
+            "stderr": ""
+          },
+          "proves": "the visible PowerShell prompt shows the client cwd, not merely a reported path"
+        },
+        {
+          "client_cwd": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\t5-dirB",
+          "pane_id": "%1",
+          "pane_current_path": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\t5-dirB",
+          "capture_pane": {
+            "pane": "%1",
+            "exit": 0,
+            "text": "PS C:\\Users\\Daniel\\AppData\\Local\\Temp\\t5-dirB>\n",
+            "stderr": ""
+          },
+          "proves": "the visible PowerShell prompt shows the client cwd, not merely a reported path"
+        }
+      ],
+      "evidence_pass": "retry pass 2 (probe3.cjs)",
+      "capture_pane": {
+        "pane": "%1",
+        "source": "capture_pane_samples",
+        "text": "PS C:\\Users\\Daniel\\AppData\\Local\\Temp\\t5-dirA>\n",
+        "exit_code": null
+      }
+    },
+    {
+      "id": "d",
+      "question": "Does `new-session -c <nonexistent-dir>` silently leave the pane in the LAUNCHING directory, while `split-window -c <nonexistent-dir>` moves it to HOME?",
+      "predicted_from_source": "new-session -c is unvalidated: main.rs:1434-1437 (v3.3.8) forwards it to the server as -d verbatim, and server/mod.rs:1143 env::set_current_dir(dir).ok() DISCARDS the error, leaving the server on its inherited launch dir => pane stays in the LAUNCH dir. split-window -c routes through usable_start_dir (src/util.rs:43, called at src/pane.rs:404 and :743) which returns home_dir() for a nonexistent path => pane goes to HOME. Two different fallbacks for the same bad input.",
+      "namespace": "t5smuuqmvlod1 (new-session) + t5smuuqmvlod2 (split-window)",
+      "observed": "NEW_SESSION_C_STAYS_IN_LAUNCH_DIR__SPLIT_WINDOW_C_FALLS_TO_HOME",
+      "contradicts_source": false,
+      "command": "psmux -L t5smuuqmvlod1 new-session -d -s dnew -c \"C:\\Users\\Daniel\\AppData\\Local\\Temp\\t5-definitely-not-here-9z8x\"   (client cwd=C:\\Users\\Daniel\\AppData\\Local\\Temp\\t5-dirA)   ||   psmux -L t5smuuqmvlod1 list-panes -t dnew -F \"#{pane_id}|#{pane_current_path}\"   ||   psmux -L t5smuuqmvlod2 new-session -d -s dsp   (client cwd=C:\\Users\\Daniel\\AppData\\Local\\Temp\\t5-dirA)   ||   psmux -L t5smuuqmvlod2 split-window -t %1 -c \"C:\\Users\\Daniel\\AppData\\Local\\Temp\\t5-definitely-not-here-9z8x\"   ||   psmux -L t5smuuqmvlod2 list-panes -a -F \"#{pane_id}|#{pane_current_path}\"",
+      "exit_code": 0,
+      "stdout": "{\n  \"home\": \"C:\\\\Users\\\\Daniel\",\n  \"launch_dir\": \"C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\Temp\\\\t5-dirA\",\n  \"bogus_dir\": \"C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\Temp\\\\t5-definitely-not-here-9z8x\",\n  \"bogus_dir_exists\": false,\n  \"new_session_bogus\": {\n    \"pane_id\": \"%1\",\n    \"pane_current_path\": \"C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\Temp\\\\t5-dirA\",\n    \"server_live\": true,\n    \"capture\": {\n      \"pane\": \"%1\",\n      \"exit_code\": 0,\n      \"text\": \"PS C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\Temp\\\\t5-dirA>\\n\"\n    }\n  },\n  \"split_window_bogus\": {\n    \"new_pane_id\": \"%2\",\n    \"pane_current_path\": \"C:\\\\Users\\\\Daniel\",\n    \"split_exit\": 0,\n    \"split_stderr\": \"\",\n    \"panes_before\": [\n      \"%1\"\n    ],\n    \"panes_after\": [\n      \"%1|C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\Temp\\\\t5-dirA\",\n      \"%2|C:\\\\Users\\\\Daniel\"\n    ],\n    \"server_live\": true,\n    \"capture\": {\n      \"pane\": \"%2\",\n      \"exit_code\": 0,\n      \"text\": \"PS C:\\\\Users\\\\Daniel>\\n\"\n    }\n  }\n}",
+      "stderr": "",
+      "notes": [],
+      "supporting": {
+        "new_session_pane_path": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\t5-dirA",
+        "split_pane_path": "C:\\Users\\Daniel",
+        "new_server_live": true,
+        "split_server_live": true,
+        "new_capture_text": {
+          "pane": "%1",
+          "exit_code": 0,
+          "text": "PS C:\\Users\\Daniel\\AppData\\Local\\Temp\\t5-dirA>\n"
+        },
+        "split_capture_text": {
+          "pane": "%2",
+          "exit_code": 0,
+          "text": "PS C:\\Users\\Daniel>\n"
+        }
+      },
+      "evidence_pass": "retry pass 2 (probe3.cjs)",
+      "capture_pane": {
+        "pane": "%1",
+        "source": "stdout.*.capture",
+        "text": "PS C:\\Users\\Daniel\\AppData\\Local\\Temp\\t5-dirA>\n",
+        "exit_code": 0
+      }
+    },
+    {
+      "id": "e",
+      "question": "Do two -L namespaces coexist?",
+      "predicted_from_source": "port_file_base (src/types.rs:1347, v3.3.8) formats the file base as \"{socket_name}__{session_name}\" when -L is set, and main.rs builds the same prefix for lookup, so each namespace gets disjoint port/registry files. Predicted: coexist, fully isolated.",
+      "namespace": "t5smuuqmvloe1 + t5smuuqmvloe2",
+      "observed": "BOTH_NAMESPACES_COEXIST:{\"path1\":\"%1|C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\Temp\\\\t5-dirA\",\"path2\":\"%1|C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\Temp\\\\t5-dirB\"}",
+      "contradicts_source": false,
+      "command": "C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5smuuqmvloe1 new-session -d -s shared   ||   C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5smuuqmvloe1 list-panes -a -F #{pane_id}|#{pane_current_path}   ||   C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5smuuqmvloe2 new-session -d -s shared   ||   C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5smuuqmvloe2 list-panes -a -F #{pane_id}|#{pane_current_path}   ||   C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5smuuqmvloe1 list-sessions -F #{session_name}   ||   C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5smuuqmvloe2 list-sessions -F #{session_name}",
+      "exit_code": 0,
+      "stdout": "{\n  \"ns1\": {\n    \"namespace\": \"t5smuuqmvloe1\",\n    \"sessions\": [\n      \"shared\"\n    ],\n    \"liveness\": {\n      \"namespace\": \"t5smuuqmvloe1\",\n      \"session\": \"shared\",\n      \"port_file\": \"50892\",\n      \"pid_file\": \"33620:134356474528587901\",\n      \"pid\": \"33620\",\n      \"port_file_exists\": true,\n      \"pid_file_exists\": true,\n      \"pid_process_alive\": true,\n      \"port_listening\": true,\n      \"alive\": true,\n      \"reason\": \"alive\"\n    },\n    \"panes\": \"%1|C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\Temp\\\\t5-dirA\\n\"\n  },\n  \"ns2\": {\n    \"namespace\": \"t5smuuqmvloe2\",\n    \"sessions\": [\n      \"shared\"\n    ],\n    \"liveness\": {\n      \"namespace\": \"t5smuuqmvloe2\",\n      \"session\": \"shared\",\n      \"port_file\": \"56483\",\n      \"pid_file\": \"34092:134356474619058076\",\n      \"pid\": \"34092\",\n      \"port_file_exists\": true,\n      \"pid_file_exists\": true,\n      \"pid_process_alive\": true,\n      \"port_listening\": true,\n      \"alive\": true,\n      \"reason\": \"alive\"\n    },\n    \"panes\": \"%1|C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\Temp\\\\t5-dirB\\n\"\n  },\n  \"registry_files\": [\n    \"t5smuuqmvloe1__shared.key\",\n    \"t5smuuqmvloe1__shared.pid\",\n    \"t5smuuqmvloe1__shared.port\",\n    \"t5smuuqmvloe1__shared.sid\",\n    \"t5smuuqmvloe2__shared.key\",\n    \"t5smuuqmvloe2__shared.pid\",\n    \"t5smuuqmvloe2__shared.port\",\n    \"t5smuuqmvloe2__shared.sid\"\n  ]\n}",
+      "stderr": "",
+      "notes": [],
+      "supporting": {
+        "ns1_sessions": [
+          "shared"
+        ],
+        "ns2_sessions": [
+          "shared"
+        ],
+        "ns1_liveness": {
+          "namespace": "t5smuuqmvloe1",
+          "session": "shared",
+          "port_file": "50892",
+          "pid_file": "33620:134356474528587901",
+          "pid": "33620",
+          "port_file_exists": true,
+          "pid_file_exists": true,
+          "pid_process_alive": true,
+          "port_listening": true,
+          "alive": true,
+          "reason": "alive"
+        },
+        "ns2_liveness": {
+          "namespace": "t5smuuqmvloe2",
+          "session": "shared",
+          "port_file": "56483",
+          "pid_file": "34092:134356474619058076",
+          "pid": "34092",
+          "port_file_exists": true,
+          "pid_file_exists": true,
+          "pid_process_alive": true,
+          "port_listening": true,
+          "alive": true,
+          "reason": "alive"
+        },
+        "ns1_pane_path": "%1|C:\\Users\\Daniel\\AppData\\Local\\Temp\\t5-dirA",
+        "ns2_pane_path": "%1|C:\\Users\\Daniel\\AppData\\Local\\Temp\\t5-dirB",
+        "distinct_pane_cwds": false,
+        "registry_files": [
+          "t5smuuqmvloe1__shared.key",
+          "t5smuuqmvloe1__shared.pid",
+          "t5smuuqmvloe1__shared.port",
+          "t5smuuqmvloe1__shared.sid",
+          "t5smuuqmvloe2__shared.key",
+          "t5smuuqmvloe2__shared.pid",
+          "t5smuuqmvloe2__shared.port",
+          "t5smuuqmvloe2__shared.sid"
+        ],
+        "ns1_sees_only_own": true,
+        "ns2_sees_only_own": true
+      },
+      "capture_pane_samples": [
+        {
+          "namespace": "t5xmuuqteu6e1",
+          "client_cwd": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\t5-dirA",
+          "pane_id": "%1",
+          "pane_current_path": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\t5-dirA",
+          "sessions_listed": "shared",
+          "capture_pane": {
+            "pane": "%1",
+            "exit": 0,
+            "text": "PS C:\\Users\\Daniel\\AppData\\Local\\Temp\\t5-dirA>\n",
+            "stderr": ""
+          },
+          "proves": "each namespace shows its OWN directory in the pane text, so they are genuinely independent"
+        },
+        {
+          "namespace": "t5xmuuqteu6e2",
+          "client_cwd": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\t5-dirB",
+          "pane_id": "%1",
+          "pane_current_path": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\t5-dirB",
+          "sessions_listed": "shared",
+          "capture_pane": {
+            "pane": "%1",
+            "exit": 0,
+            "text": "PS C:\\Users\\Daniel\\AppData\\Local\\Temp\\t5-dirB>\n",
+            "stderr": ""
+          },
+          "proves": "each namespace shows its OWN directory in the pane text, so they are genuinely independent"
+        }
+      ],
+      "evidence_pass": "retry pass 2 (probe3.cjs)",
+      "capture_pane": {
+        "pane": "%1",
+        "source": "capture_pane_samples",
+        "text": "PS C:\\Users\\Daniel\\AppData\\Local\\Temp\\t5-dirA>\n",
+        "exit_code": null
+      }
+    },
+    {
+      "id": "f",
+      "question": "Does `select-layout main-vertical` with NO -t succeed, error, or no-op, and what does `display-message -p \"#{window_width}\"` report after it?",
+      "predicted_from_source": "src/server/connection.rs:2741-2744 (v3.3.8) parses select-layout by taking the first non-dash arg and sends CtrlReq::SelectLayout(layout) with NO reply channel -- so it cannot report failure. Server applies it to app.active_idx (src/server/mod.rs:4610-4616, apply_layout at src/layout.rs:1069). With one window and one active window, no -t is harmless. Predicted: exit 0, silent, applied to the active window; window_width unchanged (layout redistributes PANE widths, not the window width).",
+      "namespace": "t5muup1fa6f",
+      "namespace_isolated": true,
+      "observed": "SUCCEEDS_SILENTLY_AND_APPLIES_TO_ACTIVE_WINDOW__WINDOW_WIDTH_UNCHANGED",
+      "contradicts_source": false,
+      "command": "C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5muup1fa6f list-panes -a -F #{pane_id}|#{pane_left}|#{pane_top}|#{pane_width}|#{pane_height}   ||   C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5muup1fa6f display-message -p -t %1 #{window_width}   ||   C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5muup1fa6f select-layout main-vertical   ||   C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5muup1fa6f display-message -p -t %1 #{window_width}   ||   C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5muup1fa6f select-layout -t %1 main-horizontal   ||   C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5muup1fa6f select-layout not-a-real-layout",
+      "exit_code": 0,
+      "stdout": "{\n  \"select_layout_no_t\": {\n    \"argv\": [\n      \"-L\",\n      \"t5muup1fa6f\",\n      \"select-layout\",\n      \"main-vertical\"\n    ],\n    \"exit\": 0,\n    \"stdout\": \"\",\n    \"stderr\": \"\"\n  },\n  \"window_width_before\": \"120\",\n  \"window_width_after\": \"120\",\n  \"geometry_before\": \"%1|0|0|59|30\\n%2|60|0|60|30\\n\",\n  \"geometry_after_no_t\": \"%1|0|0|71|30\\n%2|72|0|48|30\\n\",\n  \"select_layout_with_t\": {\n    \"argv\": [\n      \"-L\",\n      \"t5muup1fa6f\",\n      \"select-layout\",\n      \"-t\",\n      \"%1\",\n      \"main-horizontal\"\n    ],\n    \"exit\": 0,\n    \"stdout\": \"\",\n    \"stderr\": \"\"\n  },\n  \"geometry_after_with_t\": \"%1|0|0|120|17\\n%2|0|18|120|12\\n\",\n  \"window_width_after_with_t\": \"120\",\n  \"bogus_layout_name\": {\n    \"argv\": [\n      \"-L\",\n      \"t5muup1fa6f\",\n      \"select-layout\",\n      \"not-a-real-layout\"\n    ],\n    \"exit\": 0,\n    \"stdout\": \"\",\n    \"stderr\": \"\"\n  },\n  \"geometry_after_bogus_layout\": \"%1|0|0|59|30\\n%2|60|0|60|30\\n\"\n}",
+      "stderr": "",
+      "notes": [
+        "A bogus layout name also exits 0 with no diagnostic -- select-layout has no failure channel at all at v3.3.8, so it can never report an error.",
+        "REGISTRY RESIDUE FROM THIS SUB-PROBE SURVIVED: [\"instances\\\\t5muup1fa6f-75c0cbee6fb15197\"] -- run is FAILED"
+      ],
+      "supporting": {
+        "window_width_before": "120",
+        "window_width_after": "120",
+        "geometry_before": "%1|0|0|59|30\n%2|60|0|60|30",
+        "geometry_after_no_t": "%1|0|0|71|30\n%2|72|0|48|30",
+        "geometry_changed_by_no_t_call": true,
+        "bogus_layout_exit": 0,
+        "bogus_layout_stderr": ""
+      },
+      "registry_before": "d00d1791136c41ac67c7425fc22b36438edf4d8ccc4b77e75aa1355e22bb9070",
+      "registry_after": "e08e7d584946ba5b2489f3eeca709f0b94798cf4f991d5cdec961bfd72c4326a",
+      "registry_changed_by_probe": true,
+      "registry_residue_after_probe": [
+        "instances\\t5muup1fa6f-75c0cbee6fb15197"
+      ],
+      "registry_clean_after_probe": false,
+      "evidence_pass": "ORIGINAL pass 1 (verbatim, not re-run)",
+      "capture_pane": null,
+      "capture_pane_absent_reason": "No capture-pane was taken for (f): it is a layout-geometry question and its evidence is list-panes geometry (pane_left/pane_width) before and after, which is the authoritative measurement for a layout change. Not a pane-content question."
+    },
+    {
+      "id": "g",
+      "question": "Does `respawn-pane -k -t <pane> -- <cmd>` run the command and PRESERVE the pane id?",
+      "predicted_from_source": "src/server/connection.rs:2093-2106 (v3.3.8) reads the command ONLY from the `--` tail (issue #399) and sends CtrlReq::RespawnPane(workdir, kill, command, empty), a 4-tuple with no env (src/types.rs:1635). Server handles it at src/server/mod.rs:3890. Predicted: with `--` the command runs and the pane keeps its id.",
+      "namespace": "t5muup1fa6g",
+      "namespace_isolated": true,
+      "observed": "RUNS_COMMAND_AND_PRESERVES_PANE_ID",
+      "contradicts_source": false,
+      "command": "C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5muup1fa6g list-panes -a -F #{pane_id}|#{pane_pid}   ||   C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5muup1fa6g respawn-pane -k -t %1 -- C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\Temp\\\\t5_g.cmd   ||   C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5muup1fa6g capture-pane -p -t %1 -S -40   ||   C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5muup1fa6g list-panes -a -F #{pane_id}|#{pane_pid}",
+      "exit_code": 0,
+      "stdout": "{\n  \"respawn\": {\n    \"argv\": [\n      \"-L\",\n      \"t5muup1fa6g\",\n      \"respawn-pane\",\n      \"-k\",\n      \"-t\",\n      \"%1\",\n      \"--\",\n      \"C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\Temp\\\\t5_g.cmd\"\n    ],\n    \"exit\": 0,\n    \"stdout\": \"\",\n    \"stderr\": \"\"\n  },\n  \"capture_pane\": {\n    \"pane\": \"%1\",\n    \"exit\": 0,\n    \"text\": \"G_MARKER_7Q\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\"\n  },\n  \"panes_before\": \"%1|35064\\n\",\n  \"panes_after\": \"%1|\\n\",\n  \"marker_written_to_file\": \"G_FOOIS=[] \\r\\n\"\n}",
+      "stderr": "",
+      "notes": [
+        "The wrapper is a long-lived .cmd (echo + `ping -n 90`) so the respawned pane cannot exit before capture-pane runs; a short-lived command makes the pane vanish and proves nothing.",
+        "pane_pid for the respawned pane reads EMPTY on this build while the pane and its id remain -- recorded, not treated as failure.",
+        "REGISTRY RESIDUE FROM THIS SUB-PROBE SURVIVED: [\"instances\\\\t5muup1fa6g-63a3fe0c429dfe9e\"] -- run is FAILED"
+      ],
+      "supporting": {
+        "target_pane": "%1",
+        "panes_before": [
+          "%1"
+        ],
+        "panes_after": [
+          "%1"
+        ],
+        "pane_id_preserved": true,
+        "pane_set_unchanged": true,
+        "capture_exit": 0,
+        "marker_in_capture_text": true,
+        "marker_in_file": "G_FOOIS=[] \r\n",
+        "wrapper_script": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\t5_g.cmd"
+      },
+      "registry_before": "e08e7d584946ba5b2489f3eeca709f0b94798cf4f991d5cdec961bfd72c4326a",
+      "registry_after": "765acd1c13836a5bbc49160feacd1ce72b3896e2c1b82ddff3a124d22594e827",
+      "registry_changed_by_probe": true,
+      "registry_residue_after_probe": [
+        "instances\\t5muup1fa6g-63a3fe0c429dfe9e"
+      ],
+      "registry_clean_after_probe": false,
+      "evidence_pass": "ORIGINAL pass 1 (verbatim, not re-run)",
+      "capture_pane": {
+        "pane": "%1",
+        "source": "stdout.capture_pane",
+        "text": "G_MARKER_7Q\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+        "exit_code": 0
+      }
+    },
+    {
+      "id": "h",
+      "question": "Does `respawn-pane -k -e FOO=bar -t <pane> -- <cmd>` deliver FOO to the pane? (The -- is mandatory: without it a null result cannot distinguish \"env dropped\" from \"command never ran\".)",
+      "predicted_from_source": "CtrlReq::RespawnPane is a 4-TUPLE (Option<workdir>, bool kill, Option<command>, bool empty) at src/types.rs:1635 (v3.3.8) with NO env field, and the parser at src/server/connection.rs:2093-2106 never reads -e at all. -e on respawn-pane is master-only via commit 4addc0a (upstream #708). Predicted at v3.3.8: the COMMAND RUNS (it came after --) but FOO IS NOT DELIVERED.",
+      "namespace": "t5muup1fa6h",
+      "namespace_isolated": true,
+      "observed": "COMMAND_RUNS_BUT_ENV_DROPPED__FOO_NOT_DELIVERED",
+      "contradicts_source": false,
+      "command": "C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5muup1fa6h respawn-pane -k -e FOO=bar -t %1 -- C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\Temp\\\\t5_h.cmd   ||   C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5muup1fa6h capture-pane -p -t %1 -S -40   ||   C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5muup1fa6h respawn-pane -k -t %1 -- C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\Temp\\\\t5_h2.cmd   ||   C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5muup1fa6h respawn-pane -k -e FOO=bar -t %1",
+      "exit_code": 0,
+      "stdout": "{\n  \"with_dash_and_env\": {\n    \"argv\": [\n      \"-L\",\n      \"t5muup1fa6h\",\n      \"respawn-pane\",\n      \"-k\",\n      \"-e\",\n      \"FOO=bar\",\n      \"-t\",\n      \"%1\",\n      \"--\",\n      \"C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\Temp\\\\t5_h.cmd\"\n    ],\n    \"exit\": 0,\n    \"stdout\": \"\",\n    \"stderr\": \"\"\n  },\n  \"capture_pane\": {\n    \"pane\": \"%1\",\n    \"exit\": 0,\n    \"text\": \"H_MARKER_4M2\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\"\n  },\n  \"env_file_written_by_pane\": \"H_FOOIS=[] \\r\\n\",\n  \"control_no_env_flag\": {\n    \"argv\": [\n      \"-L\",\n      \"t5muup1fa6h\",\n      \"respawn-pane\",\n      \"-k\",\n      \"-t\",\n      \"%1\",\n      \"--\",\n      \"C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\Temp\\\\t5_h2.cmd\"\n    ],\n    \"exit\": 0,\n    \"stderr\": \"\"\n  },\n  \"control_no_env_capture\": {\n    \"pane\": \"%1\",\n    \"exit\": 0,\n    \"text\": \"H2_MARKER_NODDASH\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\"\n  },\n  \"control_no_env_file\": \"H2_FOOIS=[] \\r\\n\",\n  \"control_no_dash\": {\n    \"argv\": [\n      \"-L\",\n      \"t5muup1fa6h\",\n      \"respawn-pane\",\n      \"-k\",\n      \"-e\",\n      \"FOO=bar\",\n      \"-t\",\n      \"%1\"\n    ],\n    \"exit\": 0,\n    \"stderr\": \"\"\n  },\n  \"control_no_dash_capture\": {\n    \"pane\": \"%1\",\n    \"exit\": 0,\n    \"text\": \"PS C:\\\\Users\\\\Daniel>\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\"\n  },\n  \"control_no_dash_file\": null\n}",
+      "stderr": "",
+      "notes": [
+        "Side 2 (no -e, still with --) and side 3 (no --) are the controls that make this answer trustworthy: side 3 shows the command really is dropped without `--`, so an empty FOO in side 1 cannot be a \"never ran\" artefact.",
+        "REGISTRY RESIDUE FROM THIS SUB-PROBE SURVIVED: [\"instances\\\\t5muup1fa6h-4cd83e07e5c48acc\"] -- run is FAILED"
+      ],
+      "supporting": {
+        "target_pane": "%1",
+        "pane_id_survived_respawn": true,
+        "panes_after": [
+          "%1"
+        ],
+        "command_ran_with_dash": true,
+        "capture_text_with_dash": "H_MARKER_4M2\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+        "env_file_with_dash": "H_FOOIS=[] \r\n",
+        "foo_rendered_empty": true,
+        "control_without_env_flag_command_ran": true,
+        "control_without_env_flag_capture": "H2_MARKER_NODDASH\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+        "control_without_env_flag_file": "H2_FOOIS=[] \r\n",
+        "control_without_dash_command_ran": false,
+        "control_without_dash_capture": "PS C:\\Users\\Daniel>\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+        "control_without_dash_file": null,
+        "wrapper_with_env": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\t5_h.cmd",
+        "wrapper_control": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\t5_h2.cmd"
+      },
+      "registry_before": "765acd1c13836a5bbc49160feacd1ce72b3896e2c1b82ddff3a124d22594e827",
+      "registry_after": "296d2a101b4f35fe3710c92ca21ec3ae172e77f153ebb8f9751b347949df320c",
+      "registry_changed_by_probe": true,
+      "registry_residue_after_probe": [
+        "instances\\t5muup1fa6h-4cd83e07e5c48acc"
+      ],
+      "registry_clean_after_probe": false,
+      "evidence_pass": "ORIGINAL pass 1 (verbatim, not re-run)",
+      "capture_pane": {
+        "pane": "%1",
+        "source": "stdout.capture_pane",
+        "text": "H_MARKER_4M2\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+        "exit_code": 0
+      }
+    },
+    {
+      "id": "i",
+      "question": "What are the exact stderr text and exit code of `kill-pane -t <already-dead-pane>`? OmO treats a non-zero exit whose stderr matches /can't find pane/i as SUCCESS (dist/index.js:8453), so a different string makes every pane close report failure.",
+      "predicted_from_source": "cli_validate_window_pane_target runs for kill-pane (src/main.rs:633-644, v3.3.8) and, for a bare %N whose id is definitively absent, emits eprintln!(\"psmux: can't find pane: {}\", full) then exit(1) at src/main.rs:313-316. Predicted: exit 1, stderr \"psmux: can't find pane: %N\" -- which MATCHES OmO's regex.",
+      "namespace": "t5muup1fa6i",
+      "namespace_isolated": true,
+      "observed": "EXIT_1_WITH_STDERR_MATCHING_OMO_REGEX__CLOSE_REPORTS_SUCCESS",
+      "contradicts_source": false,
+      "command": "C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5muup1fa6i list-panes -a -F #{pane_id}   ||   C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5muup1fa6i kill-pane -t %2   ||   C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5muup1fa6i list-panes -a -F #{pane_id}   ||   C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5muup1fa6i kill-pane -t %2   ||   C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5muup1fa6i kill-pane -t %4242",
+      "exit_code": 1,
+      "stdout": "{\n  \"kill_pane_alive\": {\n    \"argv\": [\n      \"-L\",\n      \"t5muup1fa6i\",\n      \"kill-pane\",\n      \"-t\",\n      \"%2\"\n    ],\n    \"exit\": 0,\n    \"stdout\": \"\",\n    \"stderr\": \"\"\n  },\n  \"panes_after_first_kill\": \"%1\\n\",\n  \"kill_pane_same_id_again\": {\n    \"argv\": [\n      \"-L\",\n      \"t5muup1fa6i\",\n      \"kill-pane\",\n      \"-t\",\n      \"%2\"\n    ],\n    \"exit\": 1,\n    \"stdout\": \"\",\n    \"stderr\": \"psmux: can't find pane: %2\\n\"\n  },\n  \"kill_pane_never_existed\": {\n    \"argv\": [\n      \"-L\",\n      \"t5muup1fa6i\",\n      \"kill-pane\",\n      \"-t\",\n      \"%4242\"\n    ],\n    \"exit\": 1,\n    \"stdout\": \"\",\n    \"stderr\": \"psmux: can't find pane: %4242\\n\"\n  },\n  \"sessions_still_alive\": [\n    \"kp\"\n  ],\n  \"omo_regex\": \"/can't find pane/i  (dist/index.js:8453, oh-my-openagent 5.1.17 on Windows / 5.1.18 on Linux -- line identical on both)\"\n}",
+      "stderr": "psmux: can't find pane: %2\n\npsmux: can't find pane: %4242\n",
+      "notes": [
+        "Both sub-cases are recorded: re-killing an id that existed and died, and an id that never existed. They are the same code path (src/main.rs:313-316) but different real situations.",
+        "Killing the LAST pane in a session kills the whole server, which replaces the pane error with \"psmux: no server running on session ...\" -- that string does NOT match the regex. The bridge must never close a session's final pane this way.",
+        "REGISTRY RESIDUE FROM THIS SUB-PROBE SURVIVED: [\"instances\\\\t5muup1fa6i-9927f9db2b24b22f\"] -- run is FAILED"
+      ],
+      "supporting": {
+        "victim_pane": "%2",
+        "panes_before": "%1\n%2",
+        "panes_after": "%1",
+        "dead_pane_exit": 1,
+        "dead_pane_stderr": "psmux: can't find pane: %2",
+        "never_existed_exit": 1,
+        "never_existed_stderr": "psmux: can't find pane: %4242",
+        "server_survived": true,
+        "omo_would_treat_as_success": true,
+        "omo_would_treat_never_existed_as_success": true
+      },
+      "registry_before": "296d2a101b4f35fe3710c92ca21ec3ae172e77f153ebb8f9751b347949df320c",
+      "registry_after": "e78ff0b2d1d78e965ee9532541fd9d2903a26c814d3fbd99f3fc7ab7a33ed5a4",
+      "registry_changed_by_probe": true,
+      "registry_residue_after_probe": [
+        "instances\\t5muup1fa6i-9927f9db2b24b22f"
+      ],
+      "registry_clean_after_probe": false,
+      "evidence_pass": "ORIGINAL pass 1 (verbatim, not re-run)",
+      "capture_pane": null,
+      "capture_pane_absent_reason": "No capture-pane was taken for (i): by construction the pane under test is DEAD, so there is nothing to capture. The evidence is the exit code and exact stderr of kill-pane, plus list-panes before/after showing the sibling pane survived."
+    },
+    {
+      "id": "j",
+      "question": "What are the exit code and stream behaviour of `send-keys -t <pane> C-c`?",
+      "predicted_from_source": "src/server/connection.rs:1421+ (v3.3.8) parses send-keys and writes the key into the pane, with no reply channel, so it cannot produce stdout/stderr. Predicted: exit 0, empty stdout, empty stderr, and a ^C echo visible in capture-pane.",
+      "namespace": "t5smuuqmvloj",
+      "observed": "EXIT_0__EMPTY_STDOUT_AND_STDERR__CARET_C_ECHOED_IN_PANE",
+      "contradicts_source": false,
+      "command": "C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5smuuqmvloj new-session -d -s sk   ||   C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5smuuqmvloj list-panes -a -F #{pane_id}   ||   C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5smuuqmvloj send-keys -t %1 C-c   ||   C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5smuuqmvloj capture-pane -p -t %1",
+      "exit_code": 0,
+      "stdout": "{\n  \"target_pane\": \"%1\",\n  \"send_keys\": {\n    \"argv\": [\n      \"-L\",\n      \"t5smuuqmvloj\",\n      \"send-keys\",\n      \"-t\",\n      \"%1\",\n      \"C-c\"\n    ],\n    \"exit\": 0,\n    \"stdout_json\": \"\",\n    \"stderr_json\": \"\",\n    \"stdout_bytes\": 0,\n    \"stderr_bytes\": 0\n  },\n  \"capture_before\": {\n    \"pane\": \"%1\",\n    \"exit\": 0,\n    \"text\": \"PS C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\Temp\\\\t5-dirA>\\n\"\n  },\n  \"capture_after\": {\n    \"pane\": \"%1\",\n    \"exit\": 0,\n    \"text\": \"PS C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\Temp\\\\t5-dirA> ^C\\nPS C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\Temp\\\\t5-dirA>\\n\"\n  },\n  \"panes_after\": [\n    \"%1\"\n  ],\n  \"liveness\": {\n    \"namespace\": \"t5smuuqmvloj\",\n    \"session\": \"sk\",\n    \"port_file\": \"50084\",\n    \"pid_file\": \"33672:134356474726945861\",\n    \"pid\": \"33672\",\n    \"port_file_exists\": true,\n    \"pid_file_exists\": true,\n    \"pid_process_alive\": true,\n    \"port_listening\": true,\n    \"alive\": true,\n    \"reason\": \"alive\"\n  }\n}",
+      "stderr": "",
+      "notes": [],
+      "supporting": {
+        "target_pane": "%1",
+        "target_valid": true,
+        "server_live": true,
+        "exit": 0,
+        "stdout_bytes": 0,
+        "stderr_bytes": 0,
+        "stderr_is_empty": true,
+        "caret_c_echoed": true,
+        "pane_still_listed": true,
+        "capture_before_text": "PS C:\\Users\\Daniel\\AppData\\Local\\Temp\\t5-dirA>\n",
+        "capture_after_text": "PS C:\\Users\\Daniel\\AppData\\Local\\Temp\\t5-dirA> ^C\nPS C:\\Users\\Daniel\\AppData\\Local\\Temp\\t5-dirA>\n"
+      },
+      "target_resolution": {
+        "raw_list_panes_stdout": "%1\n",
+        "chosen": "%1",
+        "valid": true,
+        "rule": "must match /^%\\d+$/; empty/undefined/null is rejected as a harness bug",
+        "list_panes_exit": 0
+      },
+      "evidence_pass": "retry pass 2 (probe3.cjs)",
+      "capture_pane": {
+        "pane": "capture_before",
+        "source": "supporting.capture_before_text",
+        "text": "PS C:\\Users\\Daniel\\AppData\\Local\\Temp\\t5-dirA>\n"
+      }
+    },
+    {
+      "id": "k",
+      "question": "What is the exact stdout shape of `display -p -t <pane> \"#{window_width},#{window_height}\"`?",
+      "predicted_from_source": "src/server/connection.rs:1988-2041 (v3.3.8): display-message/display collects non-flag args as the format string, sends DisplayMessageById for a bare %N, and on -p writes with writeln! -- so the shape is the two values joined by a comma plus ONE trailing newline, nothing else. Predicted: \"<width>,<height>\\n\".",
+      "namespace": "t5muup1fa6k",
+      "namespace_isolated": true,
+      "observed": "EXACTLY_TWO_INTS_COMMA_SEPARATED_PLUS_ONE_TRAILING_NEWLINE",
+      "contradicts_source": false,
+      "command": "C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5muup1fa6k display-message -p -t %1 #{window_width},#{window_height}   ||   C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5muup1fa6k display -p -t %1 #{window_width},#{window_height}   ||   C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5muup1fa6k display-message -p -t %1 #{window_width}   ||   C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5muup1fa6k display-message -t %1 #{window_width},#{window_height}",
+      "exit_code": 0,
+      "stdout": "{\n  \"display_message_p\": {\n    \"argv\": [\n      \"-L\",\n      \"t5muup1fa6k\",\n      \"display-message\",\n      \"-p\",\n      \"-t\",\n      \"%1\",\n      \"#{window_width},#{window_height}\"\n    ],\n    \"exit\": 0,\n    \"stdout_json\": \"120,30\\n\",\n    \"stderr\": \"\"\n  },\n  \"display_alias_p\": {\n    \"argv\": [\n      \"-L\",\n      \"t5muup1fa6k\",\n      \"display\",\n      \"-p\",\n      \"-t\",\n      \"%1\",\n      \"#{window_width},#{window_height}\"\n    ],\n    \"exit\": 0,\n    \"stdout_json\": \"120,30\\n\"\n  },\n  \"single_variable\": {\n    \"argv\": [\n      \"-L\",\n      \"t5muup1fa6k\",\n      \"display-message\",\n      \"-p\",\n      \"-t\",\n      \"%1\",\n      \"#{window_width}\"\n    ],\n    \"exit\": 0,\n    \"stdout_json\": \"120\\n\"\n  },\n  \"without_p\": {\n    \"argv\": [\n      \"-L\",\n      \"t5muup1fa6k\",\n      \"display-message\",\n      \"-t\",\n      \"%1\",\n      \"#{window_width},#{window_height}\"\n    ],\n    \"exit\": 0,\n    \"stdout_json\": \"\",\n    \"stderr\": \"\"\n  }\n}",
+      "stderr": "",
+      "notes": [
+        "`display` and `display-message` are the same arm in src/server/connection.rs:1988 and produced byte-identical output.",
+        "Without -p the command writes NOTHING to stdout and exits 0 -- a caller that forgets -p silently reads an empty string.",
+        "REGISTRY RESIDUE FROM THIS SUB-PROBE SURVIVED: [\"instances\\\\t5muup1fa6k-9fc1b26115945cf1\"] -- run is FAILED"
+      ],
+      "supporting": {
+        "stdout_json": "120,30\n",
+        "stdout_raw_length": 7,
+        "regex_two_ints_comma_then_one_newline": true,
+        "alias_display_identical": true,
+        "single_variable_stdout_json": "120\n",
+        "no_p_flag_stdout_json": "",
+        "no_p_flag_exit": 0
+      },
+      "registry_before": "6be1a9e690aee594e36e605b489e351df521c279c67de6cb3207dc24f3c86218",
+      "registry_after": "757e0ff39e620bbf77a08963e10048c8230cebfe84536a2d50884fd02d00593b",
+      "registry_changed_by_probe": true,
+      "registry_residue_after_probe": [
+        "instances\\t5muup1fa6k-9fc1b26115945cf1"
+      ],
+      "registry_clean_after_probe": false,
+      "evidence_pass": "ORIGINAL pass 1 (verbatim, not re-run)",
+      "capture_pane": null,
+      "capture_pane_absent_reason": "No capture-pane was taken for (k): it asks for the stdout shape of display-message -p, which is not pane content. Its evidence is the raw stdout bytes."
+    },
+    {
+      "id": "l",
+      "question": "What is the exit code of `select-pane -t <pane> -T <title>` on a pane that EXISTS and on one that does NOT?",
+      "predicted_from_source": "select-pane is in the shared validator list (src/main.rs:639, v3.3.8) so a bare %N that is definitively absent hits eprintln! + exit(1) at src/main.rs:313-316; an existing pane parses -T into SetPaneTitle (src/server/connection.rs:1577-1580) and exits 0. Predicted: 0 on an existing pane (title set), 1 with \"psmux: can't find pane: %N\" on a missing one.",
+      "namespace": "t5muup1fa6l",
+      "namespace_isolated": true,
+      "observed": "EXIT_0_AND_TITLE_SET_ON_EXISTING__EXIT_1_WITH_CANNOT_FIND_PANE_ON_MISSING",
+      "contradicts_source": false,
+      "command": "C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5muup1fa6l select-pane -t %1 -T t5-title-9z   ||   C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5muup1fa6l display-message -p -t %1 #{pane_title}   ||   C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5muup1fa6l select-pane -t %9999 -T nope   ||   C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5muup1fa6l select-pane -t %4242 -T nope2",
+      "exit_code": 0,
+      "stdout": "{\n  \"existing_pane\": {\n    \"argv\": [\n      \"-L\",\n      \"t5muup1fa6l\",\n      \"select-pane\",\n      \"-t\",\n      \"%1\",\n      \"-T\",\n      \"t5-title-9z\"\n    ],\n    \"exit\": 0,\n    \"stdout\": \"\",\n    \"stderr\": \"\"\n  },\n  \"title_readback\": {\n    \"argv\": [\n      \"-L\",\n      \"t5muup1fa6l\",\n      \"display-message\",\n      \"-p\",\n      \"-t\",\n      \"%1\",\n      \"#{pane_title}\"\n    ],\n    \"exit\": 0,\n    \"stdout_json\": \"t5-title-9z\\n\"\n  },\n  \"missing_pane_9999\": {\n    \"argv\": [\n      \"-L\",\n      \"t5muup1fa6l\",\n      \"select-pane\",\n      \"-t\",\n      \"%9999\",\n      \"-T\",\n      \"nope\"\n    ],\n    \"exit\": 1,\n    \"stdout\": \"\",\n    \"stderr\": \"psmux: can't find pane: %9999\\n\"\n  },\n  \"missing_pane_4242\": {\n    \"argv\": [\n      \"-L\",\n      \"t5muup1fa6l\",\n      \"select-pane\",\n      \"-t\",\n      \"%4242\",\n      \"-T\",\n      \"nope2\"\n    ],\n    \"exit\": 1,\n    \"stdout\": \"\",\n    \"stderr\": \"psmux: can't find pane: %4242\\n\"\n  }\n}",
+      "stderr": "psmux: can't find pane: %9999\n\npsmux: can't find pane: %4242\n",
+      "notes": [
+        "REGISTRY RESIDUE FROM THIS SUB-PROBE SURVIVED: [\"instances\\\\t5muup1fa6l-45bd26fff45eec66\"] -- run is FAILED"
+      ],
+      "supporting": {
+        "target_pane": "%1",
+        "existing_exit": 0,
+        "existing_stderr": "",
+        "title_readback": "t5-title-9z",
+        "title_actually_set": true,
+        "missing_exit": 1,
+        "missing_stderr": "psmux: can't find pane: %9999",
+        "missing_alt_exit": 1,
+        "missing_alt_stderr": "psmux: can't find pane: %4242"
+      },
+      "registry_before": "757e0ff39e620bbf77a08963e10048c8230cebfe84536a2d50884fd02d00593b",
+      "registry_after": "be0f6d33b3d17a4851f80df385fd3b63c33382dd42545a3268527780e0e5674e",
+      "registry_changed_by_probe": true,
+      "registry_residue_after_probe": [
+        "instances\\t5muup1fa6l-45bd26fff45eec66"
+      ],
+      "registry_clean_after_probe": false,
+      "evidence_pass": "ORIGINAL pass 1 (verbatim, not re-run)",
+      "capture_pane": null,
+      "capture_pane_absent_reason": "No capture-pane was taken for (l): the evidence is the exit code plus a #{pane_title} read-back proving the title was set, which is stronger than pane text for this question."
+    },
+    {
+      "id": "fail",
+      "question": "DELIBERATE FAILURE PROBE: a target session that does NOT exist must be recorded as an error and the run must CONTINUE.",
+      "predicted_from_source": "Routing to a nonexistent session falls through to \"no server running on session '<ns>__<name>'\" (main.rs:2358-2366 port-file lookup, v3.3.8). The QA criterion is that this is recorded and does not abort the remaining questions.",
+      "namespace": "t5muup1fa6x",
+      "namespace_isolated": true,
+      "observed": "ERROR_RECORDED_AND_RUN_CONTINUED",
+      "contradicts_source": false,
+      "command": "C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5muup1fa6x display-message -p -t nosuchsess #S   ||   C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5muup1fa6x kill-pane -t nosuchsess   ||   C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5muup1fa6x has-session -t nosuchsess   ||   C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5muup1fa6x new-session -d -s stillworks   ||   C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\psmux\\\\psmux.exe -L t5muup1fa6x list-sessions -F #{session_name}",
+      "exit_code": 1,
+      "stdout": "{\n  \"bad_display_message\": {\n    \"argv\": [\n      \"-L\",\n      \"t5muup1fa6x\",\n      \"display-message\",\n      \"-p\",\n      \"-t\",\n      \"nosuchsess\",\n      \"#S\"\n    ],\n    \"exit\": 1,\n    \"stdout\": \"\",\n    \"stderr\": \"psmux: no server running on session 't5muup1fa6x__nosuchsess'\\n\"\n  },\n  \"bad_kill_pane\": {\n    \"argv\": [\n      \"-L\",\n      \"t5muup1fa6x\",\n      \"kill-pane\",\n      \"-t\",\n      \"nosuchsess\"\n    ],\n    \"exit\": 1,\n    \"stdout\": \"\",\n    \"stderr\": \"psmux: no server running on session 't5muup1fa6x__nosuchsess'\\n\"\n  },\n  \"bad_has_session\": {\n    \"argv\": [\n      \"-L\",\n      \"t5muup1fa6x\",\n      \"has-session\",\n      \"-t\",\n      \"nosuchsess\"\n    ],\n    \"exit\": 1,\n    \"stdout\": \"\",\n    \"stderr\": \"\"\n  },\n  \"continuation_new_session_exit\": 0,\n  \"continuation_list_sessions\": \"stillworks\\n\",\n  \"continuation_capture\": {\n    \"exit\": 0,\n    \"text\": \"PS C:\\\\Users\\\\Daniel>\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\\n\"\n  }\n}",
+      "stderr": "psmux: no server running on session 't5muup1fa6x__nosuchsess'\n\npsmux: no server running on session 't5muup1fa6x__nosuchsess'\n",
+      "notes": [
+        "REGISTRY RESIDUE FROM THIS SUB-PROBE SURVIVED: [\"instances\\\\t5muup1fa6x-fdd43b2c118c8b2f\"] -- run is FAILED"
+      ],
+      "supporting": {
+        "errors_recorded_not_raised": true,
+        "run_continued": true,
+        "error_texts": [
+          "psmux: no server running on session 't5muup1fa6x__nosuchsess'",
+          "psmux: no server running on session 't5muup1fa6x__nosuchsess'",
+          ""
+        ]
+      },
+      "registry_before": "be0f6d33b3d17a4851f80df385fd3b63c33382dd42545a3268527780e0e5674e",
+      "registry_after": "56b5daae4fa7d94d5ef06a756f171f106f1f95e27f55e690a6554bf53946caee",
+      "registry_changed_by_probe": true,
+      "registry_residue_after_probe": [
+        "instances\\t5muup1fa6x-fdd43b2c118c8b2f"
+      ],
+      "registry_clean_after_probe": false,
+      "evidence_pass": "ORIGINAL pass 1 (verbatim, not re-run)"
+    }
+  ],
+  "question_ids": [
+    "a",
+    "b",
+    "c",
+    "d",
+    "e",
+    "f",
+    "g",
+    "h",
+    "i",
+    "j",
+    "k",
+    "l",
+    "fail"
+  ],
+  "registry_untouched": true,
+  "registry_untouched_detail": {
+    "meaning": "No file in %USERPROFILE%\\.psmux naming any -L namespace created by THIS task survived, and no psmux.exe process this task started was left running.",
+    "why_not_a_byte_hash": "A whole-directory byte-hash is NOT a valid invariant at 3.3.8. MEASURED: psmux -V and psmux list-sessions change nothing in the registry, but new-session always writes there, because psmux keeps every session registry file in the ONE real registry regardless of -L.",
+    "noise_floor": {
+      "method": "psmux -V and psmux list-sessions change NOTHING in the registry; a new-session adds {<ns>__<n>.key,.pid,.port,.sid}, instances\\<token>, servers\\<pid> and bumps next_session_id.",
+      "kill-session_removes": [
+        "<ns>__<n>.key",
+        "<ns>__<n>.pid",
+        "<ns>__<n>.port",
+        "<ns>__<n>.sid"
+      ],
+      "kill-session_leaves": [
+        "instances\\<token>",
+        "servers\\<pid>"
+      ],
+      "upstream_reap_path": "prune_orphaned_registry_files (src/session.rs:312) via prune_orphaned_instance_tokens_in_with (:535), 300s interval (:292), only when the .port is already gone",
+      "source_tree_of_citation": "/tmp/opencode/psmux-v338 (v3.3.8)"
+    },
+    "bookkeeping_files_excluded": [
+      ".registry_sweep",
+      "last_session",
+      "next_session_id",
+      "ssh_input.log",
+      "config-warnings.log"
+    ],
+    "final_registry_state": [
+      ".registry_sweep 0",
+      "instances\\ <dir>",
+      "last_session 13",
+      "next_session_id 2",
+      "servers\\ <dir>",
+      "ssh_input.log 991"
+    ],
+    "final_registry_file_count": 6,
+    "cleanup_receipt": {
+      "method": "Three rounds, because two probe runs happened AFTER the first cleanup. Every deletion is gated on (a) the file name matching a namespace prefix this task created, and (b) a live-process proof. No live PID was ever touched: psmux.exe process census was asserted EMPTY immediately before each deletion round.",
+      "round_1": {
+        "before_count": 11,
+        "after_count": 6,
+        "deleted": 5,
+        "psmux_alive_before": [],
+        "note": "The 14 t5muup1fa6* entries the orchestrator observed were ALREADY GONE by the time this ran: psmux's own orphan sweep reaped them during probing (they need a >300s interval AND the .port to be absent). Verified absent before deleting anything. Deleted 5 files: cc_debug.log (created by this task's -C runs) + 4 instances\\t5qmuuqq* tokens."
+      },
+      "round_2": {
+        "before_count": 10,
+        "after_count": 7,
+        "deleted": [
+          "instances\\t5xmuuqteu6c-39a3071eb70e8917",
+          "instances\\t5xmuuqteu6e1-4467b75d09f259fb",
+          "instances\\t5xmuuqteu6e2-d5f2c090b821f526"
+        ],
+        "psmux_alive_before": [],
+        "note": "Residue from the capture-pane run for (c) and (e), which executed after round 1."
+      },
+      "round_3": {
+        "servers_entry": [
+          {
+            "file": "servers\\30728",
+            "content": "30728:134356477226606050",
+            "named_pid": "30728",
+            "pid_alive": false,
+            "proof_query": "tasklist /FI \"PID eq 30728\" /FO CSV /NH",
+            "proof_result": "\"\"",
+            "dead_pid_proof": "the tasklist query above returned no row containing that PID",
+            "action": "DELETED"
+          }
+        ],
+        "temp_files_deleted": [
+          "tmpcleanup.cjs",
+          "final-verify.cjs",
+          "final-clean.cjs",
+          "last.cjs",
+          "fv-out.json"
+        ],
+        "psmux_alive_before": []
+      },
+      "registry_final": [
+        ".registry_sweep 0",
+        "instances\\ <dir>",
+        "last_session 13",
+        "next_session_id 2",
+        "servers\\ <dir>",
+        "ssh_input.log 991"
+      ],
+      "registry_final_entry_count": 6,
+      "t5_residue_remaining": [],
+      "psmux_processes_remaining": [],
+      "clean": true
+    },
+    "warnings_for_later_todos": [
+      "last_session currently contains the string \"t5ttyprobe__1\", left by an early probe of this task. The FILE is one of the pre-existing bookkeeping entries and was deliberately NOT edited, but its CONTENT names a session that no longer exists. resolve_routing_target (src/session.rs:2069, v3.3.8) skips a last-session entry whose .port is absent, so this is inert -- but any later todo that trusts last_session blindly will be misled.",
+      "config-warnings.log, present before this task (98 bytes), is GONE. psmux deleted it itself: write_config_warnings_log removes the file when the warning list is empty (src/server/mod.rs:729-731, v3.3.8). This was not a deletion by this task.",
+      "cc_debug.log was CREATED by this task (the -C control-mode runs behind questions (a) and (b)) and has been removed.",
+      "next_session_id was advanced from 1 to 79 by this task's session creations. It is a monotonic counter psmux maintains; it cannot be decremented and was deliberately not edited."
+    ]
+  },
+  "qa_record": {
+    "case_1_failure_continues": {
+      "claim": "A probe targeting a nonexistent session records the error and the run CONTINUES.",
+      "proven_by": "qa.cjs CASE_1, real ssh invocation",
+      "errors_recorded": true,
+      "run_continued": true,
+      "PASS": true,
+      "exact_error_texts": [
+        "psmux: no server running on session 't5qmuuqqp64f__nosuchsess'",
+        "psmux: no server running on session 't5qmuuqqp64f__nosuchsess'",
+        ""
+      ],
+      "what_continued": "new-session then list-sessions returned \"stillworks\" and list-panes returned \"%1\", so a real probe ran and succeeded immediately after the failing ones."
+    },
+    "case_2_stray_guard_fires": {
+      "claim": "A run that leaves a session behind exits NON-ZERO rather than reporting success.",
+      "proven_by": "qa.cjs CASE_2 with guard cleanup DISABLED; the observed ssh exit code was 1",
+      "ssh_exit_code_observed": 1,
+      "deliberately_left_live": [
+        "leftover"
+      ],
+      "stray_detected": true,
+      "guard_pass_criterion": "run_passed = all_answered && registry_untouched && no_stray_sessions",
+      "driver_note": "A namespace was deliberately left with a live session and guard cleanup was DISABLED, so the stray survived and the driver exits 1 -- proving a stray session FAILS the run."
+    },
+    "real_probe_guards_that_passed": {
+      "probe2_run_passed": false,
+      "probe3_run_passed": true,
+      "probe2_namespaces_still_live_after_cleanup": [],
+      "probe3_namespaces_still_live_after_cleanup": [],
+      "probe3_surviving_psmux_processes": []
+    }
+  },
+  "harness_failures_and_fixes": {
+    "purpose": "Two of the three discarded passes were MY harness bugs, not psmux behaviour. Recorded so nobody re-derives them.",
+    "pass_1_invalid_questions": [
+      "a",
+      "b",
+      "c",
+      "d",
+      "e",
+      "j"
+    ],
+    "bug_1": "The options object was appended INTO the argv array instead of being passed as the third argument to spawnSync, so every probe needing a client cwd silently failed to create a session. Symptom: createLive() exhausted its retries and (c)(d)(e) then threw TypeError on undefined.liveness.",
+    "bug_2": "The netstat snapshot used by the liveness assertion was cached ONCE per run. Any port created after that first snapshot reported \"port not LISTENING\", so four healthy probes were discarded as HARNESS_LIMITATION. The servers had been alive the whole time.",
+    "bug_3": "Probe (j) passed the literal string \"undefined\" as the -t pane target because the pane id was never resolved, producing the misleading stderr \"psmux: no server running on session ...__undefined\".",
+    "bug_4": "The registry-cleanup walker did not recurse into subdirectories, so instances\\*.psmux tokens were invisible to it.",
+    "lesson": "A liveness assertion is only worth anything if it re-reads the evidence it asserts on. Caching the assertion input made the assertion itself lie."
+  },
+  "temp_cleanup_receipt": {
+    "windows_temp": "C:\\Users\\daniel\\AppData\\Local\\Temp",
+    "deleted_round_1": [
+      "probe.cjs",
+      "probe-out.json",
+      "probe2.cjs",
+      "probe2-out.json",
+      "probe3.cjs",
+      "probe3-out.json",
+      "probe-omo.ps1",
+      "probe1.ps1",
+      "probe2.ps1",
+      "recon.cjs",
+      "recon-out.json",
+      "ttyprobe.cjs",
+      "ttyprobe.ps1",
+      "ttyprobe-out.json",
+      "pilot.cjs",
+      "pilot-out.json",
+      "pilot2.cjs",
+      "pilot2-out.json",
+      "pilot3.cjs",
+      "pilot3-out.json",
+      "noise.cjs",
+      "sweep.cjs",
+      "sweeptest.cjs",
+      "survey.cjs",
+      "residue.cjs",
+      "stalecheck.cjs",
+      "diag.cjs",
+      "killstray.cjs",
+      "cleanup1.cjs",
+      "cleanup-registry.cjs",
+      "caps.cjs",
+      "caps-out.json",
+      "qa.cjs",
+      "qa-out.json",
+      "t5-dirA",
+      "t5-dirB",
+      "t5_g.cmd",
+      "t5_h.cmd",
+      "t5_h2.cmd",
+      "t5_h_out.txt",
+      "t5_h2_out.txt"
+    ],
+    "already_absent_round_1": [
+      "noise-out.json",
+      "sweep-out.json",
+      "sweeptest-out.json",
+      "survey-out.json",
+      "residue-out.json",
+      "stalecheck-out.json",
+      "diag-out.json",
+      "killstray-out.json",
+      "cleanup-registry-out.json",
+      "t5_g_out.txt"
+    ],
+    "deleted_round_3": [
+      "tmpcleanup.cjs",
+      "final-verify.cjs",
+      "final-clean.cjs",
+      "last.cjs",
+      "fv-out.json"
+    ],
+    "any_of_my_names_remaining": [],
+    "foreign_files_confirmed_left_alone": {
+      "omo-config.md": true,
+      "omo-install.md": true,
+      "e2e-stock-omo.ps1": true,
+      "omo-swap-A": true,
+      "omo-swap-B": true,
+      "omo-official": true,
+      "omodocs": true,
+      "omo-lab-seed": true,
+      "omo-configtest": true,
+      "omo-feasibility.ps1": true,
+      "omo-inventory.ps1": false,
+      "omo-state.ps1": true,
+      "parity-sweep.cjs": true,
+      "tmuxenv.cjs": true,
+      "stock-vs-shim.cjs": true
+    },
+    "remaining_total_entries": 607
+  },
+  "caveats_and_limits": [
+    "Three discarded passes cost roughly 25 minutes of wall clock. Two of the three root causes were bugs in my own harness (see harness_failures_and_fixes); none of them was psmux misbehaving.",
+    "Questions (a) and (b) were driven through psmux control mode (-C) rather than a real console, because control mode returns at src/main.rs:4513 BEFORE the is_terminal() gate at :4533 and therefore reaches the identical bare-session-spawn block over pipes. An earlier attempt with Start-Process -WindowStyle Hidden was abandoned: the client is killed before list-sessions lands.",
+    "Pane ids start at %1, never %0, and are only unique WITHIN a session -- list-panes -a across several sessions in one namespace repeats %1/%2. Every pane question therefore used its own single-session namespace.",
+    "For (e) the harness label is the weaker BOTH_NAMESPACES_COEXIST rather than ..._WITH_INDEPENDENT_PANES, because the comparison kept the \"%1|\" prefix when splitting list-panes output. The underlying evidence is unambiguous and is in capture_pane_samples: namespace 1 shows PS ...\\t5-dirA> and namespace 2 shows PS ...\\t5-dirB>. A label artefact, not a measurement doubt.",
+    "Killing a session's LAST pane kills the whole server, which replaces the pane error with \"psmux: no server running on session ...\" -- a string that does NOT match OmO's /can't find pane/i. Question (i) therefore always kept a surviving sibling pane.",
+    "config-warnings.log was removed by psmux itself during this task (see registry_untouched_detail)."
+  ],
+  "capture_pane_coverage": {
+    "pane_questions": [
+      "c",
+      "d",
+      "e",
+      "f",
+      "g",
+      "h",
+      "i",
+      "j",
+      "k",
+      "l"
+    ],
+    "with_capture_text": [
+      "c",
+      "d",
+      "e",
+      "g",
+      "h",
+      "j"
+    ],
+    "without_capture_text_and_why": {
+      "f": "No capture-pane was taken for (f): it is a layout-geometry question and its evidence is list-panes geometry (pane_left/pane_width) before and after, which is the authoritative measurement for a layout change. Not a pane-content question.",
+      "i": "No capture-pane was taken for (i): by construction the pane under test is DEAD, so there is nothing to capture. The evidence is the exit code and exact stderr of kill-pane, plus list-panes before/after showing the sibling pane survived.",
+      "k": "No capture-pane was taken for (k): it asks for the stdout shape of display-message -p, which is not pane content. Its evidence is the raw stdout bytes.",
+      "l": "No capture-pane was taken for (l): the evidence is the exit code plus a #{pane_title} read-back proving the title was set, which is stronger than pane text for this question."
+    },
+    "rule": "A pane that merely stays alive is NOT evidence. Every pane question that can be evidenced by visible text carries real capture-pane output."
+  }
+}

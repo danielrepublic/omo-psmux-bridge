@@ -1,0 +1,893 @@
+{
+ "task": "7-contract",
+ "plan": "omo-psmux-windows-parity",
+ "scope": "argv-and-environment forwarding contract of the installed opencode wrapper, proven with a stand-in recorder executable",
+ "produced_utc": "2026-10-05T07:25:28.7301757Z",
+ "host": "WINDOWS-DANIEL",
+ "status": "complete",
+ "method": {
+  "seam": "APPDATA is redirected at the batch level to a private temp tree whose npm\\node_modules\\opencode-ai\\bin\\opencode.exe is the recorder. That is step 1 of the helper's own Resolve-RealOpencode, so the INSTALLED opencode.cmd and omo-opencode-port.ps1 were executed completely unmodified and resolved the recorder with no production edit and no backdoor.",
+  "recorder": "a C# ConsoleApplication compiled in-place with Add-Type -OutputAssembly; it writes its complete argv, its OPENCODE_PORT, its TMUX and its own image path to $OMO_RECORDER_OUT as UTF-8 and exits 0 immediately.",
+  "real_binary_never_launched": true,
+  "why_no_console_capture": "every case asserts against the recorder's own UTF-8 file, not against a pipe, because ProcessStartInfo+ReadToEndAsync is unreliable on this host. The wrapper's own stdout was still redirected to a file and measured, and is reported per case.",
+  "encoding": "recorder output written with UTF8Encoding(false) and read back with ReadAllBytes + explicit UTF-8 decode. The driver's console is CP950/Big5, which is separately demonstrated in case c9.",
+  "timeouts": "25 s per case; zero cases timed out, so no wrapper/child teardown was needed",
+  "teardown_order": "wrapper (powershell) then cmd root, implemented but unused because nothing hung"
+ },
+ "installed_files_untouched": {
+  "opencode_cmd": {
+   "path": "C:\\Users\\Daniel\\AppData\\Local\\opencode-psmux-bridge\\bin\\opencode.cmd",
+   "bytes": 1560,
+   "sha256_before": "335CD4D2F33509125205FC3DDFCDD05B256DFFA056036D45334D1B392E12A05E",
+   "sha256_after": "335CD4D2F33509125205FC3DDFCDD05B256DFFA056036D45334D1B392E12A05E",
+   "unmodified": true
+  },
+  "omo_opencode_port_ps1": {
+   "path": "C:\\Users\\Daniel\\AppData\\Local\\opencode-psmux-bridge\\bin\\omo-opencode-port.ps1",
+   "bytes": 13925,
+   "sha256_before": "24705D90904CEC0B789BF73355ACF487624D74FE3BD625EACF6F0B66FBA31E52",
+   "sha256_after": "24705D90904CEC0B789BF73355ACF487624D74FE3BD625EACF6F0B66FBA31E52",
+   "unmodified": true
+  }
+ },
+ "recorder_preflight": {
+  "exit_code": 0,
+  "file_exists": true,
+  "content": "{\"self\":\"C:\\\\Users\\\\Daniel\\\\AppData\\\\Local\\\\Temp\\\\omo-t7c-bd4fad64\\\\appdata\\\\npm\\\\node_modules\\\\opencode-ai\\\\bin\\\\opencode.exe\",\"argc\":3,\"argv\":[\"--port\",\"7801\",\"alpha\"],\"OPENCODE_PORT\":null,\"TMUX\":null,\"cwd\":\"C:\\\\Users\\\\Daniel\"}"
+ },
+ "summary": {
+  "total": 41,
+  "pass": 39,
+  "fail": 1,
+  "informational": 1,
+  "ports_observed": [
+   "1234",
+   "7801",
+   "7803",
+   "8123",
+   "8199"
+  ]
+ },
+ "suspected_defects": [
+  {
+   "id": "OPENCODE_PORT=0-is-accepted",
+   "severity": "minor / parity-faithful but wrong in practice",
+   "evidence_case": "c5b_ocp_zero",
+   "observed": "argv==[\"--port\",\"0\"] and OPENCODE_PORT=0 forwarded verbatim, no bind attempted, exit 0.",
+   "expected_by_this_task": "fall back to a bind and yield a port in 7801-7901.",
+   "analysis": "The helper mirrors /home/daniel/.bashrc:61-63, whose case \"$port\" in \"\"|*[!0-9]*) accepts \"0\" as valid, so the helper is a faithful port. But port 0 is not a bindable target: the Linux reference would then run opencode --port 0, and OmO resolveServerUrl reads env.OPENCODE_PORT verbatim rather than re-validating it. The plan text (todo 7) and the bash reference disagree with each other here; the wrapper follows the bash reference. NOT FIXED - reported only, per instructions.",
+   "secondary_note": "the same gap exists in /home/daniel/.bashrc, so fixing only the Windows side would create a divergence."
+  }
+ ],
+ "cases": {
+  "c1_tmux_unset_passthrough": {
+   "status": "PASS",
+   "assertion": "TMUX unset: argv must be byte-identical, no --port, no port logic",
+   "wrapper_invocation": "--print-logs \"two words\" tail",
+   "env_tmux": "unset",
+   "env_opencode_port_in": null,
+   "ports_held_busy_by_driver": [],
+   "wrapper_exit_code": 0,
+   "recorded_exe": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-t7c-bd4fad64\\appdata\\npm\\node_modules\\opencode-ai\\bin\\opencode.exe",
+   "recorded_argv": [
+    "--print-logs",
+    "two words",
+    "tail"
+   ],
+   "recorded_OPENCODE_PORT": null,
+   "recorded_TMUX": null,
+   "wrapper_stderr": null,
+   "wrapper_stdout_len": 0,
+   "timed_out": false,
+   "why": "argv byte-identical to the three tokens sent; no --port prepended; OPENCODE_PORT absent from child env"
+  },
+  "c2_tmux_set_no_args": {
+   "status": "PASS",
+   "assertion": "TMUX set, no args: argv == [\"--port\", n], OPENCODE_PORT == n in 7801-7901",
+   "wrapper_invocation": "",
+   "env_tmux": "set",
+   "env_opencode_port_in": null,
+   "ports_held_busy_by_driver": [],
+   "wrapper_exit_code": 0,
+   "recorded_exe": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-t7c-bd4fad64\\appdata\\npm\\node_modules\\opencode-ai\\bin\\opencode.exe",
+   "recorded_argv": [
+    "--port",
+    "7801"
+   ],
+   "recorded_OPENCODE_PORT": "7801",
+   "recorded_TMUX": "/tmp/t7c-fake-tmux,1234,0",
+   "wrapper_stderr": "[opencode-wrapper] tmux detected -> starting opencode with --port 7801",
+   "wrapper_stdout_len": 0,
+   "timed_out": false,
+   "why": "argv==[\"--port\",\"7801\"] with OPENCODE_PORT=7801; p in 7801-7901"
+  },
+  "c2b_busy_7801_7802": {
+   "status": "PASS",
+   "assertion": "7801+7802 held busy: real bind probe must skip them and pick 7803",
+   "wrapper_invocation": "",
+   "env_tmux": "set",
+   "env_opencode_port_in": null,
+   "ports_held_busy_by_driver": [
+    7801,
+    7802
+   ],
+   "wrapper_exit_code": 0,
+   "recorded_exe": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-t7c-bd4fad64\\appdata\\npm\\node_modules\\opencode-ai\\bin\\opencode.exe",
+   "recorded_argv": [
+    "--port",
+    "7803"
+   ],
+   "recorded_OPENCODE_PORT": "7803",
+   "recorded_TMUX": "/tmp/t7c-fake-tmux,1234,0",
+   "wrapper_stderr": "[opencode-wrapper] tmux detected -> starting opencode with --port 7803",
+   "wrapper_stdout_len": 0,
+   "timed_out": false,
+   "why": "argv==[\"--port\",\"7803\"] with OPENCODE_PORT=7803; p in 7801-7901; 7801 and 7802 were HELD BOUND by the driver, so reaching 7803 proves a real exclusive bind probe, not a liveness check or a fixed default"
+  },
+  "c3_tmux_set_port_1234": {
+   "status": "PASS",
+   "assertion": "--port short circuit: unchanged, no auto-bind",
+   "wrapper_invocation": "--port 1234",
+   "env_tmux": "set",
+   "env_opencode_port_in": null,
+   "ports_held_busy_by_driver": [],
+   "wrapper_exit_code": 0,
+   "recorded_exe": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-t7c-bd4fad64\\appdata\\npm\\node_modules\\opencode-ai\\bin\\opencode.exe",
+   "recorded_argv": [
+    "--port",
+    "1234"
+   ],
+   "recorded_OPENCODE_PORT": null,
+   "recorded_TMUX": "/tmp/t7c-fake-tmux,1234,0",
+   "wrapper_stderr": null,
+   "wrapper_stdout_len": 0,
+   "timed_out": false,
+   "why": "argv forwarded unchanged as two tokens; no auto-bind; OPENCODE_PORT absent"
+  },
+  "c4a_ocp_8199_held_busy": {
+   "status": "PASS",
+   "assertion": "OPENCODE_PORT=8199 while 8199 is HELD BOUND: proves env trusted, no bind attempted",
+   "wrapper_invocation": "",
+   "env_tmux": "set",
+   "env_opencode_port_in": "8199",
+   "ports_held_busy_by_driver": [
+    8199
+   ],
+   "wrapper_exit_code": 0,
+   "recorded_exe": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-t7c-bd4fad64\\appdata\\npm\\node_modules\\opencode-ai\\bin\\opencode.exe",
+   "recorded_argv": [
+    "--port",
+    "8199"
+   ],
+   "recorded_OPENCODE_PORT": "8199",
+   "recorded_TMUX": "/tmp/t7c-fake-tmux,1234,0",
+   "wrapper_stderr": "[opencode-wrapper] tmux detected -> starting opencode with --port 8199",
+   "wrapper_stdout_len": 0,
+   "timed_out": false,
+   "why": "OPENCODE_PORT=8199 used verbatim WHILE the driver held an exclusive listener on 8199; a bind of 8199 would have failed, so the fact that it did not touch the socket proves the env value short-circuits the probe entirely"
+  },
+  "c4b_ocp_8123_no_listener": {
+   "status": "PASS",
+   "assertion": "OPENCODE_PORT=8123 with nothing bound: a real bind probe would have returned 7801, so 8123 proves no bind",
+   "wrapper_invocation": "",
+   "env_tmux": "set",
+   "env_opencode_port_in": "8123",
+   "ports_held_busy_by_driver": [],
+   "wrapper_exit_code": 0,
+   "recorded_exe": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-t7c-bd4fad64\\appdata\\npm\\node_modules\\opencode-ai\\bin\\opencode.exe",
+   "recorded_argv": [
+    "--port",
+    "8123"
+   ],
+   "recorded_OPENCODE_PORT": "8123",
+   "recorded_TMUX": "/tmp/t7c-fake-tmux,1234,0",
+   "wrapper_stderr": "[opencode-wrapper] tmux detected -> starting opencode with --port 8123",
+   "wrapper_stdout_len": 0,
+   "timed_out": false,
+   "why": "OPENCODE_PORT=8123 with 7801 free; a probe would have returned 7801, obtaining 8123 proves no bind occurred"
+  },
+  "c5a_ocp_nonnumeric": {
+   "status": "PASS",
+   "assertion": "OPENCODE_PORT=abc must fall back to a bind",
+   "wrapper_invocation": "",
+   "env_tmux": "set",
+   "env_opencode_port_in": "abc",
+   "ports_held_busy_by_driver": [],
+   "wrapper_exit_code": 0,
+   "recorded_exe": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-t7c-bd4fad64\\appdata\\npm\\node_modules\\opencode-ai\\bin\\opencode.exe",
+   "recorded_argv": [
+    "--port",
+    "7801"
+   ],
+   "recorded_OPENCODE_PORT": "7801",
+   "recorded_TMUX": "/tmp/t7c-fake-tmux,1234,0",
+   "wrapper_stderr": "[opencode-wrapper] tmux detected -> starting opencode with --port 7801",
+   "wrapper_stdout_len": 0,
+   "timed_out": false,
+   "why": "OPENCODE_PORT=abc rejected as non-integer; fell back to a bind and got 7801 (in range)"
+  },
+  "c5b_ocp_zero": {
+   "status": "FAIL",
+   "assertion": "OPENCODE_PORT=0 - task expects fallback; bash reference accepts 0",
+   "wrapper_invocation": "",
+   "env_tmux": "set",
+   "env_opencode_port_in": "0",
+   "ports_held_busy_by_driver": [],
+   "wrapper_exit_code": 0,
+   "recorded_exe": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-t7c-bd4fad64\\appdata\\npm\\node_modules\\opencode-ai\\bin\\opencode.exe",
+   "recorded_argv": [
+    "--port",
+    "0"
+   ],
+   "recorded_OPENCODE_PORT": "0",
+   "recorded_TMUX": "/tmp/t7c-fake-tmux,1234,0",
+   "wrapper_stderr": "[opencode-wrapper] tmux detected -> starting opencode with --port 0",
+   "wrapper_stdout_len": 0,
+   "timed_out": false,
+   "why": "OPENCODE_PORT=0 was ACCEPTED as a valid integer: argv==[\"--port\", \"0\"] OPENCODE_PORT='0', no bind, port 0 forwarded verbatim. The task expects a fallback to a real bind. /home/daniel/.bashrc:61-63 accepts \"0\" identically (case \"\"|*[!0-9]*) so this is faithful parity, but \"port 0\" is not a usable bind target and OmO resolveServerUrl would read it verbatim."
+  },
+  "c6_flag_port_equals": {
+   "status": "PASS",
+   "assertion": "flag matrix: --port=*",
+   "wrapper_invocation": "--port=5678",
+   "env_tmux": "set",
+   "env_opencode_port_in": null,
+   "ports_held_busy_by_driver": [],
+   "wrapper_exit_code": 0,
+   "recorded_exe": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-t7c-bd4fad64\\appdata\\npm\\node_modules\\opencode-ai\\bin\\opencode.exe",
+   "recorded_argv": [
+    "--port=5678"
+   ],
+   "recorded_OPENCODE_PORT": null,
+   "recorded_TMUX": "/tmp/t7c-fake-tmux,1234,0",
+   "wrapper_stderr": null,
+   "wrapper_stdout_len": 0,
+   "timed_out": false,
+   "why": "--port=5678 forwarded byte-identically as argv=[\"--port=5678\"]; OPENCODE_PORT absent; no port logic"
+  },
+  "c6_flag_h": {
+   "status": "PASS",
+   "assertion": "flag matrix: -h",
+   "wrapper_invocation": "-h",
+   "env_tmux": "set",
+   "env_opencode_port_in": null,
+   "ports_held_busy_by_driver": [],
+   "wrapper_exit_code": 0,
+   "recorded_exe": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-t7c-bd4fad64\\appdata\\npm\\node_modules\\opencode-ai\\bin\\opencode.exe",
+   "recorded_argv": [
+    "-h"
+   ],
+   "recorded_OPENCODE_PORT": null,
+   "recorded_TMUX": "/tmp/t7c-fake-tmux,1234,0",
+   "wrapper_stderr": null,
+   "wrapper_stdout_len": 0,
+   "timed_out": false,
+   "why": "-h forwarded byte-identically as argv=[\"-h\"]; OPENCODE_PORT absent; no port logic"
+  },
+  "c6_flag_help": {
+   "status": "PASS",
+   "assertion": "flag matrix: --help",
+   "wrapper_invocation": "--help",
+   "env_tmux": "set",
+   "env_opencode_port_in": null,
+   "ports_held_busy_by_driver": [],
+   "wrapper_exit_code": 0,
+   "recorded_exe": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-t7c-bd4fad64\\appdata\\npm\\node_modules\\opencode-ai\\bin\\opencode.exe",
+   "recorded_argv": [
+    "--help"
+   ],
+   "recorded_OPENCODE_PORT": null,
+   "recorded_TMUX": "/tmp/t7c-fake-tmux,1234,0",
+   "wrapper_stderr": null,
+   "wrapper_stdout_len": 0,
+   "timed_out": false,
+   "why": "--help forwarded byte-identically as argv=[\"--help\"]; OPENCODE_PORT absent; no port logic"
+  },
+  "c6_flag_v": {
+   "status": "PASS",
+   "assertion": "flag matrix: -v",
+   "wrapper_invocation": "-v",
+   "env_tmux": "set",
+   "env_opencode_port_in": null,
+   "ports_held_busy_by_driver": [],
+   "wrapper_exit_code": 0,
+   "recorded_exe": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-t7c-bd4fad64\\appdata\\npm\\node_modules\\opencode-ai\\bin\\opencode.exe",
+   "recorded_argv": [
+    "-v"
+   ],
+   "recorded_OPENCODE_PORT": null,
+   "recorded_TMUX": "/tmp/t7c-fake-tmux,1234,0",
+   "wrapper_stderr": null,
+   "wrapper_stdout_len": 0,
+   "timed_out": false,
+   "why": "-v forwarded byte-identically as argv=[\"-v\"]; OPENCODE_PORT absent; no port logic"
+  },
+  "c6_flag_version": {
+   "status": "PASS",
+   "assertion": "flag matrix: --version",
+   "wrapper_invocation": "--version",
+   "env_tmux": "set",
+   "env_opencode_port_in": null,
+   "ports_held_busy_by_driver": [],
+   "wrapper_exit_code": 0,
+   "recorded_exe": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-t7c-bd4fad64\\appdata\\npm\\node_modules\\opencode-ai\\bin\\opencode.exe",
+   "recorded_argv": [
+    "--version"
+   ],
+   "recorded_OPENCODE_PORT": null,
+   "recorded_TMUX": "/tmp/t7c-fake-tmux,1234,0",
+   "wrapper_stderr": null,
+   "wrapper_stdout_len": 0,
+   "timed_out": false,
+   "why": "--version forwarded byte-identically as argv=[\"--version\"]; OPENCODE_PORT absent; no port logic"
+  },
+  "c7_subcommand_completion": {
+   "status": "PASS",
+   "assertion": "subcommand matrix: completion must pass through with no port logic",
+   "wrapper_invocation": "completion list",
+   "env_tmux": "set",
+   "env_opencode_port_in": null,
+   "ports_held_busy_by_driver": [],
+   "wrapper_exit_code": 0,
+   "recorded_exe": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-t7c-bd4fad64\\appdata\\npm\\node_modules\\opencode-ai\\bin\\opencode.exe",
+   "recorded_argv": [
+    "completion",
+    "list"
+   ],
+   "recorded_OPENCODE_PORT": null,
+   "recorded_TMUX": "/tmp/t7c-fake-tmux,1234,0",
+   "wrapper_stderr": null,
+   "wrapper_stdout_len": 0,
+   "timed_out": false,
+   "why": "first-argument subcommand 'completion' forwarded byte-identically with its operand; OPENCODE_PORT absent; no bind"
+  },
+  "c7_subcommand_acp": {
+   "status": "PASS",
+   "assertion": "subcommand matrix: acp must pass through with no port logic",
+   "wrapper_invocation": "acp list",
+   "env_tmux": "set",
+   "env_opencode_port_in": null,
+   "ports_held_busy_by_driver": [],
+   "wrapper_exit_code": 0,
+   "recorded_exe": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-t7c-bd4fad64\\appdata\\npm\\node_modules\\opencode-ai\\bin\\opencode.exe",
+   "recorded_argv": [
+    "acp",
+    "list"
+   ],
+   "recorded_OPENCODE_PORT": null,
+   "recorded_TMUX": "/tmp/t7c-fake-tmux,1234,0",
+   "wrapper_stderr": null,
+   "wrapper_stdout_len": 0,
+   "timed_out": false,
+   "why": "first-argument subcommand 'acp' forwarded byte-identically with its operand; OPENCODE_PORT absent; no bind"
+  },
+  "c7_subcommand_mcp": {
+   "status": "PASS",
+   "assertion": "subcommand matrix: mcp must pass through with no port logic",
+   "wrapper_invocation": "mcp list",
+   "env_tmux": "set",
+   "env_opencode_port_in": null,
+   "ports_held_busy_by_driver": [],
+   "wrapper_exit_code": 0,
+   "recorded_exe": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-t7c-bd4fad64\\appdata\\npm\\node_modules\\opencode-ai\\bin\\opencode.exe",
+   "recorded_argv": [
+    "mcp",
+    "list"
+   ],
+   "recorded_OPENCODE_PORT": null,
+   "recorded_TMUX": "/tmp/t7c-fake-tmux,1234,0",
+   "wrapper_stderr": null,
+   "wrapper_stdout_len": 0,
+   "timed_out": false,
+   "why": "first-argument subcommand 'mcp' forwarded byte-identically with its operand; OPENCODE_PORT absent; no bind"
+  },
+  "c7_subcommand_attach": {
+   "status": "PASS",
+   "assertion": "subcommand matrix: attach must pass through with no port logic",
+   "wrapper_invocation": "attach list",
+   "env_tmux": "set",
+   "env_opencode_port_in": null,
+   "ports_held_busy_by_driver": [],
+   "wrapper_exit_code": 0,
+   "recorded_exe": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-t7c-bd4fad64\\appdata\\npm\\node_modules\\opencode-ai\\bin\\opencode.exe",
+   "recorded_argv": [
+    "attach",
+    "list"
+   ],
+   "recorded_OPENCODE_PORT": null,
+   "recorded_TMUX": "/tmp/t7c-fake-tmux,1234,0",
+   "wrapper_stderr": null,
+   "wrapper_stdout_len": 0,
+   "timed_out": false,
+   "why": "first-argument subcommand 'attach' forwarded byte-identically with its operand; OPENCODE_PORT absent; no bind"
+  },
+  "c7_subcommand_run": {
+   "status": "PASS",
+   "assertion": "subcommand matrix: run must pass through with no port logic",
+   "wrapper_invocation": "run list",
+   "env_tmux": "set",
+   "env_opencode_port_in": null,
+   "ports_held_busy_by_driver": [],
+   "wrapper_exit_code": 0,
+   "recorded_exe": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-t7c-bd4fad64\\appdata\\npm\\node_modules\\opencode-ai\\bin\\opencode.exe",
+   "recorded_argv": [
+    "run",
+    "list"
+   ],
+   "recorded_OPENCODE_PORT": null,
+   "recorded_TMUX": "/tmp/t7c-fake-tmux,1234,0",
+   "wrapper_stderr": null,
+   "wrapper_stdout_len": 0,
+   "timed_out": false,
+   "why": "first-argument subcommand 'run' forwarded byte-identically with its operand; OPENCODE_PORT absent; no bind"
+  },
+  "c7_subcommand_debug": {
+   "status": "PASS",
+   "assertion": "subcommand matrix: debug must pass through with no port logic",
+   "wrapper_invocation": "debug list",
+   "env_tmux": "set",
+   "env_opencode_port_in": null,
+   "ports_held_busy_by_driver": [],
+   "wrapper_exit_code": 0,
+   "recorded_exe": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-t7c-bd4fad64\\appdata\\npm\\node_modules\\opencode-ai\\bin\\opencode.exe",
+   "recorded_argv": [
+    "debug",
+    "list"
+   ],
+   "recorded_OPENCODE_PORT": null,
+   "recorded_TMUX": "/tmp/t7c-fake-tmux,1234,0",
+   "wrapper_stderr": null,
+   "wrapper_stdout_len": 0,
+   "timed_out": false,
+   "why": "first-argument subcommand 'debug' forwarded byte-identically with its operand; OPENCODE_PORT absent; no bind"
+  },
+  "c7_subcommand_providers": {
+   "status": "PASS",
+   "assertion": "subcommand matrix: providers must pass through with no port logic",
+   "wrapper_invocation": "providers list",
+   "env_tmux": "set",
+   "env_opencode_port_in": null,
+   "ports_held_busy_by_driver": [],
+   "wrapper_exit_code": 0,
+   "recorded_exe": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-t7c-bd4fad64\\appdata\\npm\\node_modules\\opencode-ai\\bin\\opencode.exe",
+   "recorded_argv": [
+    "providers",
+    "list"
+   ],
+   "recorded_OPENCODE_PORT": null,
+   "recorded_TMUX": "/tmp/t7c-fake-tmux,1234,0",
+   "wrapper_stderr": null,
+   "wrapper_stdout_len": 0,
+   "timed_out": false,
+   "why": "first-argument subcommand 'providers' forwarded byte-identically with its operand; OPENCODE_PORT absent; no bind"
+  },
+  "c7_subcommand_auth": {
+   "status": "PASS",
+   "assertion": "subcommand matrix: auth must pass through with no port logic",
+   "wrapper_invocation": "auth list",
+   "env_tmux": "set",
+   "env_opencode_port_in": null,
+   "ports_held_busy_by_driver": [],
+   "wrapper_exit_code": 0,
+   "recorded_exe": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-t7c-bd4fad64\\appdata\\npm\\node_modules\\opencode-ai\\bin\\opencode.exe",
+   "recorded_argv": [
+    "auth",
+    "list"
+   ],
+   "recorded_OPENCODE_PORT": null,
+   "recorded_TMUX": "/tmp/t7c-fake-tmux,1234,0",
+   "wrapper_stderr": null,
+   "wrapper_stdout_len": 0,
+   "timed_out": false,
+   "why": "first-argument subcommand 'auth' forwarded byte-identically with its operand; OPENCODE_PORT absent; no bind"
+  },
+  "c7_subcommand_agent": {
+   "status": "PASS",
+   "assertion": "subcommand matrix: agent must pass through with no port logic",
+   "wrapper_invocation": "agent list",
+   "env_tmux": "set",
+   "env_opencode_port_in": null,
+   "ports_held_busy_by_driver": [],
+   "wrapper_exit_code": 0,
+   "recorded_exe": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-t7c-bd4fad64\\appdata\\npm\\node_modules\\opencode-ai\\bin\\opencode.exe",
+   "recorded_argv": [
+    "agent",
+    "list"
+   ],
+   "recorded_OPENCODE_PORT": null,
+   "recorded_TMUX": "/tmp/t7c-fake-tmux,1234,0",
+   "wrapper_stderr": null,
+   "wrapper_stdout_len": 0,
+   "timed_out": false,
+   "why": "first-argument subcommand 'agent' forwarded byte-identically with its operand; OPENCODE_PORT absent; no bind"
+  },
+  "c7_subcommand_upgrade": {
+   "status": "PASS",
+   "assertion": "subcommand matrix: upgrade must pass through with no port logic",
+   "wrapper_invocation": "upgrade list",
+   "env_tmux": "set",
+   "env_opencode_port_in": null,
+   "ports_held_busy_by_driver": [],
+   "wrapper_exit_code": 0,
+   "recorded_exe": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-t7c-bd4fad64\\appdata\\npm\\node_modules\\opencode-ai\\bin\\opencode.exe",
+   "recorded_argv": [
+    "upgrade",
+    "list"
+   ],
+   "recorded_OPENCODE_PORT": null,
+   "recorded_TMUX": "/tmp/t7c-fake-tmux,1234,0",
+   "wrapper_stderr": null,
+   "wrapper_stdout_len": 0,
+   "timed_out": false,
+   "why": "first-argument subcommand 'upgrade' forwarded byte-identically with its operand; OPENCODE_PORT absent; no bind"
+  },
+  "c7_subcommand_uninstall": {
+   "status": "PASS",
+   "assertion": "subcommand matrix: uninstall must pass through with no port logic",
+   "wrapper_invocation": "uninstall list",
+   "env_tmux": "set",
+   "env_opencode_port_in": null,
+   "ports_held_busy_by_driver": [],
+   "wrapper_exit_code": 0,
+   "recorded_exe": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-t7c-bd4fad64\\appdata\\npm\\node_modules\\opencode-ai\\bin\\opencode.exe",
+   "recorded_argv": [
+    "uninstall",
+    "list"
+   ],
+   "recorded_OPENCODE_PORT": null,
+   "recorded_TMUX": "/tmp/t7c-fake-tmux,1234,0",
+   "wrapper_stderr": null,
+   "wrapper_stdout_len": 0,
+   "timed_out": false,
+   "why": "first-argument subcommand 'uninstall' forwarded byte-identically with its operand; OPENCODE_PORT absent; no bind"
+  },
+  "c7_subcommand_serve": {
+   "status": "PASS",
+   "assertion": "subcommand matrix: serve must pass through with no port logic",
+   "wrapper_invocation": "serve list",
+   "env_tmux": "set",
+   "env_opencode_port_in": null,
+   "ports_held_busy_by_driver": [],
+   "wrapper_exit_code": 0,
+   "recorded_exe": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-t7c-bd4fad64\\appdata\\npm\\node_modules\\opencode-ai\\bin\\opencode.exe",
+   "recorded_argv": [
+    "serve",
+    "list"
+   ],
+   "recorded_OPENCODE_PORT": null,
+   "recorded_TMUX": "/tmp/t7c-fake-tmux,1234,0",
+   "wrapper_stderr": null,
+   "wrapper_stdout_len": 0,
+   "timed_out": false,
+   "why": "first-argument subcommand 'serve' forwarded byte-identically with its operand; OPENCODE_PORT absent; no bind"
+  },
+  "c7_subcommand_web": {
+   "status": "PASS",
+   "assertion": "subcommand matrix: web must pass through with no port logic",
+   "wrapper_invocation": "web list",
+   "env_tmux": "set",
+   "env_opencode_port_in": null,
+   "ports_held_busy_by_driver": [],
+   "wrapper_exit_code": 0,
+   "recorded_exe": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-t7c-bd4fad64\\appdata\\npm\\node_modules\\opencode-ai\\bin\\opencode.exe",
+   "recorded_argv": [
+    "web",
+    "list"
+   ],
+   "recorded_OPENCODE_PORT": null,
+   "recorded_TMUX": "/tmp/t7c-fake-tmux,1234,0",
+   "wrapper_stderr": null,
+   "wrapper_stdout_len": 0,
+   "timed_out": false,
+   "why": "first-argument subcommand 'web' forwarded byte-identically with its operand; OPENCODE_PORT absent; no bind"
+  },
+  "c7_subcommand_models": {
+   "status": "PASS",
+   "assertion": "subcommand matrix: models must pass through with no port logic",
+   "wrapper_invocation": "models list",
+   "env_tmux": "set",
+   "env_opencode_port_in": null,
+   "ports_held_busy_by_driver": [],
+   "wrapper_exit_code": 0,
+   "recorded_exe": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-t7c-bd4fad64\\appdata\\npm\\node_modules\\opencode-ai\\bin\\opencode.exe",
+   "recorded_argv": [
+    "models",
+    "list"
+   ],
+   "recorded_OPENCODE_PORT": null,
+   "recorded_TMUX": "/tmp/t7c-fake-tmux,1234,0",
+   "wrapper_stderr": null,
+   "wrapper_stdout_len": 0,
+   "timed_out": false,
+   "why": "first-argument subcommand 'models' forwarded byte-identically with its operand; OPENCODE_PORT absent; no bind"
+  },
+  "c7_subcommand_stats": {
+   "status": "PASS",
+   "assertion": "subcommand matrix: stats must pass through with no port logic",
+   "wrapper_invocation": "stats list",
+   "env_tmux": "set",
+   "env_opencode_port_in": null,
+   "ports_held_busy_by_driver": [],
+   "wrapper_exit_code": 0,
+   "recorded_exe": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-t7c-bd4fad64\\appdata\\npm\\node_modules\\opencode-ai\\bin\\opencode.exe",
+   "recorded_argv": [
+    "stats",
+    "list"
+   ],
+   "recorded_OPENCODE_PORT": null,
+   "recorded_TMUX": "/tmp/t7c-fake-tmux,1234,0",
+   "wrapper_stderr": null,
+   "wrapper_stdout_len": 0,
+   "timed_out": false,
+   "why": "first-argument subcommand 'stats' forwarded byte-identically with its operand; OPENCODE_PORT absent; no bind"
+  },
+  "c7_subcommand_export": {
+   "status": "PASS",
+   "assertion": "subcommand matrix: export must pass through with no port logic",
+   "wrapper_invocation": "export list",
+   "env_tmux": "set",
+   "env_opencode_port_in": null,
+   "ports_held_busy_by_driver": [],
+   "wrapper_exit_code": 0,
+   "recorded_exe": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-t7c-bd4fad64\\appdata\\npm\\node_modules\\opencode-ai\\bin\\opencode.exe",
+   "recorded_argv": [
+    "export",
+    "list"
+   ],
+   "recorded_OPENCODE_PORT": null,
+   "recorded_TMUX": "/tmp/t7c-fake-tmux,1234,0",
+   "wrapper_stderr": null,
+   "wrapper_stdout_len": 0,
+   "timed_out": false,
+   "why": "first-argument subcommand 'export' forwarded byte-identically with its operand; OPENCODE_PORT absent; no bind"
+  },
+  "c7_subcommand_import": {
+   "status": "PASS",
+   "assertion": "subcommand matrix: import must pass through with no port logic",
+   "wrapper_invocation": "import list",
+   "env_tmux": "set",
+   "env_opencode_port_in": null,
+   "ports_held_busy_by_driver": [],
+   "wrapper_exit_code": 0,
+   "recorded_exe": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-t7c-bd4fad64\\appdata\\npm\\node_modules\\opencode-ai\\bin\\opencode.exe",
+   "recorded_argv": [
+    "import",
+    "list"
+   ],
+   "recorded_OPENCODE_PORT": null,
+   "recorded_TMUX": "/tmp/t7c-fake-tmux,1234,0",
+   "wrapper_stderr": null,
+   "wrapper_stdout_len": 0,
+   "timed_out": false,
+   "why": "first-argument subcommand 'import' forwarded byte-identically with its operand; OPENCODE_PORT absent; no bind"
+  },
+  "c7_subcommand_github": {
+   "status": "PASS",
+   "assertion": "subcommand matrix: github must pass through with no port logic",
+   "wrapper_invocation": "github list",
+   "env_tmux": "set",
+   "env_opencode_port_in": null,
+   "ports_held_busy_by_driver": [],
+   "wrapper_exit_code": 0,
+   "recorded_exe": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-t7c-bd4fad64\\appdata\\npm\\node_modules\\opencode-ai\\bin\\opencode.exe",
+   "recorded_argv": [
+    "github",
+    "list"
+   ],
+   "recorded_OPENCODE_PORT": null,
+   "recorded_TMUX": "/tmp/t7c-fake-tmux,1234,0",
+   "wrapper_stderr": null,
+   "wrapper_stdout_len": 0,
+   "timed_out": false,
+   "why": "first-argument subcommand 'github' forwarded byte-identically with its operand; OPENCODE_PORT absent; no bind"
+  },
+  "c7_subcommand_pr": {
+   "status": "PASS",
+   "assertion": "subcommand matrix: pr must pass through with no port logic",
+   "wrapper_invocation": "pr list",
+   "env_tmux": "set",
+   "env_opencode_port_in": null,
+   "ports_held_busy_by_driver": [],
+   "wrapper_exit_code": 0,
+   "recorded_exe": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-t7c-bd4fad64\\appdata\\npm\\node_modules\\opencode-ai\\bin\\opencode.exe",
+   "recorded_argv": [
+    "pr",
+    "list"
+   ],
+   "recorded_OPENCODE_PORT": null,
+   "recorded_TMUX": "/tmp/t7c-fake-tmux,1234,0",
+   "wrapper_stderr": null,
+   "wrapper_stdout_len": 0,
+   "timed_out": false,
+   "why": "first-argument subcommand 'pr' forwarded byte-identically with its operand; OPENCODE_PORT absent; no bind"
+  },
+  "c7_subcommand_session": {
+   "status": "PASS",
+   "assertion": "subcommand matrix: session must pass through with no port logic",
+   "wrapper_invocation": "session list",
+   "env_tmux": "set",
+   "env_opencode_port_in": null,
+   "ports_held_busy_by_driver": [],
+   "wrapper_exit_code": 0,
+   "recorded_exe": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-t7c-bd4fad64\\appdata\\npm\\node_modules\\opencode-ai\\bin\\opencode.exe",
+   "recorded_argv": [
+    "session",
+    "list"
+   ],
+   "recorded_OPENCODE_PORT": null,
+   "recorded_TMUX": "/tmp/t7c-fake-tmux,1234,0",
+   "wrapper_stderr": null,
+   "wrapper_stdout_len": 0,
+   "timed_out": false,
+   "why": "first-argument subcommand 'session' forwarded byte-identically with its operand; OPENCODE_PORT absent; no bind"
+  },
+  "c7_subcommand_plugin": {
+   "status": "PASS",
+   "assertion": "subcommand matrix: plugin must pass through with no port logic",
+   "wrapper_invocation": "plugin list",
+   "env_tmux": "set",
+   "env_opencode_port_in": null,
+   "ports_held_busy_by_driver": [],
+   "wrapper_exit_code": 0,
+   "recorded_exe": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-t7c-bd4fad64\\appdata\\npm\\node_modules\\opencode-ai\\bin\\opencode.exe",
+   "recorded_argv": [
+    "plugin",
+    "list"
+   ],
+   "recorded_OPENCODE_PORT": null,
+   "recorded_TMUX": "/tmp/t7c-fake-tmux,1234,0",
+   "wrapper_stderr": null,
+   "wrapper_stdout_len": 0,
+   "timed_out": false,
+   "why": "first-argument subcommand 'plugin' forwarded byte-identically with its operand; OPENCODE_PORT absent; no bind"
+  },
+  "c7_subcommand_plug": {
+   "status": "PASS",
+   "assertion": "subcommand matrix: plug must pass through with no port logic",
+   "wrapper_invocation": "plug list",
+   "env_tmux": "set",
+   "env_opencode_port_in": null,
+   "ports_held_busy_by_driver": [],
+   "wrapper_exit_code": 0,
+   "recorded_exe": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-t7c-bd4fad64\\appdata\\npm\\node_modules\\opencode-ai\\bin\\opencode.exe",
+   "recorded_argv": [
+    "plug",
+    "list"
+   ],
+   "recorded_OPENCODE_PORT": null,
+   "recorded_TMUX": "/tmp/t7c-fake-tmux,1234,0",
+   "wrapper_stderr": null,
+   "wrapper_stdout_len": 0,
+   "timed_out": false,
+   "why": "first-argument subcommand 'plug' forwarded byte-identically with its operand; OPENCODE_PORT absent; no bind"
+  },
+  "c7_subcommand_db": {
+   "status": "PASS",
+   "assertion": "subcommand matrix: db must pass through with no port logic",
+   "wrapper_invocation": "db list",
+   "env_tmux": "set",
+   "env_opencode_port_in": null,
+   "ports_held_busy_by_driver": [],
+   "wrapper_exit_code": 0,
+   "recorded_exe": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-t7c-bd4fad64\\appdata\\npm\\node_modules\\opencode-ai\\bin\\opencode.exe",
+   "recorded_argv": [
+    "db",
+    "list"
+   ],
+   "recorded_OPENCODE_PORT": null,
+   "recorded_TMUX": "/tmp/t7c-fake-tmux,1234,0",
+   "wrapper_stderr": null,
+   "wrapper_stdout_len": 0,
+   "timed_out": false,
+   "why": "first-argument subcommand 'db' forwarded byte-identically with its operand; OPENCODE_PORT absent; no bind"
+  },
+  "c8a_payload_sh_behind_help": {
+   "status": "PASS",
+   "assertion": "payload-looking text behind --help: pure passthrough",
+   "wrapper_invocation": "--help /bin/sh -c \"echo hi\"",
+   "env_tmux": "set",
+   "env_opencode_port_in": null,
+   "ports_held_busy_by_driver": [],
+   "wrapper_exit_code": 0,
+   "recorded_exe": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-t7c-bd4fad64\\appdata\\npm\\node_modules\\opencode-ai\\bin\\opencode.exe",
+   "recorded_argv": [
+    "--help",
+    "/bin/sh",
+    "-c",
+    "echo hi"
+   ],
+   "recorded_OPENCODE_PORT": null,
+   "recorded_TMUX": "/tmp/t7c-fake-tmux,1234,0",
+   "wrapper_stderr": null,
+   "wrapper_stdout_len": 0,
+   "timed_out": false,
+   "why": "payload-looking text behind --help passed through untouched as [\"--help\", \"/bin/sh\", \"-c\", \"echo hi\"]; no port logic; OPENCODE_PORT absent"
+  },
+  "c8b_payload_envassign_help": {
+   "status": "PASS",
+   "assertion": "-e A=B behind --help: pure passthrough",
+   "wrapper_invocation": "--help -e A=B",
+   "env_tmux": "set",
+   "env_opencode_port_in": null,
+   "ports_held_busy_by_driver": [],
+   "wrapper_exit_code": 0,
+   "recorded_exe": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-t7c-bd4fad64\\appdata\\npm\\node_modules\\opencode-ai\\bin\\opencode.exe",
+   "recorded_argv": [
+    "--help",
+    "-e",
+    "A=B"
+   ],
+   "recorded_OPENCODE_PORT": null,
+   "recorded_TMUX": "/tmp/t7c-fake-tmux,1234,0",
+   "wrapper_stderr": null,
+   "wrapper_stdout_len": 0,
+   "timed_out": false,
+   "why": "payload-looking text behind --help passed through untouched as [\"--help\", \"-e\", \"A=B\"]; no port logic; OPENCODE_PORT absent"
+  },
+  "c8c_payload_sh_no_flag": {
+   "status": "PASS",
+   "assertion": "payload-looking text as argv[0] with TMUX set",
+   "wrapper_invocation": "/bin/sh -c \"echo hi\"",
+   "env_tmux": "set",
+   "env_opencode_port_in": null,
+   "ports_held_busy_by_driver": [],
+   "wrapper_exit_code": 0,
+   "recorded_exe": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-t7c-bd4fad64\\appdata\\npm\\node_modules\\opencode-ai\\bin\\opencode.exe",
+   "recorded_argv": [
+    "--port",
+    "7801",
+    "/bin/sh",
+    "-c",
+    "echo hi"
+   ],
+   "recorded_OPENCODE_PORT": "7801",
+   "recorded_TMUX": "/tmp/t7c-fake-tmux,1234,0",
+   "wrapper_stderr": "[opencode-wrapper] tmux detected -> starting opencode with --port 7801",
+   "wrapper_stdout_len": 0,
+   "timed_out": false,
+   "why": "payload text NOT in the passthrough allowlist and not a passthrough flag, so the ordinary tmux branch applies and PREPENDS --port 7801; the payload tokens themselves are forwarded verbatim and uninterpreted as [\"/bin/sh\", \"-c\", \"echo hi\"] - nothing executed the /bin/sh -c string and -e did not set any variable in the child"
+  },
+  "c8d_payload_envassign_noflag": {
+   "status": "PASS",
+   "assertion": "-e A=B as argv[0] with TMUX set",
+   "wrapper_invocation": "-e A=B",
+   "env_tmux": "set",
+   "env_opencode_port_in": null,
+   "ports_held_busy_by_driver": [],
+   "wrapper_exit_code": 0,
+   "recorded_exe": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-t7c-bd4fad64\\appdata\\npm\\node_modules\\opencode-ai\\bin\\opencode.exe",
+   "recorded_argv": [
+    "--port",
+    "7801",
+    "-e",
+    "A=B"
+   ],
+   "recorded_OPENCODE_PORT": "7801",
+   "recorded_TMUX": "/tmp/t7c-fake-tmux,1234,0",
+   "wrapper_stderr": "[opencode-wrapper] tmux detected -> starting opencode with --port 7801",
+   "wrapper_stdout_len": 0,
+   "timed_out": false,
+   "why": "payload text NOT in the passthrough allowlist and not a passthrough flag, so the ordinary tmux branch applies and PREPENDS --port 7801; the payload tokens themselves are forwarded verbatim and uninterpreted as [\"-e\", \"A=B\"] - nothing executed the /bin/sh -c string and -e did not set any variable in the child"
+  },
+  "c9_non_ascii_arg_informational": {
+   "status": "INFORMATIONAL",
+   "assertion": "informational only: non-ASCII argv token; records the .cmd bytes and the recorder bytes so the mangling layer can be attributed",
+   "wrapper_invocation": "--help \"caf矇-銝剜?\"",
+   "env_tmux": "set",
+   "env_opencode_port_in": null,
+   "ports_held_busy_by_driver": [],
+   "wrapper_exit_code": 0,
+   "recorded_exe": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-t7c-bd4fad64\\appdata\\npm\\node_modules\\opencode-ai\\bin\\opencode.exe",
+   "recorded_argv": [
+    "--help",
+    "caf矇-銝剜?"
+   ],
+   "recorded_OPENCODE_PORT": null,
+   "recorded_TMUX": "/tmp/t7c-fake-tmux,1234,0",
+   "wrapper_stderr": null,
+   "wrapper_stdout_len": 0,
+   "timed_out": false,
+   "why": "non-ASCII argv token mangled, but by cmd.exe and NOT by the wrapper: the .cmd bytes on disk are the correct UTF-8 636166c3a92de4b8ade69687, the recorder received caf<U+77C7>-<U+927D><U+525C>? which is the Big5/CP950 reading of those same bytes. This is the documented console-encoding hazard on this host, upstream of opencode.cmd. Any wrapper-level byte-identity claim is unaffected: the tokens the wrapper received are echoed back unchanged."
+  }
+ }
+}
