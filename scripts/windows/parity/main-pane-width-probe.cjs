@@ -57,6 +57,25 @@ function mainWidth(g) {
   return m ? Number(m[1]) : null;
 }
 
+// The same two numbers on the other axis. Rules 1a and 1b are written about
+// `main-pane-width` by name, but they name `main-pane-height` in the same breath
+// and the bridge treats them identically (translate.ts sends
+// `main-pane-height` + `main-horizontal`), so measuring only the width axis would
+// leave half the rule unmeasured for no reason.
+function mainHeight(g) {
+  const first = g.panes.split('\n').find((l) => l.startsWith('0.0|'));
+  if (!first) return null;
+  const m = first.match(/\|(\d+)x(\d+)\|\d+,\d+$/);
+  return m ? Number(m[2]) : null;
+}
+
+function windowHeight(g) {
+  const first = g.windows.split('\n')[0];
+  if (!first) return null;
+  const m = first.match(/\|(\d+)x(\d+)\|/);
+  return m ? Number(m[2]) : null;
+}
+
 function windowWidth(g) {
   const first = g.windows.split('\n')[0];
   if (!first) return null;
@@ -84,11 +103,16 @@ function record(tag, result) {
     geometry: g,
     main_width: mainWidth(g),
     window_width: windowWidth(g),
+    main_height: mainHeight(g),
+    window_height: windowHeight(g),
   };
   // The share is the only comparable number across windows of different sizes,
   // and it is what "50%" and "60%" actually mean.
   step.main_share = step.main_width !== null && step.window_width
     ? Number((step.main_width / step.window_width).toFixed(4))
+    : null;
+  step.main_height_share = step.main_height !== null && step.window_height
+    ? Number((step.main_height / step.window_height).toFixed(4))
     : null;
   out.steps.push(step);
   return step;
@@ -132,6 +156,26 @@ const e = record('E: follow-up AFTER a select-window from an exited process', p(
 
 // Verdict computed here rather than left to the reader, because the whole point
 // is that a bare percentage with no denominator is not evidence.
+// F and G — the same two claims on the OTHER axis. Rules 1a and 1b name
+// `main-pane-height` alongside `main-pane-width`, and the bridge treats them
+// identically (same option-parsing path, same follow-up shape, only the layout
+// name differs), so measuring the width axis alone would leave half of each rule
+// unmeasured.
+//
+// The window has two panes side by side from the width steps, so applying
+// `main-horizontal` stacks them and gives the height axis something to divide.
+// The applied value is 40 so a move is unmistakable against the ~60% default.
+p(['select-window', '-t', S + ':0']);
+p(['select-layout', 'main-horizontal']);
+sleep(1200);
+const hbase = record('F0: main-horizontal baseline on the height axis', { invocation: ['select-layout', '-t', S + ':0', 'main-horizontal'], status: 0, stderr: '' });
+
+record('F: set main-pane-height "40%", then select-layout', p(['set-window-option', 'main-pane-height', '40%']));
+const f = record('F2: then untargeted select-layout main-horizontal', p(['select-layout', 'main-horizontal']));
+
+record('G: set main-pane-height "40", no layout yet', p(['set-window-option', 'main-pane-height', '40']));
+const g2 = record('G2: then untargeted select-layout main-horizontal', p(['select-layout', 'main-horizontal']));
+
 out.verdict = {
   rule_1a_percent_form_ignored: a.main_share === base.main_share,
   rule_1b_option_alone_inert: b.main_share === base.main_share,
@@ -143,6 +187,14 @@ out.verdict = {
     ? null
     : Math.abs(e.main_share - 0.5) < 0.03,
   e_share: e.main_share,
+  // The height axis, same claims: the `%` form is dropped, the bare form needs the
+  // follow-up. Null rather than false when a share is unreadable, so a probe that
+  // failed to measure cannot be read as a probe that measured a failure.
+  height_baseline_share: hbase.main_height_share,
+  height_percent_form_ignored: f.main_height_share === hbase.main_height_share,
+  height_bare_form_applies_with_followup: g2.main_height_share !== null
+    && Math.abs(g2.main_height_share - 0.4) < 0.05,
+  height_shares: Object.fromEntries(out.steps.map((s) => [s.tag, s.main_height_share])),
   baseline_share: base.main_share,
   shares: Object.fromEntries(out.steps.map((s) => [s.tag, s.main_share])),
 };
