@@ -1837,6 +1837,24 @@ revision) and of psmux **v3.3.8**. When either is upgraded:
    percentage, drop rule 1a; if `apply_layout` reads the sizing option outside
    itself, drop rule 1b; only then drop rule 1c and forward `resize-pane -x` again.
    Dropping 1c first re-exposes the layout to the defect it was suppressing.
+
+   **Rules 1a and 1b are now mechanically checkable, so do not check them by
+   reading.** Both are observed rather than inferred as of 2026-10-07, and
+   `.github/workflows/parity.yml` re-measures them on every run:
+   `main-pane-width-probe.cjs` prints `rule_1a_percent_form_ignored`,
+   `rule_1b_option_alone_inert`, `rule_1b_followup_applies` and
+   `rule_1b_order_matters` as booleans. On a psmux that has learned to parse a
+   percentage, `rule_1a_percent_form_ignored` flips to `false` — that is the
+   retirement signal, and it arrives without anyone deciding to look for it.
+   Retire in the order the booleans go false, not in the order that seems
+   tidy: the dependency is 1a, then 1b, then 1c, and dropping 1c while 1a or 1b
+   still holds re-exposes the layout to the defect being suppressed.
+
+   Rule 1c has no such probe. Its premise is in `resize_pane_absolute` writing a
+   cell count into a proportions vector (`src/tree.rs:21`/`:31`), so detecting its
+   retirement means checking that `split_with_gaps` now takes absolute input —
+   which is source-reading, and is left as such deliberately: a probe that inferred
+   it would report on the layout rather than on the parser.
 6. Re-resolve every team-mode citation in section 3.10 by hand, on either
    upgrade (OmO or psmux): the `createTeamLayoutInCallerWindow` sequence, the
    `resolveCallerTmuxSession` display pair, the `TeamModeConfigSchema`
