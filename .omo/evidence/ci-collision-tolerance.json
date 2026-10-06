@@ -12,29 +12,25 @@
       "changed_windows": [
         1
       ],
-      "sample_was_midflight": true,
-      "a_landed_on": [
-        1
-      ],
-      "a_landed": true,
+      "sample_was_midflight": false,
       "invocations_ok": true,
       "before": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}",
       "mid": null,
       "after": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]\n1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]",
-      "t_start": 1791320239687,
-      "t_apply_a": 1791320239690,
-      "t_apply_b": 1791320239694,
-      "t_end": 1791320240972,
+      "t_start": 1791320620466,
+      "t_apply_a": 1791320620467,
+      "t_apply_b": 1791320620469,
+      "t_end": 1791320621707,
       "poller": {
-        "samples_in_window": 27,
+        "samples_in_window": 39,
         "distinct_w1_states": [
           "1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]"
         ],
         "a_layout_observed_count": 0,
         "a_first_seen_ms_after_apply_a": null,
-        "b_layout_observed_count": 27
+        "b_layout_observed_count": 39
       },
-      "mid_source": "in-process sample was never mid-flight (equal to `after` at every gap); see poller"
+      "mid_source": "in-process sample is not a trustworthy mid-flight observer (spawnSync blocks, so it usually returns the end state); see poller"
     },
     {
       "gap_ms": 50,
@@ -43,27 +39,25 @@
         1
       ],
       "sample_was_midflight": false,
-      "a_landed_on": null,
-      "a_landed": false,
       "invocations_ok": true,
       "before": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}",
       "mid": null,
       "after": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]\n1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]",
-      "t_start": 1791320242364,
-      "t_apply_a": 1791320242367,
-      "t_apply_b": 1791320242438,
-      "t_end": 1791320243718,
+      "t_start": 1791320622987,
+      "t_apply_a": 1791320622989,
+      "t_apply_b": 1791320623051,
+      "t_end": 1791320624294,
       "poller": {
-        "samples_in_window": 28,
+        "samples_in_window": 41,
         "distinct_w1_states": [
           "1|7f79,120x30,0,0{71x30,0,0,3,48x30,72,0,4}",
           "1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]"
         ],
         "a_layout_observed_count": 2,
-        "a_first_seen_ms_after_apply_a": 1,
-        "b_layout_observed_count": 26
+        "a_first_seen_ms_after_apply_a": 13,
+        "b_layout_observed_count": 39
       },
-      "mid_source": "in-process sample was never mid-flight (equal to `after` at every gap); see poller"
+      "mid_source": "in-process sample is not a trustworthy mid-flight observer (spawnSync blocks, so it usually returns the end state); see poller"
     },
     {
       "gap_ms": 150,
@@ -72,27 +66,25 @@
         1
       ],
       "sample_was_midflight": false,
-      "a_landed_on": null,
-      "a_landed": false,
       "invocations_ok": true,
       "before": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}",
       "mid": null,
       "after": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]\n1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]",
-      "t_start": 1791320245079,
-      "t_apply_a": 1791320245082,
-      "t_apply_b": 1791320245242,
-      "t_end": 1791320246522,
+      "t_start": 1791320625584,
+      "t_apply_a": 1791320625586,
+      "t_apply_b": 1791320625746,
+      "t_end": 1791320626978,
       "poller": {
-        "samples_in_window": 31,
+        "samples_in_window": 45,
         "distinct_w1_states": [
           "1|7f79,120x30,0,0{71x30,0,0,3,48x30,72,0,4}",
           "1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]"
         ],
-        "a_layout_observed_count": 4,
-        "a_first_seen_ms_after_apply_a": -2,
-        "b_layout_observed_count": 27
+        "a_layout_observed_count": 6,
+        "a_first_seen_ms_after_apply_a": 0,
+        "b_layout_observed_count": 39
       },
-      "mid_source": "in-process sample was never mid-flight (equal to `after` at every gap); see poller"
+      "mid_source": "in-process sample is not a trustworthy mid-flight observer (spawnSync blocks, so it usually returns the end state); see poller"
     },
     {
       "gap_ms": 400,
@@ -101,27 +93,25 @@
         1
       ],
       "sample_was_midflight": false,
-      "a_landed_on": null,
-      "a_landed": false,
       "invocations_ok": true,
       "before": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}",
       "mid": null,
       "after": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]\n1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]",
-      "t_start": 1791320247871,
-      "t_apply_a": 1791320247874,
-      "t_apply_b": 1791320248284,
-      "t_end": 1791320249564,
+      "t_start": 1791320628272,
+      "t_apply_a": 1791320628273,
+      "t_apply_b": 1791320628675,
+      "t_end": 1791320629921,
       "poller": {
-        "samples_in_window": 36,
+        "samples_in_window": 52,
         "distinct_w1_states": [
           "1|7f79,120x30,0,0{71x30,0,0,3,48x30,72,0,4}",
           "1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]"
         ],
-        "a_layout_observed_count": 9,
-        "a_first_seen_ms_after_apply_a": 26,
-        "b_layout_observed_count": 27
+        "a_layout_observed_count": 12,
+        "a_first_seen_ms_after_apply_a": 27,
+        "b_layout_observed_count": 40
       },
-      "mid_source": "in-process sample was never mid-flight (equal to `after` at every gap); see poller"
+      "mid_source": "in-process sample is not a trustworthy mid-flight observer (spawnSync blocks, so it usually returns the end state); see poller"
     },
     {
       "gap_ms": 1000,
@@ -130,27 +120,25 @@
         1
       ],
       "sample_was_midflight": false,
-      "a_landed_on": null,
-      "a_landed": false,
       "invocations_ok": true,
       "before": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}",
       "mid": null,
       "after": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]\n1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]",
-      "t_start": 1791320250935,
-      "t_apply_a": 1791320250938,
-      "t_apply_b": 1791320251942,
-      "t_end": 1791320253212,
+      "t_start": 1791320631206,
+      "t_apply_a": 1791320631208,
+      "t_apply_b": 1791320632210,
+      "t_end": 1791320633442,
       "poller": {
-        "samples_in_window": 47,
+        "samples_in_window": 71,
         "distinct_w1_states": [
           "1|7f79,120x30,0,0{71x30,0,0,3,48x30,72,0,4}",
           "1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]"
         ],
-        "a_layout_observed_count": 21,
-        "a_first_seen_ms_after_apply_a": 35,
-        "b_layout_observed_count": 26
+        "a_layout_observed_count": 32,
+        "a_first_seen_ms_after_apply_a": 19,
+        "b_layout_observed_count": 39
       },
-      "mid_source": "in-process sample was never mid-flight (equal to `after` at every gap); see poller"
+      "mid_source": "in-process sample is not a trustworthy mid-flight observer (spawnSync blocks, so it usually returns the end state); see poller"
     },
     {
       "gap_ms": 2500,
@@ -159,27 +147,25 @@
         1
       ],
       "sample_was_midflight": false,
-      "a_landed_on": null,
-      "a_landed": false,
       "invocations_ok": true,
       "before": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}",
       "mid": null,
       "after": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]\n1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]",
-      "t_start": 1791320254570,
-      "t_apply_a": 1791320254573,
-      "t_apply_b": 1791320257091,
-      "t_end": 1791320258371,
+      "t_start": 1791320634725,
+      "t_apply_a": 1791320634727,
+      "t_apply_b": 1791320637228,
+      "t_end": 1791320638474,
       "poller": {
-        "samples_in_window": 80,
+        "samples_in_window": 119,
         "distinct_w1_states": [
           "1|7f79,120x30,0,0{71x30,0,0,3,48x30,72,0,4}",
           "1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]"
         ],
-        "a_layout_observed_count": 53,
-        "a_first_seen_ms_after_apply_a": 12,
-        "b_layout_observed_count": 27
+        "a_layout_observed_count": 79,
+        "a_first_seen_ms_after_apply_a": 18,
+        "b_layout_observed_count": 40
       },
-      "mid_source": "in-process sample was never mid-flight (equal to `after` at every gap); see poller"
+      "mid_source": "in-process sample is not a trustworthy mid-flight observer (spawnSync blocks, so it usually returns the end state); see poller"
     }
   ],
   "control": {
@@ -204,7 +190,7 @@
   },
   "verdict_void_reason": null,
   "poller": {
-    "total_samples": 415,
+    "total_samples": 610,
     "a_tree": "1|7f79,120x30,0,0{71x30,0,0,3,48x30,72,0,4}",
     "b_tree": "1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]",
     "usable": true
@@ -226,13 +212,13 @@
     "a_observed_by_gap": {
       "0": 0,
       "50": 2,
-      "150": 4,
-      "400": 9,
-      "1000": 21,
-      "2500": 53
+      "150": 6,
+      "400": 12,
+      "1000": 32,
+      "2500": 79
     },
     "a_observed_at_every_gap": false,
-    "in_process_sample_ever_midflight": true
+    "in_process_sample_ever_midflight": false
   },
   "after_teardown": ""
 }
