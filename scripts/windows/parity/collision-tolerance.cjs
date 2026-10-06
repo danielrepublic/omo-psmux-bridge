@@ -73,7 +73,7 @@
 // concluding that it did nothing.
 // Each name is checked against a baseline it cannot possibly equal, or the check
 // measures the baseline instead of psmux.
-const BASELINE_FOR = { 'main-vertical': 'even-horizontal', tiled: 'main-vertical' };
+const BASELINE_FOR = { 'main-vertical': 'even-horizontal', 'even-vertical': 'main-vertical' };
 
 async function control() {
   const named = {};
@@ -119,22 +119,25 @@ const spawnP = (args) => new Promise((resolve) => {
 });
 
 const layouts = () => p(['list-windows', '-a', '-F', '#{window_index}|#{window_layout}']).stdout;
-// Both must differ from the reset layout of w1 (`even-horizontal`) or the control
-// cannot tell "applied" from "applied and identical to the reset state".
+// All three observable states must differ from each other.
 //
-// The first version of this probe used main-horizontal for A, and the control
-// reported `tiled: false` — which contradicted test_layout.rs:159, which lists
-// tiled as accepted. The likely reason is the control's own baseline, not psmux:
-// `tiled` on a two-pane window is a balanced split, which is what
-// `even-horizontal` already is, so applying it left the observable state
-// unchanged and the control scored that as "not applied". The control was
-// measuring its own reset, not psmux.
+// `tiled` was B's layout and the trial reset w1 to `even-horizontal`. On a two-pane
+// window `tiled` is a balanced split, which is what `even-horizontal` already is, so
+// psmux reports it back as `even-horizontal`. The trial therefore ran
 //
-// So A is main-vertical here, which differs from the even-horizontal reset in
-// orientation, and a successful `tiled` apply is likewise detectable because it
-// follows main-vertical rather than replacing it.
+//   even-horizontal --A--> main-vertical --B(tiled)--> even-horizontal
+//
+// and the final observable state equalled the baseline, so a sweep in which both
+// layouts applied perfectly was scored NONE at every gap. Not inertness — a baseline
+// collision with the operation's own result. The same mistake the control made, in
+// the one place it had not been fixed.
+//
+// B is now even-vertical, which is a distinct orientation and cannot alias the
+// reset. The general rule, now stated twice because it has been learned twice: pick
+// a baseline the operation cannot reproduce, or a successful apply is invisible.
 const A = 'main-vertical';    // A's layout, a left/right split
-const B = 'tiled';           // B's layout, an even split
+const B = 'even-vertical';    // B's layout, a top/bottom split — never aliases the reset
+const RESET_W1 = 'even-horizontal'; // w1's reset; distinct from both A and B
 
 function classify(before, after) {
   const b = before.split('\n');
@@ -150,8 +153,12 @@ function classify(before, after) {
 
 async function trial(gapMs) {
   // Both windows start identical on every trial so a change is attributable.
-  p(['select-layout', '-t', S + ':0', 'main-vertical']);
-  p(['select-layout', '-t', S + ':1', 'even-horizontal']);
+  // w0 resets to an orientation neither A nor B uses, so that if a layout lands on
+  // w0 by mistake the change is still visible. w1 resets to even-horizontal, which
+  // is neither A nor B. Every window starts in a state neither layout can reproduce,
+  // so any apply at all is observable on any window.
+  p(['select-layout', '-t', S + ':0', 'main-horizontal']);
+  p(['select-layout', '-t', S + ':1', RESET_W1]);
   sleep(1200);
   const before = layouts();
 

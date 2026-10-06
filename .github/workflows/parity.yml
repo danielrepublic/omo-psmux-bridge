@@ -205,14 +205,16 @@ jobs:
         run: bun scripts/windows/parity/resize-pane-cells-probe.cjs
         continue-on-error: true
 
-      - name: Run the collision-tolerance sweep (VOID — probe cannot detect its own failure)
-        # The step name says VOID because the artifact it publishes must not be read
-        # as a tolerance number. Every swept gap, up to 2500 ms, produced "nothing
-        # changed" — and because psmux cannot fail an untargeted `select-layout`,
-        # "nothing changed" is indistinguishable from "nothing could have
-        # changed". The probe's own header explains why and what a working version
-        # would need. Kept in the schedule so the failure stays visible rather than
-        # being quietly deleted.
+      - name: Run the collision-tolerance sweep
+        # Section 9.5 knows a collision exists and always heals, but not how close
+        # two calls must be for it to happen. That is the number that says whether
+        # real agent traffic is anywhere near it, and it needs no workload of the
+        # owner's own — only a swept delay.
+        #
+        # The sweep carries a control: it proves each layout applies, and that an
+        # untargeted layout applies, before trusting any trial. It reported NONE at
+        # every gap for a while, twice for reasons of its own making, and the control
+        # is what made both visible instead of silent.
         env:
           TEMP: ${{ runner.temp }}
           TMP: ${{ runner.temp }}
