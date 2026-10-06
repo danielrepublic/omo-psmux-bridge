@@ -180,13 +180,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: parity-probe-output
-          # runner.temp, not env.TEMP. TEMP is a Windows shell variable with no
-          # GitHub Actions context, so `${{ env.TEMP }}` expands to nothing and
-          # this glob silently matches no files — a green job, no red step, and
-          # the only thing the job existed to publish discarded. This path and
-          # the TEMP the probe steps run under are the same directory by
-          # construction, which is the only reason they can be trusted to agree.
-          path: ${{ runner.temp }}\omo-t14\*.json
+          # `omo-t*`, NOT a fixed directory: each probe chooses its own
+          # namespace suffix, so pinning the glob to one of them drops the
+          # newest probe's output while the job stays green. It already has.
+          path: ${{ runner.temp }}\omo-t*\*.json
           if-no-files-found: warn
 
       - name: Summarise
@@ -206,14 +203,26 @@ jobs:
           TEMP: ${{ runner.temp }}
           TMP: ${{ runner.temp }}
         run: |
-          $dir = Join-Path $env:TEMP 'omo-t14'
-          $files = Get-ChildItem $dir -Filter *.json -ErrorAction SilentlyContinue
-          if (-not $files) { Write-Host "no probe output in $dir"; exit 0 }
+          # Every `omo-t*` directory, for the same reason the artifact glob is not
+          # pinned to one: a probe that writes somewhere else is still evidence,
+          # and a summary that silently omits it reports agreement it did not find.
+          $dirs = Get-ChildItem $env:TEMP -Directory -Filter 'omo-t*' -ErrorAction SilentlyContinue
+          $files = @($dirs | ForEach-Object { Get-ChildItem $_.FullName -Filter *.json -ErrorAction SilentlyContinue })
+          if (-not $files -or $files.Count -eq 0) { Write-Host "no probe output under $env:TEMP\omo-t*"; exit 0 }
           foreach ($f in $files) {
             Write-Host "--- $($f.Name) ($($f.Length) bytes) ---"
             $json = Get-Content $f.FullName -Raw | ConvertFrom-Json
+            # A probe that computes its own verdict prints it first and in full:
+            # it is the part a reader should not have to re-derive from the rows.
+            if ($json.verdict) {
+              Write-Host "  VERDICT"
+              foreach ($v in $json.verdict.PSObject.Properties) {
+                Write-Host "    $($v.Name) = $($v.Value)"
+              }
+            }
             foreach ($prop in $json.PSObject.Properties) {
               if ($null -eq $prop.Value) { continue }
+              if ($prop.Name -eq 'verdict') { continue }
               if ($prop.Value -is [string]) {
                 if ($prop.Value.Trim()) { Write-Host "  $($prop.Name): $($prop.Value.Trim() -replace "`r?`n", ' | ')" }
                 continue
