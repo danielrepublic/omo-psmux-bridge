@@ -691,8 +691,29 @@ works. It is why the bridge emits option-then-layout and why the injected
 That is no longer a gap in the evidence, because the behaviour is now observed
 directly rather than inferred from the source.
 
+**The height axis, measured too.** Rules 1a and 1b name `main-pane-height`
+beside `main-pane-width`, and the bridge treats them identically — same
+option-parsing path, same follow-up shape, only the layout name differs — so
+measuring one axis would have left half of each rule unmeasured. Same run, same
+probe, `main-horizontal` instead:
+
+| step | height share |
+|---|---|
+| baseline, option never set | 0.5667 |
+| `set-window-option main-pane-height "40%"` | **0.5667** |
+| `set-window-option main-pane-height "40"`, no layout | **0.5667** |
+| then untargeted `select-layout main-horizontal` | **0.3667** |
+
+Identical behaviour on both axes: the `%` form is dropped, the bare form stores
+and applies nothing on its own, and the follow-up applies it. 0.3667 against a
+30-row window is 11 of 29 available rows after the one-row divider, which is what
+40% of the usable space is. The width-axis rows in the same artifact read 1.0 for
+height share, correctly — `main-vertical` splits side by side, so the pane's height
+is the window's height.
+
 Scope matches rule 1a's: one session, one window, one client, v3.3.8. Not covered:
-multi-window sessions, concurrent clients, or `main-pane-height`.
+multi-window sessions, or concurrent clients — the latter is measured separately in
+section 9.5, where two clients collide.
 
 INFERRED: with `main_pane_width = 50`, `src/layout.rs:1144` builds
 `sizes: vec![50, 50]` at the root and `src/layout.rs:1140-1141` gives the

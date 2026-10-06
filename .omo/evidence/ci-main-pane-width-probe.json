@@ -18,7 +18,10 @@
       },
       "main_width": 71,
       "window_width": 120,
-      "main_share": 0.5917
+      "main_height": 30,
+      "window_height": 30,
+      "main_share": 0.5917,
+      "main_height_share": 1
     },
     {
       "tag": "A: set main-pane-width \"50%\", then select-layout",
@@ -30,7 +33,10 @@
       },
       "main_width": 71,
       "window_width": 120,
-      "main_share": 0.5917
+      "main_height": 30,
+      "window_height": 30,
+      "main_share": 0.5917,
+      "main_height_share": 1
     },
     {
       "tag": "A2: then an untargeted select-layout main-vertical",
@@ -42,7 +48,10 @@
       },
       "main_width": 71,
       "window_width": 120,
-      "main_share": 0.5917
+      "main_height": 30,
+      "window_height": 30,
+      "main_share": 0.5917,
+      "main_height_share": 1
     },
     {
       "tag": "B: set main-pane-width \"50\", no layout yet",
@@ -54,7 +63,10 @@
       },
       "main_width": 71,
       "window_width": 120,
-      "main_share": 0.5917
+      "main_height": 30,
+      "window_height": 30,
+      "main_share": 0.5917,
+      "main_height_share": 1
     },
     {
       "tag": "C: then untargeted select-layout main-vertical",
@@ -66,7 +78,10 @@
       },
       "main_width": 59,
       "window_width": 120,
-      "main_share": 0.4917
+      "main_height": 30,
+      "window_height": 30,
+      "main_share": 0.4917,
+      "main_height_share": 1
     },
     {
       "tag": "D: select-layout first, for contrast",
@@ -78,7 +93,10 @@
       },
       "main_width": 59,
       "window_width": 120,
-      "main_share": 0.4917
+      "main_height": 30,
+      "window_height": 30,
+      "main_share": 0.4917,
+      "main_height_share": 1
     },
     {
       "tag": "D2: then set main-pane-width \"40\"",
@@ -90,7 +108,10 @@
       },
       "main_width": 59,
       "window_width": 120,
-      "main_share": 0.4917
+      "main_height": 30,
+      "window_height": 30,
+      "main_share": 0.4917,
+      "main_height_share": 1
     },
     {
       "tag": "D3: geometry after setting the option with no layout after it",
@@ -105,7 +126,10 @@
       },
       "main_width": 59,
       "window_width": 120,
-      "main_share": 0.4917
+      "main_height": 30,
+      "window_height": 30,
+      "main_share": 0.4917,
+      "main_height_share": 1
     },
     {
       "tag": "E0: reset to 60 for contrast",
@@ -120,7 +144,10 @@
       },
       "main_width": 71,
       "window_width": 120,
-      "main_share": 0.5917
+      "main_height": 30,
+      "window_height": 30,
+      "main_share": 0.5917,
+      "main_height_share": 1
     },
     {
       "tag": "E: follow-up AFTER a select-window from an exited process",
@@ -132,7 +159,91 @@
       },
       "main_width": 59,
       "window_width": 120,
-      "main_share": 0.4917
+      "main_height": 30,
+      "window_height": 30,
+      "main_share": 0.4917,
+      "main_height_share": 1
+    },
+    {
+      "tag": "F0: main-horizontal baseline on the height axis",
+      "invocation": [
+        "select-layout",
+        "-t",
+        "mpw:0",
+        "main-horizontal"
+      ],
+      "exit": 0,
+      "stderr": "",
+      "geometry": {
+        "windows": "0|120x30|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]|2p",
+        "panes": "0.0|%1|120x17|0,0\n0.1|%2|120x12|0,18"
+      },
+      "main_width": 120,
+      "window_width": 120,
+      "main_height": 17,
+      "window_height": 30,
+      "main_share": 1,
+      "main_height_share": 0.5667
+    },
+    {
+      "tag": "F: set main-pane-height \"40%\", then select-layout",
+      "exit": 0,
+      "stderr": "",
+      "geometry": {
+        "windows": "0|120x30|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]|2p",
+        "panes": "0.0|%1|120x17|0,0\n0.1|%2|120x12|0,18"
+      },
+      "main_width": 120,
+      "window_width": 120,
+      "main_height": 17,
+      "window_height": 30,
+      "main_share": 1,
+      "main_height_share": 0.5667
+    },
+    {
+      "tag": "F2: then untargeted select-layout main-horizontal",
+      "exit": 0,
+      "stderr": "",
+      "geometry": {
+        "windows": "0|120x30|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]|2p",
+        "panes": "0.0|%1|120x17|0,0\n0.1|%2|120x12|0,18"
+      },
+      "main_width": 120,
+      "window_width": 120,
+      "main_height": 17,
+      "window_height": 30,
+      "main_share": 1,
+      "main_height_share": 0.5667
+    },
+    {
+      "tag": "G: set main-pane-height \"40\", no layout yet",
+      "exit": 0,
+      "stderr": "",
+      "geometry": {
+        "windows": "0|120x30|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]|2p",
+        "panes": "0.0|%1|120x17|0,0\n0.1|%2|120x12|0,18"
+      },
+      "main_width": 120,
+      "window_width": 120,
+      "main_height": 17,
+      "window_height": 30,
+      "main_share": 1,
+      "main_height_share": 0.5667
+    },
+    {
+      "tag": "G2: then untargeted select-layout main-horizontal",
+      "exit": 0,
+      "stderr": "",
+      "geometry": {
+        "windows": "0|120x30|cdac,120x30,0,0[120x11,0,0,1,120x18,0,12,2]|2p",
+        "panes": "0.0|%1|120x11|0,0\n0.1|%2|120x18|0,12"
+      },
+      "main_width": 120,
+      "window_width": 120,
+      "main_height": 11,
+      "window_height": 30,
+      "main_share": 1,
+      "main_height_share": 0.3667
     }
   ],
   "verdict": {
@@ -142,6 +253,26 @@
     "rule_1b_order_matters": true,
     "rule_1b_survives_intervening_select_window": true,
     "e_share": 0.4917,
+    "height_baseline_share": 0.5667,
+    "height_percent_form_ignored": true,
+    "height_bare_form_applies_with_followup": true,
+    "height_shares": {
+      "baseline: main-vertical, option never set": 1,
+      "A: set main-pane-width \"50%\", then select-layout": 1,
+      "A2: then an untargeted select-layout main-vertical": 1,
+      "B: set main-pane-width \"50\", no layout yet": 1,
+      "C: then untargeted select-layout main-vertical": 1,
+      "D: select-layout first, for contrast": 1,
+      "D2: then set main-pane-width \"40\"": 1,
+      "D3: geometry after setting the option with no layout after it": 1,
+      "E0: reset to 60 for contrast": 1,
+      "E: follow-up AFTER a select-window from an exited process": 1,
+      "F0: main-horizontal baseline on the height axis": 0.5667,
+      "F: set main-pane-height \"40%\", then select-layout": 0.5667,
+      "F2: then untargeted select-layout main-horizontal": 0.5667,
+      "G: set main-pane-height \"40\", no layout yet": 0.5667,
+      "G2: then untargeted select-layout main-horizontal": 0.3667
+    },
     "baseline_share": 0.5917,
     "shares": {
       "baseline: main-vertical, option never set": 0.5917,
@@ -153,7 +284,12 @@
       "D2: then set main-pane-width \"40\"": 0.4917,
       "D3: geometry after setting the option with no layout after it": 0.4917,
       "E0: reset to 60 for contrast": 0.5917,
-      "E: follow-up AFTER a select-window from an exited process": 0.4917
+      "E: follow-up AFTER a select-window from an exited process": 0.4917,
+      "F0: main-horizontal baseline on the height axis": 1,
+      "F: set main-pane-height \"40%\", then select-layout": 1,
+      "F2: then untargeted select-layout main-horizontal": 1,
+      "G: set main-pane-height \"40\", no layout yet": 1,
+      "G2: then untargeted select-layout main-horizontal": 1
     }
   },
   "after_teardown": ""
