@@ -133,6 +133,40 @@ function concurrentTrial(tag, clientA, clientB, pauseMs) {
     2500,
   );
 
+  // Trial 3 — does a collision heal?
+  //
+  // Trials 1 and 2 show that two clients can land on the same window. That is only
+  // a defect if it PERSISTS: if a later, correctly-targeted call restores each
+  // window, then a collision is a transient wrong frame in a sequence that ends up
+  // right, which is a materially smaller problem than a session left mislaid out
+  // with no way back.
+  //
+  // No bridge-side fix exists for the collision (CONTRACT.md 9.5), so whether the
+  // system recovers on its own is the only thing left that bounds it. Both windows
+  // are reset, deliberately collided, then each is given a correct targeted layout
+  // and the result compared with a known-good arrangement.
+  const collided = await concurrentTrial(
+    'collision, before recovery',
+    { target: S + ':0', layout: 'main-horizontal' },
+    { target: S + ':1', layout: 'tiled' },
+    2500,
+  );
+  p(['select-layout', '-t', S + ':0', 'main-horizontal']);
+  p(['select-layout', '-t', S + ':1', 'tiled']);
+  sleep(1500);
+  const recovered = layouts();
+  const wanted = [
+    p(['list-windows', '-t', S + ':0', '-F', '#{window_layout}']).stdout,
+    p(['list-windows', '-t', S + ':1', '-F', '#{window_layout}']).stdout,
+  ];
+  out.recovery = {
+    after_collision: collided.after,
+    after_targeted_repair: recovered,
+    wanted_layouts: wanted,
+    repair_succeeded: recovered.split('\n').map((l) => l.split('|')[1]).join('|')
+      === wanted.join('|'),
+  };
+
   const landing = (rec) => rec.changed_windows.map((w) => w.window).sort();
 
   // A trial whose invocations did not all succeed has measured NOTHING, and
