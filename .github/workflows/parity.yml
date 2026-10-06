@@ -172,6 +172,17 @@ jobs:
         run: bun scripts/windows/parity/main-pane-width-probe.cjs
         continue-on-error: true
 
+      - name: Run the current-window survival probe
+        # Asks the question the bridge actually depends on. OmO spawns a separate
+        # process per command, and rules 1b/1e inject an untargeted
+        # `select-layout`, so what matters is not which window is "current" but
+        # whether the pointer set by one process steers another one.
+        env:
+          TEMP: ${{ runner.temp }}
+          TMP: ${{ runner.temp }}
+        run: bun scripts/windows/parity/current-window-survival.cjs
+        continue-on-error: true
+
       - name: Publish whatever the probes produced
         # continue-on-error above means a probe failure must not discard the other
         # probe's output. A run where one probe worked and one did not is still
