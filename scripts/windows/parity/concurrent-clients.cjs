@@ -18,7 +18,16 @@
 // spawn rather than spawnSync, so the two `select-window` calls genuinely overlap.
 //
 //   A  select-window -> w0, pause, untargeted `main-horizontal`
-//   B  select-window -> w1, pause, untargeted `tiled`
+//   B  select-window -> w1, pause, untargeted `even-vertical`
+//
+// `tiled` was B's layout here and it is gone for a measured reason. w1 resets to
+// `even-horizontal`, and `tiled` on a two-pane window serialises to the identical
+// layout tree — `collision-tolerance.cjs` recorded byte-identical `#{window_layout}`
+// strings before and after a `tiled` apply, `aliased_with_reset: true`. So B's apply
+// was unobservable no matter whether it succeeded: the window ended where it started.
+// A probe that cannot see half its clients' work cannot support a risk claim, which
+// is what section 9.5 was making. `even-vertical` stacks the panes and produces a
+// tree `even-horizontal` cannot, so the apply is visible either way.
 //
 // Each applies a layout the OTHER window is not already in, so whichever window
 // each one lands on is visible.
@@ -120,7 +129,7 @@ function concurrentTrial(tag, clientA, clientB, pauseMs) {
   const t1 = await concurrentTrial(
     'two clients, distinct targets, concurrent',
     { target: S + ':0', layout: 'main-horizontal' },
-    { target: S + ':1', layout: 'tiled' },
+    { target: S + ':1', layout: 'even-vertical' },
     700,
   );
 
@@ -129,7 +138,7 @@ function concurrentTrial(tag, clientA, clientB, pauseMs) {
   const t2 = await concurrentTrial(
     'two clients, distinct targets, long pause',
     { target: S + ':0', layout: 'main-horizontal' },
-    { target: S + ':1', layout: 'tiled' },
+    { target: S + ':1', layout: 'even-vertical' },
     2500,
   );
 
@@ -145,24 +154,30 @@ function concurrentTrial(tag, clientA, clientB, pauseMs) {
   // system recovers on its own is the only thing left that bounds it. Both windows
   // are reset, deliberately collided, then each is given a correct targeted layout
   // and the result compared with a known-good arrangement.
+  // The known-good arrangement is read BEFORE the collision, not after the repair.
+  //
+  // It used to be read after, from the same live server the repair had just
+  // modified — so `wantedLayouts` was a re-read of `recovered` and the comparison
+  // could not fail. `repair_succeeded` was vacuously true, and it is the only thing
+  // bounding 9.5's risk claim. Capturing it first makes the reference independent of
+  // the state it is judging, which is the whole difference between a check and a
+  // tautology.
+  p(['select-layout', '-t', S + ':0', 'main-horizontal']);
+  p(['select-layout', '-t', S + ':1', 'even-vertical']);
+  sleep(1500);
+  const wantedLayouts = p(['list-windows', '-a', '-F', '#{window_index}|#{window_layout}']).stdout
+    .split('\n').map((l) => l.split('|')[1]);
+
   const collided = await concurrentTrial(
     'collision, before recovery',
     { target: S + ':0', layout: 'main-horizontal' },
-    { target: S + ':1', layout: 'tiled' },
+    { target: S + ':1', layout: 'even-vertical' },
     2500,
   );
   p(['select-layout', '-t', S + ':0', 'main-horizontal']);
-  p(['select-layout', '-t', S + ':1', 'tiled']);
+  p(['select-layout', '-t', S + ':1', 'even-vertical']);
   sleep(1500);
   const recovered = layouts();
-  // `list-windows -t` does NOT filter: both targeted calls return every window, so
-  // asking for one window's layout yields the whole list and comparing that
-  // against a per-window reference can never match. The first run of this repair
-  // check reported repair_succeeded: false for exactly that reason, while the
-  // geometry in the artifact was in fact correct. The reference is therefore the
-  // whole window list, read once, and the comparison is index-for-index on it.
-  const wantedLayouts = p(['list-windows', '-a', '-F', '#{window_index}|#{window_layout}']).stdout
-    .split('\n').map((l) => l.split('|')[1]);
   const recoveredLayouts = recovered.split('\n').map((l) => l.split('|')[1]);
   out.recovery = {
     after_collision: collided.after,
