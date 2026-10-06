@@ -193,17 +193,37 @@ async function trial(gapMs) {
   const first = spawnP(['select-layout', A]);
   await sleep(gapMs);
   const second = spawnP(['select-layout', B]);
+  // Sample here, while B is in flight and A has had the whole gap to land.
+  //
+  // This is the observation the sweep lacked. Sampling only after awaiting both makes
+  // `CHANGED_ONE` on w1 equally consistent with "A applied then B overwrote it" and
+  // "only B applied" — B's layout is the end state either way, and A's effect is gone
+  // before anything looks. section 9.5's staggered trial measured this mechanism
+  // directly, so the sweep no longer has to infer it, but the sweep should report it
+  // rather than rely on another probe for it.
+  //
+  // Placed AFTER the spawn of B, not before, so B's start time — and therefore the
+  // overlap this sweep exists to vary — is untouched. The only cost is that the await
+  // below happens one `list-windows` later.
+  const mid = layouts();
   const results = await Promise.all([first, second]);
 
   sleep(1200);
   const after = layouts();
   const { outcome, changed } = classify(before, after);
+  // Which windows moved before B could have finished. If this shows w1 moving, A's
+  // layout was computed and delivered, and B then replaced it.
+  const a_landed = classify(before, mid).changed;
   return {
     gap_ms: gapMs,
     outcome,
     changed_windows: changed,
+    // Windows A moved on its own, i.e. proof its layout was not discarded unheard.
+    a_landed_on: a_landed,
+    a_landed: a_landed.length > 0,
     invocations_ok: results.every((r) => r.exit === 0),
     before,
+    mid,
     after,
   };
 }
@@ -252,6 +272,11 @@ async function trial(gapMs) {
     })(),
     clean_outcomes: ok.filter((t) => t.outcome !== 'NONE' && t.outcome !== 'BOTH_ON_ONE').length,
     disturbed_outcomes: ok.filter((t) => t.outcome === 'NONE' || t.outcome === 'BOTH_ON_ONE').length,
+    // Whether A's layout was ever observed on its own, per gap. With this present,
+    // `CHANGED_ONE` stops being ambiguous: it means "B ended up applied AND A's layout
+    // was demonstrably delivered first", not merely "B's layout is the end state".
+    a_landed_by_gap: Object.fromEntries(out.trials.map((t) => [t.gap_ms, t.a_landed_on])),
+    a_landed_at_every_gap: ok.length > 0 && ok.every((t) => t.a_landed),
   };
 
   p(['kill-session', '-t', S]);
