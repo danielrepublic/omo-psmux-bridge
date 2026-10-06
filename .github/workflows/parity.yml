@@ -205,6 +205,17 @@ jobs:
         run: bun scripts/windows/parity/resize-pane-cells-probe.cjs
         continue-on-error: true
 
+      - name: Run the collision-tolerance sweep
+        # Section 9.5 knows a collision exists and always heals, but not how close
+        # two calls must be for it to happen. That is the number that says whether
+        # real agent traffic is anywhere near it, and it needs no workload of the
+        # owner's own — only a swept delay.
+        env:
+          TEMP: ${{ runner.temp }}
+          TMP: ${{ runner.temp }}
+        run: bun scripts/windows/parity/collision-tolerance.cjs
+        continue-on-error: true
+
       - name: Publish whatever the probes produced
         # continue-on-error above means a probe failure must not discard the other
         # probe's output. A run where one probe worked and one did not is still
