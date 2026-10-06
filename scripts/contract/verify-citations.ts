@@ -259,7 +259,7 @@ export function verifyCitation(citation: Citation, trees: VerifyTrees): Problem 
   if (lines === null) {
     return {
       code: "CITATION_UNRESOLVED_FILE",
-      detail: `${at}: ${oneLine(absPath)} is not under a pinned tree`,
+      detail: `${at}: cannot read ${oneLine(absPath)}`,
     };
   }
   if (citation.start > lines.length || citation.end > lines.length) {

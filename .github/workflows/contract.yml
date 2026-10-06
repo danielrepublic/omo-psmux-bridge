@@ -92,21 +92,38 @@ jobs:
           glob="$(jq -r '.omo.bundleGlob' scripts/contract/pins.json)"
           resolved="${glob//\$HOME/$HOME}"
           resolved="${resolved//\{version\}/$version}"
-          target="$(dirname "$resolved")"
-          echo "pin wants ${version} at ${resolved}"
+
+          # Install target is the PACKAGE ROOT: the glob minus `/dist/index.js`,
+          # NOT `dirname` of it. `dirname` looks right and silently extracts one
+          # level too deep, and a version check cannot catch it because
+          # `package.json` still lands readable there. Failing loudly on any
+          # other shape keeps a pin change a deliberate act.
+          suffix="/dist/index.js"
+          case "$resolved" in
+            *"$suffix") target="${resolved%"$suffix"}" ;;
+            *)
+              echo "::error title=bundle-glob-shape::pins.json bundleGlob must end in ${suffix} so the package root is derivable, got: ${glob}"
+              exit 1
+              ;;
+          esac
+          echo "pin wants ${version}; package root ${target}"
           mkdir -p "$target"
           tarball="$(npm view "oh-my-openagent@${version}" dist.tarball)"
           curl --silent --show-error --location "$tarball" \
             | tar -xz -C "$target" --strip-components=1
-          # The pin asserts a version. Trust the tarball's own package.json rather
-          # than the directory name, so a pin and a tarball that disagree cannot
-          # pass as agreement.
+          # Assert the bundle the citations actually resolve against. Checking
+          # only package.json is what let a one-level-too-deep extraction pass.
+          if [ ! -f "${resolved}" ]; then
+            echo "::error title=bundle-missing::expected the bundle at ${resolved} after extracting ${tarball} into ${target}, but it is not there"
+            ls -la "$target" || true
+            exit 1
+          fi
           installed="$(jq -r '.version' "${target}/package.json")"
           if [ "$installed" != "$version" ]; then
             echo "::error title=bundle-pin-mismatch::pin says ${version} but the tarball contains ${installed}"
             exit 1
           fi
-          echo "installed oh-my-openagent@${installed}"
+          echo "installed oh-my-openagent@${installed}; bundle present"
 
       - name: Verify every citation
         # Runs once. `tee` inside `if` swallows the exit code without
