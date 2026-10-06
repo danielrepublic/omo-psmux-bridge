@@ -20,6 +20,7 @@ other claim of theirs is checkable; this file is what makes them checkable.
 
 | File | Bytes | Produced by |
 |---|---|---|
+| `ci-collision-tolerance-VOID.json` | 2455 | `scripts/windows/parity/collision-tolerance.cjs`, namespace `omo_t24`, session `gap`. **VOID — do not read as a result.** Reports "nothing changed" at every gap up to 2500 ms because neither layout applies, not because interference is absent. |
 | `ci-resize-pane-cells-probe.json` | 1268 | `scripts/windows/parity/resize-pane-cells-probe.cjs`, namespace `omo_t23`, session `rc`. Run 37523398790, commit `2e9885e`. Measures CONTRACT.md rule 1c: a bare `-x 99` lands as ~98% of the window, not 99 columns, and the bridge suppresses it. |
 | `ci-concurrent-clients.json` | 3057 | `scripts/windows/parity/concurrent-clients.cjs`, namespace `omo_t22`, session `race`. Run [37521411814](https://github.com/danielrepublic/omo-psmux-bridge/actions/runs/37521411814), commit `4536eb2`. Settles CONTRACT.md section 9.5. |
 | `ci-current-window-survival.json` | 3443 | `scripts/windows/parity/current-window-survival.cjs`, namespace `omo_t21`, session `cur`. Run [37520072031](https://github.com/danielrepublic/omo-psmux-bridge/actions/runs/37520072031), commit `aa382bf`. Settles CONTRACT.md section 9.4. |
@@ -85,6 +86,10 @@ read as proof of rule 1a when it was psmux's 60% default.
 **Scope.** One session, one window, one client, sequential calls, against v3.3.8.
 It says nothing about a session with several windows, and nothing about two
 clients at once.
+
+## VOID artifacts
+
+`ci-collision-tolerance-VOID.json` is a failed experiment kept on purpose. It is named VOID in its filename, in the workflow step, and in its own header, because an empty result from a probe that cannot detect its own failure is indistinguishable from a finding. CONTRACT.md section 9.5 records why, and what a working version would need.
 
 ## Reading these artifacts safely
 

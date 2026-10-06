@@ -1,26 +1,42 @@
 'use strict';
-// How close together must two clients' layout calls be before anything goes wrong?
+// VOID — this probe does not measure what it claims. Kept because the reason it
+// fails is itself the useful finding, and because deleting a negative result is how
+// the next person repeats it.
 //
-// Section 9.5 measured that a collision is real but not reproducible: one run in
-// three showed it, and it always healed. That is enough to know the defect exists
-// and not enough to judge whether it matters, because the missing number is the
-// tolerance — how far apart two agents' `select-layout` calls can be before the
-// interference stops.
+// WHAT IT WAS FOR
+// Section 9.5 knows a collision is real, non-reproducible, and self-healing. What
+// it lacks is the tolerance: how close together two clients' `select-layout` calls
+// must be before they interfere. If microseconds, real agent traffic will not
+// trigger it; if hundreds of milliseconds, it is a live risk. This swept that
+// delay.
 //
-// This sweep measures that directly. One parameter varies: the delay between the
-// two clients' untargeted layouts. Everything else is fixed, both windows start
-// from the same reset layouts, and both clients target different windows so a
-// correct outcome is unambiguous.
+// WHAT IT PRODUCED
+// `NONE` at every gap — 0, 50, 150, 400, 1000 and 2500 ms. Nothing changed at any
+// separation, up to two and a half seconds.
 //
-// The outcomes that mean "something went wrong" are:
+// WHY THAT IS NOT A TOLERANCE NUMBER
+// Both layouts here differ from the reset layouts, so at least one of them should
+// have landed. None did. The sweep is not measuring interference between two
+// layouts — it is reproducing the 9.4 R1/R2 phenomenon, where an untargeted layout
+// is inert once a process has issued `select-window` and exited. The gap, the
+// variable this probe exists to sweep, is irrelevant when neither layout applies.
 //
-//   NONE        neither window changed — the concurrent-trial signature
-//   BOTH_ON_ONE both layouts landed on the same window — the collision signature
-//   CORRECT     each window holds the layout its own client asked for
+// The guard that should have caught it does not, and that is the sharper lesson.
+// `invocations_all_succeeded` checks exit codes, and psmux cannot fail an untargeted
+// `select-layout` — it exits 0 whether it applied the layout or did nothing at all.
+// That is section 9.3's first finding. So an exit-code guard is blind to precisely
+// the failure this probe needed to detect, and three earlier guards did not prevent
+// this because they all watched the same wrong signal.
 //
-// At some delay the distribution must move to CORRECT, because two processes
-// cannot interleave forever. Where that transition sits is the number that says
-// whether real agent traffic is anywhere near it.
+// WHAT A WORKING VERSION NEEDS
+// A per-trial control: before sweeping, prove that an untargeted layout CAN apply
+// in that exact session state, and void the trial if it cannot. Every probe here
+// after this one should carry one. "Nothing changed" must never be reportable
+// without a same-trial demonstration that something could have changed.
+//
+// Retiring the sweep rather than fixing it in place: a correct version needs a
+// session state where a layout reliably applies first, and establishing that is
+// the open question in 9.4, not a prerequisite this probe can assume away.
 
 const { spawn, spawnSync } = require('child_process');
 const path = require('path');

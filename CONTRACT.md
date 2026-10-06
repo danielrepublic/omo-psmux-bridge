@@ -1778,6 +1778,29 @@ question 9.4 was left with is now answered in the direction that matters (the
 bridge's own sequence works) while the general question (when is a bare untargeted
 layout inert, and why) stays open.
 
+**A sweep that tried to measure the tolerance, and could not.**
+`collision-tolerance.cjs` varies the delay between two clients' untargeted
+layouts — 0, 50, 150, 400, 1000, 2500 ms — to find how close they must be before
+they interfere. It reports "nothing changed" at **every** gap, up to two and a half
+seconds. That is not a tolerance of zero and it is not a tolerance at all. Both
+layouts in that sweep differ from the reset layouts, so at least one should have
+landed; none did, because the sweep reproduces the R1/R2 behaviour above rather
+than measuring interference between two layouts. The gap is irrelevant when neither
+layout applies.
+
+**The guard could not see it, and that is the sharper finding.** The probe checks
+`invocations_all_succeeded`, which is an exit-code check — and psmux cannot fail an
+untargeted `select-layout`: it exits 0 whether it applied the layout or ignored it
+entirely. That is this section's first measurement. So the guard is blind to
+exactly the failure it was added for, and the three guards added earlier this week
+did not prevent it because all of them watched the same signal.
+
+The lesson generalises past this probe: **"nothing changed" must never be
+reportable without a same-trial demonstration that something could have changed.**
+Any probe measuring an untargeted psmux call needs a control invocation in the
+same session state, and voids its own trial when the control fails. Every probe
+written after this one should carry one.
+
 **Scope.** One session, one window each of two, sequential, v3.3.8, one client at
 a time. Not covered: more than two windows, or any layout other than
 `main-horizontal` / `main-vertical` / `even-horizontal`. Concurrent clients are
