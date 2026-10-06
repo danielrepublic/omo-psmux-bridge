@@ -7,20 +7,20 @@ other claim of theirs is checkable; this file is what makes them checkable.
 | | |
 |---|---|
 | Workflow | `.github/workflows/parity.yml`, job `layout-probes` |
-| Run | https://github.com/danielrepublic/omo-psmux-bridge/actions/runs/37517410205 |
-| Run conclusion | `success` |
-| Produced at | 2026-10-06T19:14:04Z |
-| Commit under test | `c227f0128b4fb0936ebb0c37bc64fdcc95bb969d` |
+| Runs | [37517410205](https://github.com/danielrepublic/omo-psmux-bridge/actions/runs/37517410205) (layout probes), [37518808644](https://github.com/danielrepublic/omo-psmux-bridge/actions/runs/37518808644) (all three, including the sizing probe) |
+| Run conclusion | `success` on both |
+| Commit under test | `c227f0128b4fb0936ebb0c37bc64fdcc95bb969d` (layout probes), `7fe273a4b20d62ee47f4d44e8f4f7cd95d774bac` (all three) |
 | psmux | tag `v3.3.8`, commit `66cf61354c473b35d4f0c06c57384fc46d61ffdb` |
 | psmux provenance | release asset `psmux-v3.3.8-windows-x64.zip`, extracted to `%LOCALAPPDATA%\psmux`, tag read from `scripts/contract/pins.json` rather than hardcoded |
 | Bun | 1.4.2 (pinned, same value as `release.yml`) |
 | Runner | `windows-latest` |
-| Isolation | each probe used its own `-L` namespace (`omo_t19`, `omo_t19b`); both tore down clean (`after_teardown` empty) |
+| Isolation | each probe used its own `-L` namespace (`omo_t19`, `omo_t19b`, `omo_t20`); all tore down clean (`after_teardown` empty) |
 
 ## Files
 
 | File | Bytes | Produced by |
 |---|---|---|
+| `ci-main-pane-width-probe.json` | 3784 | `scripts/windows/parity/main-pane-width-probe.cjs`, namespace `omo_t20`, session `mpw`. Run 37518808644. |
 | `ci-layout-which-window.json` | 1777 | `scripts/windows/parity/layout-which-window.cjs`, namespace `omo_t19b`, session `lay2` |
 | `ci-layout-probe.json` | 3397 | `scripts/windows/parity/layout-probe.cjs`, namespace `omo_t19`, session `lay` |
 
@@ -48,6 +48,40 @@ point window 0 is already in `even-horizontal` — the layout string `f890` is
 layout already in effect, and it is not evidence about which window is current.
 Read `ci-layout-which-window.json` for that; it varies the layout name so a
 change is actually possible. This is a defect in the probe, not in psmux.
+
+## What the sizing probe establishes
+
+`ci-main-pane-width-probe.json` settles CONTRACT.md section 3.9 rules 1a and 1b,
+which until now were the document's only "unrecorded, not measured" claims about
+the layout. Its `verdict` block:
+
+```json
+{ "rule_1a_percent_form_ignored": true,
+  "rule_1b_option_alone_inert":  true,
+  "rule_1b_followup_applies":    true,
+  "rule_1b_order_matters":       true,
+  "baseline_share": 0.5917 }
+```
+
+Read as a sequence of main-pane shares of the window width:
+
+| step | share | what it shows |
+|---|---|---|
+| baseline, option never set | 0.5917 | psmux's ~60% default |
+| `set-window-option main-pane-width "50%"` | 0.5917 | the `%` form is silently dropped — rule 1a |
+| then `select-layout` | 0.5917 | nothing to apply, because nothing was stored |
+| `set-window-option main-pane-width "50"` | 0.5917 | storing alone changes nothing — rule 1b's premise |
+| then `select-layout` | **0.4917** | the follow-up is what makes it take effect — rule 1b's remedy |
+| `select-layout`, then `main-pane-width "40"` | 0.4917 | setting after a layout is inert — rule 1b's ordering claim |
+
+The share is recorded rather than the raw column count on purpose. A bare
+`pane_width` cannot distinguish "50% of 199" from "50% of 120", and that is
+precisely how the single `119` in `issue-1-team-layout-probe-after.json` came to
+read as proof of rule 1a when it was psmux's 60% default.
+
+**Scope.** One session, one window, one client, sequential calls, against v3.3.8.
+It says nothing about a session with several windows, and nothing about two
+clients at once.
 
 ## Reproducing
 

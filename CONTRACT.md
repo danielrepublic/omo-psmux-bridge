@@ -590,21 +590,33 @@ a guarantee of the language: `str::parse::<u16>` accepts only decimal digits, an
 there is no trailing-character allowance, so a `%` cannot survive it. Between the
 two, this rule's premise no longer rests on the author's reading of two lines.
 
-**The width arithmetic below is still not measured.** Having established that
-`50` stores 50 and `50%` stores nothing, the remaining step — that a stored 50
-then yields a 99-cell main pane in a 200-column window — is a claim about
-`apply_layout`, and `apply_layout` has **no test coverage in psmux at all**: a
-search for `apply_layout` across `tests-rs/` returns zero hits. So the last step
-is inference over `src/layout.rs:1094-1145`, unaided by any upstream assertion.
-INFERRED: `main_v_pct` falls back to `60` while the option is unset
-(`src/layout.rs:1096`), so `set-window-option main-pane-width "50%"` leaves the
-main pane at ~119 cells in a 200-column window — psmux's own 60% default — and
-`… "50"` gives ~99.
+**MEASURED 2026-10-07. This rule is no longer inference.** Evidence
+`.omo/evidence/ci-main-pane-width-probe.json`, produced by an automated
+`windows-latest` run of `main-pane-width-probe.cjs` against v3.3.8; provenance
+including run id and commit under test is in `.omo/evidence/README-parity-ci.md`.
+Main-pane share of the window width, read at every step:
 
-What would settle it, and it is the same probe either way: `list-panes -a -F
-'#{pane_width}'` before and after each call, in a throwaway `-L` namespace, with
-both outputs captured into this repository. Until then the *storage* half of this
-rule is corroborated and its *geometry* half is argued.
+| step | share | what it shows |
+|---|---|---|
+| baseline, option never set | **0.5917** | psmux's ~60% default, matching `src/layout.rs:1096` |
+| `set-window-option main-pane-width "50%"` | **0.5917** | the `%` form is stored as nothing — this rule's premise |
+| then an untargeted `select-layout main-vertical` | 0.5917 | nothing to apply, because nothing was stored |
+| `set-window-option main-pane-width "50"` | 0.5917 | the bare form stores, but applying it is deferred |
+| then an untargeted `select-layout main-vertical` | **0.4917** | the stored 50 takes effect only once a layout runs |
+
+0.5917 against a `min(95)`-capped 60 default is psmux's own fallback, and 0.4917
+is the stored 50. Both numbers are shares rather than column counts because a
+bare `pane_width` cannot distinguish "50% of 199" from "50% of 120" — which is
+exactly how the single `119` in `issue-1-team-layout-probe-after.json` came to
+read as proof of this rule when it was the 60% default instead.
+
+**Scope of the measurement.** One session, one window, one client, sequential
+calls, v3.3.8. It does not cover a multi-window session, nor two clients at
+once, and it does not cover `main-pane-height`.
+
+The arithmetic this section used to carry as INFERRED is now settled: `"50%"`
+leaves the main pane at psmux's default, and `"50"` followed by a layout moves it
+to the stored share. Nothing further is needed from a host run for this rule.
 
 A value with no `%`, or any other option name, is forwarded byte-identically.
 
@@ -657,31 +669,50 @@ discarded: OmO spawns its own layout calls with `stdout: "ignore", stderr:
 a code (`index.js:8918`, `index.js:8922`), and the primary command's exit code is
 the only one OmO branches on (`index.js:8415`).
 
-**Unrecorded, not measured, and not even partly corroborated.** The geometry below
-is what the cited lines imply, not a result: no capture of it exists in version
-control in this repository. Unlike rule 1a, **nothing here can be upgraded by
-psmux's own tests, because `apply_layout` has no test coverage upstream** — a
-search for `apply_layout` across `tests-rs/` at v3.3.8 returns zero hits. So
-while rule 1a's storage half is now asserted by psmux's authors
-(`tests-rs/test_config_exhaustive.rs:1470`), this rule's entire premise — that
-setting the option applies nothing until a layout runs, and that a layout then
-sizes the main pane from it — is inference over `src/layout.rs:1094-1145` with no
-upstream assertion behind it whatsoever.
+**MEASURED 2026-10-07, and this rule needed it more than rule 1a did.** The same
+run as rule 1a — `.omo/evidence/ci-main-pane-width-probe.json` — tests both halves
+of this rule directly, and its `verdict` block reads `rule_1b_option_alone_inert:
+true`, `rule_1b_followup_applies: true`, `rule_1b_order_matters: true`.
 
-That asymmetry is the reason the probe below is not optional bookkeeping. Rule 1a
-is well founded; this rule is the one carrying the layout, and it rests on the
-least-tested function in the psmux codebase.
+| step | share | what it shows |
+|---|---|---|
+| `set-window-option main-pane-width "50"`, nothing else | 0.5917 | storing the option applies **nothing** — this rule's premise |
+| then an untargeted `select-layout main-vertical` | **0.4917** | the injected follow-up is what makes it take effect |
+| `select-layout` first, then `main-pane-width "40"` | 0.4917 | setting the option **after** a layout is inert |
+
+That third row is the ordering claim, which was the weakest part of this rule and
+is now falsifiable rather than merely plausible: the same option, the same
+window, the same layout — the order is the only variable, and only one order
+works. It is why the bridge emits option-then-layout and why the injected
+`select-layout` is load-bearing rather than decorative.
+
+`apply_layout` still has **no test coverage in psmux** — a search across
+`tests-rs/` at v3.3.8 returns zero hits — so nothing here is asserted upstream.
+That is no longer a gap in the evidence, because the behaviour is now observed
+directly rather than inferred from the source.
+
+Scope matches rule 1a's: one session, one window, one client, v3.3.8. Not covered:
+multi-window sessions, concurrent clients, or `main-pane-height`.
 
 INFERRED: with `main_pane_width = 50`, `src/layout.rs:1144` builds
 `sizes: vec![50, 50]` at the root and `src/layout.rs:1140-1141` gives the
 right-hand column `equal_sizes` shares, so a 200-column window should show a main
 pane of 99 cells with the remainder in the right column, and a 240-column window
-a main pane of 119. The *order* — option before layout — is structural rather
-than observed, and follows from the cited lines: `main_pane_width` is read inside
-`apply_layout` and nowhere else on that path, so setting it afterwards re-applies
-nothing. What would settle it: capture `list-windows` and `list-panes -a` with
-`#{pane_width}` for the `main-pane-width 50`-then-`select-layout` order and for the
-reverse order, both in one throwaway `-L` namespace, both outputs stored here.
+a main pane of 119.
+
+**Two of the three things this paragraph used to leave open are now measured, and
+the third is corrected above.** The order — option before layout — is no longer
+structural-by-inference: the probe ran both orders and only option-then-layout
+moved the pane (see the table above). The `50%`-vs-`50` storage difference is
+rule 1a's, measured there. The column counts below remain INFERRED arithmetic
+rather than observation, and deliberately so: the probe recorded **shares** of the
+window width (0.5917 and 0.4917), not absolute cells, because the runner's window
+width is psmux's default and is not 200 or 240. The shares are what the rules
+depend on; the specific cell counts are illustrations of them.
+
+A run at a fixed 200-column window would settle the counts, and would need a
+probe that sizes the window rather than accepting the default. Nothing else in
+this document depends on it.
 
 | window columns | panes | main | agents |
 |---|---|---|---|
