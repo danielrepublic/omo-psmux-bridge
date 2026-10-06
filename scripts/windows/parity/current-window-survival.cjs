@@ -70,7 +70,7 @@ const out = { namespace: NS, session: S, baseline: layouts(), readings: [] };
 
 const APPLIED = 'main-horizontal';
 
-function reading(tag, setCurrent, applyInSameProcess) {
+function reading(tag, setCurrent, applyInSameProcess, skipSetCurrent) {
   // Reset both windows so each reading starts from the same state.
   p(['select-layout', '-t', S + ':0', 'main-vertical']);
   p(['select-layout', '-t', S + ':1', 'even-horizontal']);
@@ -79,11 +79,14 @@ function reading(tag, setCurrent, applyInSameProcess) {
   // the state this reading actually started from.
   const base = layouts();
 
-  const setResult = p(['select-window', '-t', S + ':' + setCurrent]);
-  sleep(600);
+  let setResult = { status: null, stderr: null };
+  if (!skipSetCurrent) {
+    setResult = p(['select-window', '-t', S + ':' + setCurrent]);
+    sleep(600);
+  }
 
   let applyResult = null;
-  if (applyInSameProcess) {
+  if (applyInSameProcess || skipSetCurrent) {
     applyResult = p(['select-layout', APPLIED]);
     sleep(900);
   }
@@ -91,7 +94,8 @@ function reading(tag, setCurrent, applyInSameProcess) {
 
   const rec = {
     tag,
-    set_current_to: S + ':' + setCurrent,
+    set_current_to: skipSetCurrent ? null : S + ':' + setCurrent,
+    issued_select_window: !skipSetCurrent,
     select_window_exit: setResult.status,
     select_window_stderr: setResult.stderr,
     applied_in_same_process: applyInSameProcess,
@@ -118,6 +122,15 @@ const r3 = reading('R3 control: set current and apply in ONE process', '1', true
 const r1 = reading('R1: set current to 0 in one process, apply in ANOTHER', '0', false);
 const r2 = reading('R2: set current to 1 in one process, apply in ANOTHER', '1', false);
 
+// R4 is the shape the bridge actually produces. Rules 1b and 1e inject an
+// untargeted `select-layout` as a FOLLOW-UP, and runFollowUps spawns it as its
+// own process — one that never issued a `select-window` of its own. R1 and R2 set
+// current from a process that has since exited; R4 sets it from nobody at all.
+// If those two behave differently then "the pointer did not survive" is the wrong
+// summary, and the real finding is that an untargeted layout needs a current window
+// its own connection established — which would make the injected follow-up inert.
+const r4 = reading('R4: NO select-window anywhere; fresh process applies untargeted', '0', false, true);
+
 function changedIndex(rec) {
   return rec.changed_windows.length === 1 ? rec.changed_windows[0].window : null;
 }
@@ -126,10 +139,11 @@ out.verdict = {
   control_lands_on_made_current: changedIndex(r3) === 1,
   r1_changed: changedIndex(r1),
   r2_changed: changedIndex(r2),
-  // The decision-relevant fact: does setting the pointer in a process that then
-  // EXITS still steer a later, unrelated process?
+  // The bridge's actual shape: a fresh process that never issued select-window.
+  r4_changed: changedIndex(r4),
   pointer_survives_connection: changedIndex(r1) === 0 && changedIndex(r2) === 1,
-  note: 'pointer_survives_connection=false means an injected untargeted select-layout from a separate process does NOT follow the window the caller selected',
+  untargeted_applies_without_any_select_window: r4.changed_windows.length > 0,
+  note: 'r4 is what rules 1b/1e rely on: their follow-up runs as its own process that never set a current window. If r4_changed is null, the injected select-layout does nothing at all.',
 };
 
 p(['kill-session', '-t', S]);
