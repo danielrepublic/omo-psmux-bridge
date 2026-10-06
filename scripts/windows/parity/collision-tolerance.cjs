@@ -190,42 +190,80 @@ async function trial(gapMs) {
   await spawnP(['select-window', '-t', S + ':0']);
   await spawnP(['select-window', '-t', S + ':1']);
 
+  // Timestamps bracket the trial so the poller's snapshots can be correlated with it
+  // afterwards. Correlating after the fact is the whole point: an observer that runs in
+  // this process cannot sample mid-flight without blocking the applies.
+  const tStart = Date.now();
   const first = spawnP(['select-layout', A]);
+  const tApplyA = Date.now();
   await sleep(gapMs);
   const second = spawnP(['select-layout', B]);
+  const tApplyB = Date.now();
   // Sample here, while B is in flight and A has had the whole gap to land.
   //
-  // This is the observation the sweep lacked. Sampling only after awaiting both makes
-  // `CHANGED_ONE` on w1 equally consistent with "A applied then B overwrote it" and
-  // "only B applied" — B's layout is the end state either way, and A's effect is gone
-  // before anything looks. section 9.5's staggered trial measured this mechanism
-  // directly, so the sweep no longer has to infer it, but the sweep should report it
-  // rather than rely on another probe for it.
+  // THIS SAMPLE IS NOT MID-FLIGHT, AND THE ARTIFACT PROVES IT. `layouts()` is a
+  // spawnSync: it blocks the event loop, and by the time it returns both applies have
+  // finished. Every gap recorded `mid` byte-identical to `after`, so the sample is the
+  // end state wearing a mid-flight label. `a_landed_on` computed from it credits A for
+  // a change B made — `a_landed_at_every_gap: true` was a false positive and is not
+  // evidence that anything about A is observable this way.
   //
-  // Placed AFTER the spawn of B, not before, so B's start time — and therefore the
-  // overlap this sweep exists to vary — is untouched. The only cost is that the await
-  // below happens one `list-windows` later.
+  // The sample cannot be fixed by moving it: sampling before the spawn of B delays B
+  // and changes the very gap this probe varies, and sampling after is what this is. An
+  // observer that cannot be made concurrent with the thing it observes has to be
+  // replaced rather than repositioned — hence the separate poller process, whose
+  // snapshots are correlated by timestamp after the fact instead of blocking anyone.
   const mid = layouts();
   const results = await Promise.all([first, second]);
 
   sleep(1200);
   const after = layouts();
+  const tEnd = Date.now();
   const { outcome, changed } = classify(before, after);
-  // Which windows moved before B could have finished. If this shows w1 moving, A's
-  // layout was computed and delivered, and B then replaced it.
-  const a_landed = classify(before, mid).changed;
+  const sample_was_midflight = mid !== after;
   return {
     gap_ms: gapMs,
     outcome,
     changed_windows: changed,
-    // Windows A moved on its own, i.e. proof its layout was not discarded unheard.
-    a_landed_on: a_landed,
-    a_landed: a_landed.length > 0,
+    // Void unless the sample demonstrably differs from the end state. A sample equal to
+    // `after` cannot separate A's layout from B's, so nothing derived from it counts.
+    sample_was_midflight: sample_was_midflight,
+    a_landed_on: sample_was_midflight ? classify(before, mid).changed : null,
+    a_landed: sample_was_midflight && classify(before, mid).changed.length > 0,
     invocations_ok: results.every((r) => r.exit === 0),
     before,
     mid,
     after,
+    t_start: tStart,
+    t_apply_a: tApplyA,
+    t_apply_b: tApplyB,
+    t_end: tEnd,
   };
+}
+
+// Poller mode: a SEPARATE process.
+//
+// The mid-flight sample cannot be taken from this process. `layouts()` is a
+// spawnSync, so it blocks the event loop, and both applies are finished by the time it
+// returns — measured, not assumed: every gap recorded `mid` byte-identical to `after`.
+// Moving the sample earlier delays B's spawn and changes the gap being swept, so the
+// observer has to be replaced rather than repositioned.
+//
+// Running the observer as its own process removes the contention entirely. It polls
+// `list-windows` on its own clock while this process issues the two applies, appending
+// `{t, windows}` per snapshot. The trial brackets itself with timestamps and the two
+// timelines are joined afterwards, so nothing in the measured sequence is delayed by
+// the act of observing it.
+const POLL_PATH = process.argv[3];
+if (process.argv[2] === '--poll') {
+  fs.writeFileSync(POLL_PATH, '');
+  const deadline = Date.now() + 120000;
+  while (Date.now() < deadline) {
+    const snapshot = { t: Date.now(), windows: layouts() };
+    fs.appendFileSync(POLL_PATH, JSON.stringify(snapshot) + '\n');
+    sleep(15);
+  }
+  process.exit(0);
 }
 
 (async () => {
@@ -255,9 +293,63 @@ async function trial(gapMs) {
       'read as "no interference" — it is indistinguishable from "nothing applied"';
   }
 
+  // The poller runs for the whole sweep, in its own process, so observing does not
+  // delay anything it observes. It is started before the first trial and stopped after
+  // the last; the timelines are joined per trial afterwards.
+  const pollPath = path.join(process.env.TEMP, 'omo-t24-poll.jsonl');
+  const poller = spawn(process.execPath, [__filename, '--poll', pollPath], { windowsHide: true });
+  poller.unref();
+
   for (const gap of GAPS) {
     out.trials.push(await trial(gap));
   }
+
+  poller.kill();
+  sleep(300); // let the poller's last append flush before reading
+
+  // Join the two timelines. A trial's window is [t_start, t_end]; within it, did w1 ever
+  // hold A's layout? The control already recorded the exact tree each name produces, so
+  // this is a string comparison against a measured reference rather than a guess.
+  const aTree = (out.control.layout_names_accepted[A].observed || '')
+    .split('\n').find((l) => l.startsWith('1|'));
+  const bTree = (out.control.layout_names_accepted[B].observed || '')
+    .split('\n').find((l) => l.startsWith('1|'));
+
+  let pollerSamples = [];
+  try {
+    pollerSamples = fs.readFileSync(pollPath, 'utf8').split('\n')
+      .filter(Boolean).map((l) => JSON.parse(l));
+  } catch (e) {
+    pollerSamples = [];
+  }
+
+  for (const t of out.trials) {
+    const window_ = pollerSamples.filter((s) => s.t >= t.t_start && s.t <= t.t_end);
+    const aSeen = aTree ? window_.filter((s) => (s.windows.split('\n').find((l) => l.startsWith('1|')) || '') === aTree) : [];
+    const bSeen = bTree ? window_.filter((s) => (s.windows.split('\n').find((l) => l.startsWith('1|')) || '') === bTree) : [];
+    t.poller = {
+      samples_in_window: window_.length,
+      // Distinct states w1 held during the trial, in order. Length > 2 means something
+      // appeared between the reset and B's layout, which is the question at issue.
+      distinct_w1_states: [...new Set(window_.map((s) => (s.windows.split('\n').find((l) => l.startsWith('1|')) || '')))],
+      a_layout_observed_count: aSeen.length,
+      a_first_seen_ms_after_apply_a: aSeen.length ? aSeen[0].t - t.t_apply_a : null,
+      b_layout_observed_count: bSeen.length,
+    };
+    // Replace the in-process sample, which was never mid-flight, with what the
+    // concurrent observer actually saw.
+    t.mid = null;
+    t.mid_source = 'in-process sample was never mid-flight (equal to `after` at every gap); see poller';
+  }
+
+  out.poller = {
+    total_samples: pollerSamples.length,
+    a_tree: aTree,
+    b_tree: bTree,
+    // If the poller produced nothing, the mid-flight question is unanswered and must
+    // not be reported as answered.
+    usable: pollerSamples.length > 0 && !!aTree && !!bTree,
+  };
 
   const ok = out.trials.filter((t) => t.invocations_ok);
   out.verdict = {
@@ -272,11 +364,16 @@ async function trial(gapMs) {
     })(),
     clean_outcomes: ok.filter((t) => t.outcome !== 'NONE' && t.outcome !== 'BOTH_ON_ONE').length,
     disturbed_outcomes: ok.filter((t) => t.outcome === 'NONE' || t.outcome === 'BOTH_ON_ONE').length,
-    // Whether A's layout was ever observed on its own, per gap. With this present,
-    // `CHANGED_ONE` stops being ambiguous: it means "B ended up applied AND A's layout
-    // was demonstrably delivered first", not merely "B's layout is the end state".
-    a_landed_by_gap: Object.fromEntries(out.trials.map((t) => [t.gap_ms, t.a_landed_on])),
-    a_landed_at_every_gap: ok.length > 0 && ok.every((t) => t.a_landed),
+    // Whether A's layout was ever observed on its own, per gap — from the CONCURRENT
+    // poller, not from the in-process sample, which was never mid-flight and is void.
+    a_observed_by_gap: Object.fromEntries(out.trials.map((t) => [
+      t.gap_ms, (t.poller || {}).a_layout_observed_count,
+    ])),
+    a_observed_at_every_gap: ok.length > 0 && out.poller.usable
+      && ok.every((t) => (t.poller || {}).a_layout_observed_count > 0),
+    // Evidence for the retraction above, kept as a verdict key so the artifact carries
+    // the reason its own `a_landed` fields are null rather than merely omitting them.
+    in_process_sample_ever_midflight: ok.some((t) => t.sample_was_midflight),
   };
 
   p(['kill-session', '-t', S]);
