@@ -846,32 +846,34 @@ jobs:
             exit 1
           fi
 
-          # A tag push with no release and no gh-visible repo access is a
-          # different failure from "release exists", and must not be reported as
-          # if the gate simply passed.
+          # There is deliberately NO permission pre-check here, and that is a decision
+          # rather than an omission.
           #
-          # The permission probe is deliberately three-valued, because the probe
-          # itself is not reliable with this job's token. `GH_TOKEN` here is
-          # `${{ github.token }}` -- an App INSTALLATION token -- and
-          # `GET /repos/{owner}/{repo}` does not populate `permissions` for one,
-          # so `.permissions.push` comes back empty and a two-valued test reports
-          # "no push permission" for a token that can in fact create the release.
-          # A user token does return the field, which is what made the two-valued
-          # version look correct while it was being written.
+          # This gate used to assert `gh api repos/{owner}/{repo} --jq
+          # '.permissions.push'` printed exactly `true`, and failed a real
+          # release on a repository with no release on it. Making that probe
+          # three-valued did not help, because all three of its answers are wrong
+          # for this job's token. `GH_TOKEN` here is `${{ github.token }}`, an App
+          # INSTALLATION token, and for one the `permissions` object on that
+          # endpoint does not describe what the workflow was granted: it has
+          # returned `push=false` for a workflow that declares
+          # `permissions: contents: write`, which is precisely the grant that
+          # authorises creating a release. A user token returns a truthful `true`
+          # from the same command, which is why the probe read as correct while
+          # it was being written and why every local check passed.
           #
-          # So: an explicit `false` is a real refusal and stops the build; anything
-          # we cannot read is reported and deferred to `gh release create`, which
-          # either succeeds or fails loudly on its own. Nothing is skipped silently
-          # either way -- the create step is the authority on whether this token can
-          # write, and its failure names itself.
-          PUSH_PERMISSION=$(gh api "repos/${{ github.repository }}" --jq '.permissions.push' 2>/dev/null | head -n 1 || true)
-          if [ "$PUSH_PERMISSION" = "false" ]; then
-            echo "::error title=release permissions::the workflow token reports push=false on ${{ github.repository }}, so the release cannot be created. Check that 'permissions: contents: write' is still declared and that the repository has not changed its workflow-permission policy."
-            exit 1
-          fi
-          if [ "$PUSH_PERMISSION" != "true" ]; then
-            echo "[gate] note=could not read '.permissions.push' (got: '${PUSH_PERMISSION:-<empty>}'). Expected for an installation token and NOT treated as a failure; 'gh release create' below is the authority on write access and fails loudly if it lacks it."
-          fi
+          # So the probe cannot answer the question it was written to answer, in
+          # any state. Keeping it would mean keeping a gate that either blocks a
+          # valid release or, once loosened enough to pass, checks nothing.
+          #
+          # What actually enforces write access is the next step: `gh release
+          # create` either succeeds or fails loudly and names itself, and the job
+          # fails with it. Nothing is skipped silently -- there is no path through
+          # this workflow that reaches a green job without a release having been
+          # created. That is the property this gate was protecting, and it is
+          # enforced by the thing that does the writing rather than by a probe
+          # that cannot see the answer.
+          echo "[gate] no release exists for $TAG; gh release create below is the authority on write access"
 
           echo "[gate] no existing release for $TAG; publishing"
 
