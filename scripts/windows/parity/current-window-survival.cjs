@@ -86,10 +86,17 @@ function reading(tag, setCurrent, applyInSameProcess, skipSetCurrent) {
   }
 
   let applyResult = null;
-  if (applyInSameProcess || skipSetCurrent) {
-    applyResult = p(['select-layout', APPLIED]);
-    sleep(900);
-  }
+  // Applied unless the reading is explicitly "same process only". R1 and R2 are
+  // cross-process readings and MUST issue this call.
+  //
+  // This condition was `applyInSameProcess || skipSetCurrent`, which meant R1 and R2
+  // — false, undefined — never issued the layout at all. Their recorded
+  // `changed_windows: []` was therefore the probe not taking a step, not psmux
+  // declining one, and CONTRACT.md section 9.4 cited it as evidence. Fixed by
+  // making the apply unconditional: every reading wants the layout applied, and
+  // only R3 additionally wants the pointer set in the same process.
+  applyResult = p(['select-layout', APPLIED]);
+  sleep(900);
   const after = layouts();
 
   const rec = {
@@ -98,7 +105,10 @@ function reading(tag, setCurrent, applyInSameProcess, skipSetCurrent) {
     issued_select_window: !skipSetCurrent,
     select_window_exit: setResult.status,
     select_window_stderr: setResult.stderr,
-    applied_in_same_process: applyInSameProcess,
+    // True ONLY for R3, and it means the pointer was set by this same call.
+    // It does NOT mean the others skipped the layout call — every reading applies
+    // it now. `apply_exit` is the field that says whether it actually ran.
+    pointer_set_in_same_process: applyInSameProcess,
     layout_applied: APPLIED,
     apply_exit: applyResult ? applyResult.status : null,
     apply_stderr: applyResult ? applyResult.stderr : null,
