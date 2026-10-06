@@ -23,7 +23,7 @@ other claim of theirs is checkable; this file is what makes them checkable.
 | `ci-collision-tolerance-VOID.json` | 2455 | `scripts/windows/parity/collision-tolerance.cjs`, namespace `omo_t24`, session `gap`. **VOID — do not read as a result.** Reports "nothing changed" at every gap up to 2500 ms because neither layout applies, not because interference is absent. |
 | `ci-resize-pane-cells-probe.json` | 1268 | `scripts/windows/parity/resize-pane-cells-probe.cjs`, namespace `omo_t23`, session `rc`. Run 37523398790, commit `2e9885e`. Measures CONTRACT.md rule 1c: a bare `-x 99` lands as ~98% of the window, not 99 columns, and the bridge suppresses it. |
 | `ci-concurrent-clients.json` | 3057 | `scripts/windows/parity/concurrent-clients.cjs`, namespace `omo_t22`, session `race`. Run [37521411814](https://github.com/danielrepublic/omo-psmux-bridge/actions/runs/37521411814), commit `4536eb2`. Settles CONTRACT.md section 9.5. |
-| `ci-current-window-survival.json` | 3443 | `scripts/windows/parity/current-window-survival.cjs`, namespace `omo_t21`, session `cur`. Run [37520072031](https://github.com/danielrepublic/omo-psmux-bridge/actions/runs/37520072031), commit `aa382bf`. Settles CONTRACT.md section 9.4. |
+| `ci-current-window-survival.json` | 3443 | `scripts/windows/parity/current-window-survival.cjs`, namespace `omo_t21`, session `cur`. Run [37520072031](https://github.com/danielrepublic/omo-psmux-bridge/actions/runs/37520072031), latest run 37524781796, commit `19984d0`. Settles CONTRACT.md section 9.4 — and REFUTES the claim 9.4 originally made: the current-window pointer does survive the connection. |
 | `ci-main-pane-width-probe.json` | 9236 | `scripts/windows/parity/main-pane-width-probe.cjs`, namespace `omo_t20`, session `mpw`. Latest run 37521905593, commit `1192418`; covers BOTH the width and height axes of rules 1a and 1b, plus step E. |
 | `ci-layout-which-window.json` | 1777 | `scripts/windows/parity/layout-which-window.cjs`, namespace `omo_t19b`, session `lay2` |
 | `ci-layout-probe.json` | 3397 | `scripts/windows/parity/layout-probe.cjs`, namespace `omo_t19`, session `lay` |
@@ -93,8 +93,8 @@ clients at once.
 
 ## Reading these artifacts safely
 
-Two of the five probes in this directory produced an **empty** result on their
-first run, and in both cases the emptiness meant "the probe did not run", not
+Three of the probes in this directory produced an **empty** or void result, in every case
+because the probe did not do what it claimed rather than because psmux misbehaved, and in both cases the emptiness meant "the probe did not run", not
 "nothing happened":
 
 - `ci-concurrent-clients.json`'s first run had every invocation exit 1 on a

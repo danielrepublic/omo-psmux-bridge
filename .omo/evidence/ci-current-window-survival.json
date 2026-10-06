@@ -9,7 +9,7 @@
       "issued_select_window": true,
       "select_window_exit": 0,
       "select_window_stderr": "",
-      "applied_in_same_process": true,
+      "pointer_set_in_same_process": true,
       "layout_applied": "main-horizontal",
       "apply_exit": 0,
       "apply_stderr": "",
@@ -29,13 +29,19 @@
       "issued_select_window": true,
       "select_window_exit": 0,
       "select_window_stderr": "",
-      "applied_in_same_process": false,
+      "pointer_set_in_same_process": false,
       "layout_applied": "main-horizontal",
-      "apply_exit": null,
-      "apply_stderr": null,
+      "apply_exit": 0,
+      "apply_stderr": "",
       "before": "0|7f70,120x30,0,0{71x30,0,0,1,48x30,72,0,2}|2p\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}|2p",
-      "after": "0|7f70,120x30,0,0{71x30,0,0,1,48x30,72,0,2}|2p\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}|2p",
-      "changed_windows": []
+      "after": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]|2p\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}|2p",
+      "changed_windows": [
+        {
+          "window": 0,
+          "before": "0|7f70,120x30,0,0{71x30,0,0,1,48x30,72,0,2}|2p",
+          "after": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]|2p"
+        }
+      ]
     },
     {
       "tag": "R2: set current to 1 in one process, apply in ANOTHER",
@@ -43,13 +49,19 @@
       "issued_select_window": true,
       "select_window_exit": 0,
       "select_window_stderr": "",
-      "applied_in_same_process": false,
+      "pointer_set_in_same_process": false,
       "layout_applied": "main-horizontal",
-      "apply_exit": null,
-      "apply_stderr": null,
+      "apply_exit": 0,
+      "apply_stderr": "",
       "before": "0|7f70,120x30,0,0{71x30,0,0,1,48x30,72,0,2}|2p\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}|2p",
-      "after": "0|7f70,120x30,0,0{71x30,0,0,1,48x30,72,0,2}|2p\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}|2p",
-      "changed_windows": []
+      "after": "0|7f70,120x30,0,0{71x30,0,0,1,48x30,72,0,2}|2p\n1|b7b2,120x30,0,0[120x17,0,0,3,120x12,0,18,4]|2p",
+      "changed_windows": [
+        {
+          "window": 1,
+          "before": "1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}|2p",
+          "after": "1|b7b2,120x30,0,0[120x17,0,0,3,120x12,0,18,4]|2p"
+        }
+      ]
     },
     {
       "tag": "R4: NO select-window anywhere; fresh process applies untargeted",
@@ -57,7 +69,7 @@
       "issued_select_window": false,
       "select_window_exit": null,
       "select_window_stderr": null,
-      "applied_in_same_process": false,
+      "pointer_set_in_same_process": false,
       "layout_applied": "main-horizontal",
       "apply_exit": 0,
       "apply_stderr": "",
@@ -74,10 +86,10 @@
   ],
   "verdict": {
     "control_lands_on_made_current": true,
-    "r1_changed": null,
-    "r2_changed": null,
+    "r1_changed": 0,
+    "r2_changed": 1,
     "r4_changed": 1,
-    "pointer_survives_connection": false,
+    "pointer_survives_connection": true,
     "untargeted_applies_without_any_select_window": true,
     "note": "r4 is what rules 1b/1e rely on: their follow-up runs as its own process that never set a current window. If r4_changed is null, the injected select-layout does nothing at all."
   },

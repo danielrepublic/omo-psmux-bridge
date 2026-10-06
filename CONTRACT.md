@@ -1745,35 +1745,43 @@ it is "the follow-up silently re-lays-out a window the caller did not name, and
 reports success". 9.1 already established that this cannot be fixed by injecting
 `-t`, because psmux strips it before dispatch.
 
-**Retracted 2026-10-07: R1 and R2 were not evidence of anything.** This paragraph
-originally read "R1 and R2 show that a `select-window` issued by a process which
-then **exits** does not steer a later process at all". It cited two readings from
-`ci-current-window-survival.json`, both of which recorded
-`"changed_windows": []` and were taken as psmux declining the layout.
+**RETRACTED AND REFUTED 2026-10-07.** The claim was: "a `select-window` issued by
+a process which then **exits** does not steer a later process at all — the
+untargeted layout does nothing." It rested on two readings whose `changed_windows`
+were empty.
 
-**Those two readings never issued the layout call.** Their recorded `apply_exit` is
-`null`. The probe gated the call on `applyInSameProcess || skipSetCurrent`, and R1
-and R2 were `false, undefined` — so the step never ran, and the empty result
-recorded the probe's own omission. The claim was cited from an artifact that
-contradicted it, and reading only `changed_windows` is what hid it.
+Those two readings **never issued the layout call.** Their recorded `apply_exit`
+was `null`: the probe gated the call on `applyInSameProcess || skipSetCurrent`, and
+both were `false, undefined`, so the step was skipped and the empty result recorded
+the probe's own omission. An artifact contradicting the claim sat in the repository
+the whole time, invisible because only `changed_windows` was read.
 
-The condition is fixed: every reading now applies the layout, and only R3
-additionally sets the pointer in the same process. The field that says whether the
-call ran is `apply_exit`, and it is the one to read.
+Re-run with the call unconditional, the claim is not merely unsupported — it is
+**false**:
 
-**The conclusion survives on other evidence, not on this.** `collision-tolerance.cjs`
-independently observes the same inertness — every swept gap up to 2500 ms leaves
-both windows unchanged, while every invocation exits 0 — so "an untargeted layout
-is inert once a process has issued `select-window` and exited" stands. But it
-stands on the sweep, which is itself VOID for a different reason (it cannot
-distinguish that from never-applying at all, because psmux cannot fail this
-command). So the honest status of this claim is: **asserted, contradicted by its
-own cited artifact, and not yet re-established by a corrected reading.** R1 and R2
-have to be re-run before this may be used as a basis for anything.
+| reading | `apply_exit` | window that changed |
+|---|---|---|
+| R3 control, pointer and layout in one process | 0 | the one made current |
+| **R1** pointer set to w0 by an earlier process, layout from another | **0** | **w0** |
+| **R2** pointer set to w1 by an earlier process, layout from another | **0** | **w1** |
+| R4 no `select-window` anywhere | 0 | w1 |
 
-That is the second time in this document that a probe's silence was read as a
-finding, and both times the guard meant to prevent it was watching exit codes —
-which psmux returns as 0 whether it acted or not.
+`pointer_survives_connection: true`. Each cross-process layout landed on the
+window its earlier process had selected. **The pointer survives the connection, and
+a later untargeted layout follows it.**
+
+This is good news for rules 1b and 1e, and it is the opposite of what this section
+claimed an hour ago: their follow-up does not merely work when nothing has touched
+the window (R4), it lands on the window the caller's own earlier command selected.
+The weakness recorded here before — "an untargeted layout may be inert in a real
+session" — is **not supported**. What remains is 9.5's collision, which is about two
+clients racing rather than about the pointer evaporating.
+
+The generalisable lesson, since this is the second time a probe's silence was read
+as a finding: `changed_windows` alone cannot distinguish "psmux declined" from
+"the probe did not run". Every reading must record whether the call was issued —
+`apply_exit` is that field — and a probe of an untargeted psmux command needs a
+same-trial control, because psmux returns exit 0 whether it acted or not.
 
 **The sequence rule 1b actually emits was then measured directly, and it works.**
 `main-pane-width-probe.cjs` step E puts a `select-window` from a process that exits
