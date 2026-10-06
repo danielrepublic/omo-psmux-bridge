@@ -69,6 +69,7 @@
 import { createHash } from "node:crypto";
 
 import type { AuthEnvArg } from "./grammar";
+import { splitAssignment } from "./grammar";
 import { HELPER_CONTRACT, parseHelperCommandLine } from "./translate";
 import type { EnvSlot, Translation } from "./translate";
 
@@ -362,15 +363,17 @@ export type EnvAssignment = AuthEnvArg;
 /**
  * Split one `NAME=VALUE` assignment on its FIRST `=` only.
  *
- * First, not last: a password containing `=` must survive whole, which is why
- * src/grammar.ts splits the same way. Returns undefined for an assignment with
- * no `=` or with an empty name, so a malformed slot is refused instead of
- * applying an empty variable.
+ * First, not last: a password containing `=` must survive whole. Returns
+ * undefined for an assignment with no `=` or with an empty name, so a malformed
+ * slot is refused instead of applying an empty variable.
+ *
+ * The rule itself is `splitAssignment` in src/grammar.ts, imported rather than
+ * restated. The two must agree — a credential split one way on the way in and
+ * another on the way out silently changes shape — and the only thing that
+ * guaranteed agreement before was a comment in this file claiming agreement.
  */
 export function applySlotAssignment(assignment: string): EnvAssignment | undefined {
-  const separator = assignment.indexOf("=");
-  if (separator <= 0) return undefined;
-  return { name: assignment.slice(0, separator), value: assignment.slice(separator + 1) };
+  return splitAssignment(assignment);
 }
 
 /** True iff a variable NAME looks credential-bearing. */

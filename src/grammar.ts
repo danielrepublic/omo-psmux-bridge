@@ -245,6 +245,22 @@ interface ScannedHead {
 }
 
 /**
+ * Split one `NAME=VALUE` assignment on its FIRST `=`.
+ *
+ * Returns undefined for a bare name with no `=`, and for `=value` with no name.
+ * The value is kept whole, so a password containing `=` survives intact.
+ *
+ * Exported rather than restated per call site: src/descriptor.ts must split
+ * env-slot assignments by this same rule, and until it imported this function
+ * the only thing tying the two together was a comment claiming they matched.
+ */
+export function splitAssignment(assignment: string): AuthEnvArg | undefined {
+  const separator = assignment.indexOf("=");
+  if (separator <= 0) return undefined;
+  return { name: assignment.slice(0, separator), value: assignment.slice(separator + 1) };
+}
+
+/**
  * Walk the elements before the payload, pulling out `-e NAME=VALUE` pairs
  * wherever they sit. Returns undefined for a malformed pair, which sends the
  * whole argv to pass-through.
@@ -268,12 +284,9 @@ function scanAuthEnvArgs(head: readonly string[]): ScannedHead | undefined {
     }
     const raw = head[index + 1];
     if (raw === undefined) return undefined;
-    const separator = raw.indexOf("=");
-    // Rejects a bare name with no `=`, and `=value` with no name. The value
-    // itself is kept whole: only the FIRST `=` splits, so a password
-    // containing `=` survives.
-    if (separator <= 0) return undefined;
-    envArgs.push({ name: raw.slice(0, separator), value: raw.slice(separator + 1) });
+    const pair = splitAssignment(raw);
+    if (pair === undefined) return undefined;
+    envArgs.push(pair);
     index += 2;
   }
 

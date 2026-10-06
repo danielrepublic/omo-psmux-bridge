@@ -448,7 +448,13 @@ export function normalizeWindowsPath(candidate: string): string {
   return windows ? normalized.replaceAll("/", "\\") : normalized;
 }
 
-/** Join a normalised directory with a leaf name, in the directory's own flavour. */
+/**
+ * Join a normalised directory with a leaf name, in the directory's own flavour.
+ *
+ * Deliberately NOT interchangeable with the same-named function in
+ * src/descriptor.ts, which is Windows-only and always uses a backslash. Merging
+ * them breaks `test/descriptor.test.ts`'s `startsWith(PROFILE_DIR + "\\")`.
+ */
 function joinWindows(dir: string, leaf: string): string {
   if (looksLikeWindows(dir)) return `${dir.replace(/[\\/]+$/, "")}\\${leaf}`;
   return `${dir.replace(/\/+$/, "")}/${leaf}`;
