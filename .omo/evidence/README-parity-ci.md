@@ -20,6 +20,7 @@ other claim of theirs is checkable; this file is what makes them checkable.
 
 | File | Bytes | Produced by |
 |---|---|---|
+| `ci-concurrent-clients.json` | 3057 | `scripts/windows/parity/concurrent-clients.cjs`, namespace `omo_t22`, session `race`. Run [37521411814](https://github.com/danielrepublic/omo-psmux-bridge/actions/runs/37521411814), commit `4536eb2`. Settles CONTRACT.md section 9.5. |
 | `ci-current-window-survival.json` | 3443 | `scripts/windows/parity/current-window-survival.cjs`, namespace `omo_t21`, session `cur`. Run [37520072031](https://github.com/danielrepublic/omo-psmux-bridge/actions/runs/37520072031), commit `aa382bf`. Settles CONTRACT.md section 9.4. |
 | `ci-main-pane-width-probe.json` | 3784 | `scripts/windows/parity/main-pane-width-probe.cjs`, namespace `omo_t20`, session `mpw`. Run 37518808644. |
 | `ci-layout-which-window.json` | 1777 | `scripts/windows/parity/layout-which-window.cjs`, namespace `omo_t19b`, session `lay2` |
@@ -83,6 +84,26 @@ read as proof of rule 1a when it was psmux's 60% default.
 **Scope.** One session, one window, one client, sequential calls, against v3.3.8.
 It says nothing about a session with several windows, and nothing about two
 clients at once.
+
+## Reading these artifacts safely
+
+Two of the five probes in this directory produced an **empty** result on their
+first run, and in both cases the emptiness meant "the probe did not run", not
+"nothing happened":
+
+- `ci-concurrent-clients.json`'s first run had every invocation exit 1 on a
+  `cmd.exe` path-quoting error. Its verdict keys were still computed and read as a
+  collision finding.
+- `ci-layout-probe.json`'s `which_window` rows are unchanged by construction,
+  because it re-applies `even-horizontal` to a window already in that layout.
+
+So: **check the exit codes and the `*_landed` / `changed_windows` fields before
+reading any verdict as a finding.** `concurrent-clients.json` and
+`current-window-survival.json` both gate every verdict key behind
+`invocations_all_succeeded` or its equivalent, and that guard exists because the
+alternative was a confident wrong answer. A probe that failed to measure has to
+refuse to produce a finding, and "the result was empty" is not evidence that
+nothing occurred.
 
 ## Reproducing
 

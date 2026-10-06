@@ -1,0 +1,127 @@
+{
+  "namespace": "omo_t22",
+  "session": "race",
+  "baseline": "0|7f70,120x30,0,0{71x30,0,0,1,48x30,72,0,2}|2p\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}|2p",
+  "trials": [
+    {
+      "tag": "two clients, distinct targets, concurrent",
+      "pause_ms": 700,
+      "client_a": {
+        "target": "race:0",
+        "layout": "main-horizontal"
+      },
+      "client_b": {
+        "target": "race:1",
+        "layout": "tiled"
+      },
+      "invocations": [
+        {
+          "args": [
+            "select-window",
+            "-t",
+            "race:0"
+          ],
+          "exit": 0,
+          "stderr": ""
+        },
+        {
+          "args": [
+            "select-window",
+            "-t",
+            "race:1"
+          ],
+          "exit": 0,
+          "stderr": ""
+        },
+        {
+          "args": [
+            "select-layout",
+            "main-horizontal"
+          ],
+          "exit": 0,
+          "stderr": ""
+        },
+        {
+          "args": [
+            "select-layout",
+            "tiled"
+          ],
+          "exit": 0,
+          "stderr": ""
+        }
+      ],
+      "before": "0|7f70,120x30,0,0{71x30,0,0,1,48x30,72,0,2}|2p\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}|2p",
+      "after": "0|7f70,120x30,0,0{71x30,0,0,1,48x30,72,0,2}|2p\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}|2p",
+      "changed_windows": []
+    },
+    {
+      "tag": "two clients, distinct targets, long pause",
+      "pause_ms": 2500,
+      "client_a": {
+        "target": "race:0",
+        "layout": "main-horizontal"
+      },
+      "client_b": {
+        "target": "race:1",
+        "layout": "tiled"
+      },
+      "invocations": [
+        {
+          "args": [
+            "select-window",
+            "-t",
+            "race:0"
+          ],
+          "exit": 0,
+          "stderr": ""
+        },
+        {
+          "args": [
+            "select-window",
+            "-t",
+            "race:1"
+          ],
+          "exit": 0,
+          "stderr": ""
+        },
+        {
+          "args": [
+            "select-layout",
+            "main-horizontal"
+          ],
+          "exit": 0,
+          "stderr": ""
+        },
+        {
+          "args": [
+            "select-layout",
+            "tiled"
+          ],
+          "exit": 0,
+          "stderr": ""
+        }
+      ],
+      "before": "0|7f70,120x30,0,0{71x30,0,0,1,48x30,72,0,2}|2p\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}|2p",
+      "after": "0|7890,120x30,0,0{59x30,0,0,1,60x30,60,0,2}|2p\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}|2p",
+      "changed_windows": [
+        {
+          "window": 0,
+          "before": "0|7f70,120x30,0,0{71x30,0,0,1,48x30,72,0,2}|2p",
+          "after": "0|7890,120x30,0,0{59x30,0,0,1,60x30,60,0,2}|2p"
+        }
+      ]
+    }
+  ],
+  "verdict": {
+    "invocations_all_succeeded": true,
+    "failed_invocations": [],
+    "concurrent_landed": [],
+    "serialised_landed": [
+      0
+    ],
+    "both_got_their_own_window": false,
+    "collided_on_one_window": false,
+    "concurrency_changed_the_outcome": true
+  },
+  "after_teardown": ""
+}

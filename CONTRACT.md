@@ -1733,8 +1733,62 @@ bridge's own sequence works) while the general question (when is a bare untarget
 layout inert, and why) stays open.
 
 **Scope.** One session, one window each of two, sequential, v3.3.8, one client at
-a time. Not covered: genuinely concurrent clients, more than two windows, or any
-layout other than `main-horizontal` / `main-vertical` / `even-horizontal`.
+a time. Not covered: more than two windows, or any layout other than
+`main-horizontal` / `main-vertical` / `even-horizontal`. Concurrent clients are
+covered next, in 9.5.
+
+### 9.5 Concurrent clients collide, and this one is a real risk to the bridge
+
+Measured 2026-10-07. Evidence `.omo/evidence/ci-concurrent-clients.json` from
+`scripts/windows/parity/concurrent-clients.cjs`; run id and commit under test in
+`.omo/evidence/README-parity-ci.md`. This is the last claim 9.3 left INFERRED and
+9.4 explicitly declared uncovered.
+
+Two clients, each naming a **different** window, then each applying an untargeted
+layout the other window is not already in. Both phases are pairs of overlapping
+psmux processes:
+
+| trial | result |
+|---|---|
+| serialised (2.5 s between phases) | **only window 0 changed**, `7f70` → `7890` |
+| concurrent (0.7 s between phases) | **nothing changed** |
+| `concurrency_changed_the_outcome` | **true** |
+
+All eight invocations exited 0. The probe refuses to compute any verdict key
+unless they all did, because its first run reported an empty result for both
+trials — every invocation had exited 1 on a `cmd.exe` quoting error — and an empty
+result from a probe that never ran is indistinguishable in the artifact from an
+empty result that means something.
+
+**What it shows.** In the serialised trial, client B's `tiled` landed on window
+**0** — the window client **A** had selected — and client A's `main-horizontal`
+left no visible trace anywhere. Both clients succeeded. So the current-window
+pointer is **global server state, not per-client**: the last `select-window` wins,
+and every untargeted layout issued afterwards lands on that one window. This is
+`active_idx` at `src/layout.rs:1070`, behaving as one value for the session, which
+9.3 flagged as the reason the claim could not be asserted and 9.1 made
+un-targetable — psmux strips `-t` before dispatch.
+
+**Why this matters here and not merely as trivia.** Team mode creates several
+agents laying out at the same time, and rules 1b and 1e each inject an untargeted
+`select-layout`. Two overlapping injections therefore either collide on one window
+(what the serialised trial shows) or both do nothing (what the concurrent trial
+shows). In both cases the layout lands somewhere the caller did not name, and every
+invocation reports success. **This is the one measured defect in this document that
+the bridge cannot work around**: rule 1a can be dropped when psmux learns to parse
+a percentage, rule 1b when the option is read outside `apply_layout`, rule 1c when
+`sizes` stops being proportions — but there is no bridge-side fix for a global
+current-window pointer, because the only handle psmux offers (`-t`) is discarded
+before dispatch.
+
+INFERRED, explicitly untested: whether this bites in practice depends on how often
+two injections overlap, which this run does not measure — it forced overlap in
+both trials. A real team-mode session may rarely collide. That is the difference
+between a defect that is certain and one that is merely possible, and this
+document does not have the data to say which.
+
+**Scope.** One session, two windows, two clients, v3.3.8. Not covered: more than
+two clients, more than two windows, or a real OmO team-mode sequence.
 
 ---
 
