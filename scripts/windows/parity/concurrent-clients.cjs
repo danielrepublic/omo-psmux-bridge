@@ -123,6 +123,79 @@ function concurrentTrial(tag, clientA, clientB, pauseMs) {
   });
 }
 
+// Trial 4 — is a dropped layout computed and then discarded, or never computed?
+//
+// Trials 1-3 start both applies with Promise.all, so there is no instant between them
+// at which anything can be observed. Both are reported as `changed: [1]`, which is
+// equally consistent with client A's layout having been computed against w1 and then
+// overwritten by B's, and with A's layout never having been computed at all. This
+// trial staggers phase 2 so there IS a moment between the two applies, and samples it.
+//
+// This is a DIFFERENT condition from trials 1-3 — phase 2 is serial here, parallel
+// there — and it is labelled separately for that reason. It answers the mechanism
+// question, not the collision-rate question, and its result must not be pooled with
+// theirs.
+//
+// §9.5 already established that staggering phase 2 by 2.5 s does not prevent the
+// collision, so a staggered trial that shows A's layout landing on w1 is the expected
+// result if the mechanism is last-writer-wins on a global pointer. If A's layout does
+// not appear mid-flight, the mechanism is something else and 9.5's explanation is wrong.
+async function staggeredTrial(tag, clientA, clientB) {
+  p(['select-layout', '-t', S + ':0', 'main-horizontal']);
+  p(['select-layout', '-t', S + ':1', 'even-horizontal']);
+  sleep(1200);
+  const before = layouts();
+
+  // Phase 1 as in every other trial: both clients name their window, concurrently.
+  const selects = await Promise.all([
+    spawnP(['select-window', '-t', clientA.target]),
+    spawnP(['select-window', '-t', clientB.target]),
+  ]);
+  sleep(1500);
+  const after_selects = layouts();
+
+  // Phase 2, staggered. A first, sampled, then B.
+  const applyA = await spawnP(['select-layout', clientA.layout]);
+  sleep(1500);
+  const mid = layouts();
+  const applyB = await spawnP(['select-layout', clientB.layout]);
+  sleep(1500);
+  const after = layouts();
+
+  const diff = (x, y) => {
+    const bx = x.split('\n');
+    const ay = y.split('\n');
+    const out = [];
+    for (let i = 0; i < Math.max(bx.length, ay.length); i += 1) {
+      if (bx[i] !== ay[i]) out.push({ window: i, before: bx[i], after: ay[i] });
+    }
+    return out;
+  };
+
+  const rec = {
+    tag,
+    condition: 'phase 2 staggered (serial), NOT pooled with trials 1-3',
+    client_a: { target: clientA.target, layout: clientA.layout },
+    client_b: { target: clientB.target, layout: clientB.layout },
+    invocations: [...selects, applyA, applyB],
+    before,
+    after_selects,
+    mid,
+    after,
+    // Which windows moved between the reset and the mid-flight sample. If w0 is here,
+    // A's layout reached the window A named. If w1 is here, A's untargeted layout was
+    // computed against the pointer B had already moved — computed, then overwritten.
+    changed_by_a_alone: diff(before, mid),
+    changed_by_b_alone: diff(mid, after),
+  };
+  // Deliberately NOT pushed into out.trials: the verdict there iterates records
+  // expecting `changed_windows`, and this record reports two separate diffs instead.
+  // Pooling a different condition into the same series is how the previous two
+  // corrections in this file went wrong.
+  out.staggered = rec;
+  return rec;
+}
+
 (async () => {
   // Trial 1: both select a different window, then apply a layout the other
   // window does not already have.
@@ -140,6 +213,13 @@ function concurrentTrial(tag, clientA, clientB, pauseMs) {
     { target: S + ':0', layout: 'main-horizontal' },
     { target: S + ':1', layout: 'even-vertical' },
     2500,
+  );
+
+  // Trial 4: the mechanism question. Runs last so it cannot perturb trials 1-3.
+  await staggeredTrial(
+    'staggered phase 2, sampled between the two applies',
+    { target: S + ':0', layout: 'main-horizontal' },
+    { target: S + ':1', layout: 'even-vertical' },
   );
 
   // Trial 3 — does a collision heal?
