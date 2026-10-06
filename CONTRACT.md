@@ -1771,9 +1771,22 @@ psmux processes:
 
 | trial | result |
 |---|---|
-| serialised (2.5 s between phases) | **only window 0 changed**, `7f70` → `7890` |
-| concurrent (0.7 s between phases) | **nothing changed** |
-| `concurrency_changed_the_outcome` | **true** |
+| serialised (2.5 s between phases) | **window 0 changed** (`7f70` → `7890`) — **in 1 run of 3** |
+| concurrent (0.7 s between phases) | **nothing changed**, in all 3 runs |
+| `concurrency_changed_the_outcome` | `true` once, `false` twice |
+
+**Corrected 2026-10-07: this paragraph first reported the serialised trial as a
+settled result and drew a conclusion from it. It is a race, and the conclusion was
+overstated.** Re-running the identical probe three times gave `serialised_landed`
+of `[0]`, then `[]`, then `[]`. Every invocation exited 0 in all three runs, so
+the clients genuinely believe they succeeded; what varies is which window the
+layout lands on, and sometimes neither window changes at all.
+
+What survives the correction: the pointer is global server state — `active_idx` at
+`src/layout.rs:1070`, and 9.3 and 9.4 already measured that behaviour
+single-threaded. What does **not** survive is any claim that a collision is
+reproducible on demand, or that the serialised case reliably collides. One sample
+in three is a race observed, not a mechanism characterised.
 
 All eight invocations exited 0. The probe refuses to compute any verdict key
 unless they all did, because its first run reported an empty result for both
@@ -1781,14 +1794,38 @@ trials — every invocation had exited 1 on a `cmd.exe` quoting error — and an
 result from a probe that never ran is indistinguishable in the artifact from an
 empty result that means something.
 
-**What it shows.** In the serialised trial, client B's `tiled` landed on window
-**0** — the window client **A** had selected — and client A's `main-horizontal`
-left no visible trace anywhere. Both clients succeeded. So the current-window
-pointer is **global server state, not per-client**: the last `select-window` wins,
-and every untargeted layout issued afterwards lands on that one window. This is
-`active_idx` at `src/layout.rs:1070`, behaving as one value for the session, which
-9.3 flagged as the reason the claim could not be asserted and 9.1 made
-un-targetable — psmux strips `-t` before dispatch.
+**What it shows.** Every invocation exited 0 in all three runs, so the clients
+genuinely believe they succeeded whatever happened to the geometry. The pointer is
+**global server state, not per-client** — `active_idx` at `src/layout.rs:1070`, one
+value for the session, which 9.3 flagged as the reason the claim could not be
+asserted and 9.1 made un-targetable, since psmux strips `-t` before dispatch. When
+two clients overlap, the window one of them named is not reliably the window that
+receives its layout, and neither can tell.
+
+**And a collision is recoverable.** The same probe's repair step deliberately
+collides, then gives each window a correct targeted layout and compares the result
+against the layouts requested:
+
+```
+recovered : b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2] // 7899,120x30,0,0{59x30,...}
+wanted    : b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2] // 7899,120x30,0,0{59x30,...}
+repair_succeeded : true
+```
+
+Both windows hold exactly the layout they were asked for. So the failure mode is
+a **wrong frame that the next layout call repairs**, not a session left mislaid out
+with no way back. That bounds the defect considerably: it converts "concurrent
+injections corrupt the layout" into "concurrent injections may briefly produce the
+wrong layout, and OmO's next layout call fixes it".
+
+**This repair check was itself wrong on its first run and reported
+`repair_succeeded: false` while the geometry in the same artifact was visibly
+correct.** `list-windows -t` does not filter — both targeted calls return every
+window — so the check compared a two-line list against a per-window reference and
+could not have matched for any input. The `invocations_all_succeeded` guard added
+after the concurrency probe's false negative does not catch this class: those
+commands exited 0 and returned the wrong *shape*. It is recorded because a reader
+comparing the two verdicts should know which one to trust.
 
 **Why this matters here and not merely as trivia.** Team mode creates several
 agents laying out at the same time, and rules 1b and 1e each inject an untargeted
