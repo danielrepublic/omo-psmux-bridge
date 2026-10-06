@@ -63,19 +63,6 @@ jobs:
     # instead of a stuck one.
     timeout-minutes: 25
 
-    # TEMP/TMP live at JOB level, not workflow level, and that placement is the
-    # whole point. The probes write to `process.env.TEMP`, a Windows shell
-    # variable with no GitHub Actions context, so `${{ env.TEMP }}` expands to
-    # nothing and the artifact glob silently degrades to `\omo-t14\*.json` —
-    # which uploads nothing while the job still reports success. Overriding TEMP
-    # to `runner.temp` makes the probe's own path and the upload path the same
-    # directory. Workflow-level `env` cannot do this: the `runner` context is not
-    # available there, so the identical expression would expand to empty one
-    # level up and reintroduce the bug in a place that reads as correct.
-    env:
-      TEMP: ${{ runner.temp }}
-      TMP: ${{ runner.temp }}
-
     steps:
       - name: Check out
         uses: actions/checkout@v4
@@ -120,6 +107,18 @@ jobs:
         # A shim at any other path would make the probe report the REAL psmux's
         # behaviour and label it "through the shim", which is the one failure
         # mode that would produce evidence rather than an error.
+        #
+        # TEMP is overridden per STEP because that is the only level where the
+        # `runner` context resolves; job- and workflow-level `env` cannot hold
+        # this expression. The probes write to `process.env.TEMP`, which is not
+        # a GitHub Actions context at all, so `${{ env.TEMP }}` expands empty and
+        # the artifact glob degrades to `\omo-t14\*.json` — a green job with no
+        # red step that published nothing. Hoisting this block breaks the file.
+        # Every step touching the probe directory carries it, because one of them
+        # disagreeing is the same silent failure in a different hat.
+        env:
+          TEMP: ${{ runner.temp }}
+          TMP: ${{ runner.temp }}
         run: |
           $ErrorActionPreference = 'stop'
           $bin = Join-Path $env:TEMP 'omo-t14\bin'
@@ -146,10 +145,20 @@ jobs:
         # settled and that exit 0 settles nothing, because psmux cannot fail this
         # command. So this step is expected to be inconclusive; it is run anyway
         # because a committed inconclusive is worth more than an absent one.
+        #
+        # The first run of this job was green with both probes having written
+        # their JSON, and the artifact upload still found nothing. Same TEMP
+        # override as the cross-compile step, for the same reason.
+        env:
+          TEMP: ${{ runner.temp }}
+          TMP: ${{ runner.temp }}
         run: bun scripts/windows/parity/layout-probe.cjs
         continue-on-error: true
 
       - name: Run the which-window probe
+        env:
+          TEMP: ${{ runner.temp }}
+          TMP: ${{ runner.temp }}
         run: bun scripts/windows/parity/layout-which-window.cjs
         continue-on-error: true
 
@@ -161,9 +170,12 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: parity-probe-output
-          # runner.temp, not env.TEMP — see the job-level env block. A glob that
-          # silently matches nothing makes the whole job look successful while
-          # discarding the only thing it produced.
+          # runner.temp, not env.TEMP. TEMP is a Windows shell variable with no
+          # GitHub Actions context, so `${{ env.TEMP }}` expands to nothing and
+          # this glob silently matches no files — a green job, no red step, and
+          # the only thing the job existed to publish discarded. This path and
+          # the TEMP the probe steps run under are the same directory by
+          # construction, which is the only reason they can be trusted to agree.
           path: ${{ runner.temp }}\omo-t14\*.json
           if-no-files-found: warn
 
@@ -180,6 +192,9 @@ jobs:
         # because the probes record `windows_before`/`before`/`after` instead.
         # Guessing a shape is how a summary reports nothing while passing.
         if: always()
+        env:
+          TEMP: ${{ runner.temp }}
+          TMP: ${{ runner.temp }}
         run: |
           $dir = Join-Path $env:TEMP 'omo-t14'
           $files = Get-ChildItem $dir -Filter *.json -ErrorAction SilentlyContinue
