@@ -1648,13 +1648,13 @@ that the rule stops being an assumption.
   from what was measured.
 - Rule 1b's and rule 1e's injected `select-layout main-vertical` inherits this
   behaviour, including its risk: if the current window is not the window OmO
-  meant, the layout lands on the wrong one and reports success. The measurement
-  shows the mechanism exists; it does not show the bridge's injections always
-  have the intended window current. That remains the open part of this section,
-  narrowed from "does it work at all" to "is the current window the right one".
-- Nothing here bears on rules 1a/1b's `main-pane-width` geometry, which is still
-  unmeasured. This run applied named layouts to existing pane sets; it never set
-  `main-pane-width`.
+  meant, the layout lands on the wrong one and reports success. **Now measured,
+  2026-10-07 — see 9.4. The follow-up is not inert, but its target is server
+  state the bridge does not set.**
+
+- Nothing here bears on rules 1a/1b's `main-pane-width` geometry. That was
+  unmeasured when this section was first written and is now measured separately —
+  see section 3.9.
 
 **A defect in the probe that was supposed to answer this.** The companion
 artifact `ci-layout-probe.json` also carries a `which_window` control, and it is
@@ -1666,6 +1666,53 @@ window is current. `layout-which-window.cjs` avoids this by starting the windows
 in *different* layouts and varying the requested name so a change is possible.
 Recorded rather than quietly dropped, because the two artifacts disagree on their
 face and a reader deserves to know which one to believe.
+
+### 9.4 Does the injected follow-up actually do anything?
+
+Measured 2026-10-07, because 9.3's residual was not answerable from 9.3. Evidence
+`.omo/evidence/ci-current-window-survival.json` from
+`scripts/windows/parity/current-window-survival.cjs`; run id and commit under test
+in `.omo/evidence/README-parity-ci.md`. Two windows reset to different layouts
+before every reading, and the layout applied is `main-horizontal` — which differs
+from both reset layouts, so any landing is visible and "nothing changed" is a real
+answer rather than an artefact.
+
+| reading | what ran | result |
+|---|---|---|
+| R3 control | `select-window`, then apply, **same process** | window **1** changed |
+| R1 | `select-window` to 0 in one process, apply in another | **nothing changed** |
+| R2 | `select-window` to 1 in one process, apply in another | **nothing changed** |
+| R4 | **no `select-window` at all**, fresh process applies | window **1** changed |
+
+**The good news first, because it is what rules 1b and 1e depend on.** Their
+follow-up is spawned by `runFollowUps` as its own process, which is R4's shape: a
+process that never issued a `select-window`. R4 changed a window, so **the
+injected untargeted `select-layout` is not inert.** It does not need a
+current-window pointer of its own.
+
+**The risk, stated precisely.** R4 landed on window 1 because the session happened
+to be in that state — the probe's own preceding targeted layouts had just touched
+window 1. **That is not evidence that it lands on the window the caller meant.**
+It is evidence that it lands on *whatever the server considers current*, and the
+bridge does not set that. So the failure mode is not "the follow-up is dropped";
+it is "the follow-up silently re-lays-out a window the caller did not name, and
+reports success". 9.1 already established that this cannot be fixed by injecting
+`-t`, because psmux strips it before dispatch.
+
+**And a finding that was not being looked for.** R1 and R2 show that a
+`select-window` issued by a process which then **exits** does not steer a later
+process at all — the untargeted layout does nothing. So a client that selects a
+window and disconnects leaves the server in a state where an untargeted layout is
+a silent no-op. OmO spawns one process per command, which is exactly that shape.
+Whether that makes rules 1b/1e intermittently inert in a real session is **not
+established here**: R4 shows the no-prior-`select-window` case works, R1/R2 show
+the exited-`select-window` case does not, and a real OmO sequence does both in
+some order. This is the open part, and it is now a much narrower question than
+the one 9.3 left.
+
+**Scope.** One session, one window each of two, sequential, v3.3.8, one client at
+a time. Not covered: genuinely concurrent clients, more than two windows, or any
+layout other than `main-horizontal` / `main-vertical` / `even-horizontal`.
 
 ---
 

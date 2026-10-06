@@ -1,0 +1,85 @@
+{
+  "namespace": "omo_t21",
+  "session": "cur",
+  "baseline": "0|7f70,120x30,0,0{71x30,0,0,1,48x30,72,0,2}|2p\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}|2p",
+  "readings": [
+    {
+      "tag": "R3 control: set current and apply in ONE process",
+      "set_current_to": "cur:1",
+      "issued_select_window": true,
+      "select_window_exit": 0,
+      "select_window_stderr": "",
+      "applied_in_same_process": true,
+      "layout_applied": "main-horizontal",
+      "apply_exit": 0,
+      "apply_stderr": "",
+      "before": "0|7f70,120x30,0,0{71x30,0,0,1,48x30,72,0,2}|2p\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}|2p",
+      "after": "0|7f70,120x30,0,0{71x30,0,0,1,48x30,72,0,2}|2p\n1|b7b2,120x30,0,0[120x17,0,0,3,120x12,0,18,4]|2p",
+      "changed_windows": [
+        {
+          "window": 1,
+          "before": "1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}|2p",
+          "after": "1|b7b2,120x30,0,0[120x17,0,0,3,120x12,0,18,4]|2p"
+        }
+      ]
+    },
+    {
+      "tag": "R1: set current to 0 in one process, apply in ANOTHER",
+      "set_current_to": "cur:0",
+      "issued_select_window": true,
+      "select_window_exit": 0,
+      "select_window_stderr": "",
+      "applied_in_same_process": false,
+      "layout_applied": "main-horizontal",
+      "apply_exit": null,
+      "apply_stderr": null,
+      "before": "0|7f70,120x30,0,0{71x30,0,0,1,48x30,72,0,2}|2p\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}|2p",
+      "after": "0|7f70,120x30,0,0{71x30,0,0,1,48x30,72,0,2}|2p\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}|2p",
+      "changed_windows": []
+    },
+    {
+      "tag": "R2: set current to 1 in one process, apply in ANOTHER",
+      "set_current_to": "cur:1",
+      "issued_select_window": true,
+      "select_window_exit": 0,
+      "select_window_stderr": "",
+      "applied_in_same_process": false,
+      "layout_applied": "main-horizontal",
+      "apply_exit": null,
+      "apply_stderr": null,
+      "before": "0|7f70,120x30,0,0{71x30,0,0,1,48x30,72,0,2}|2p\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}|2p",
+      "after": "0|7f70,120x30,0,0{71x30,0,0,1,48x30,72,0,2}|2p\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}|2p",
+      "changed_windows": []
+    },
+    {
+      "tag": "R4: NO select-window anywhere; fresh process applies untargeted",
+      "set_current_to": null,
+      "issued_select_window": false,
+      "select_window_exit": null,
+      "select_window_stderr": null,
+      "applied_in_same_process": false,
+      "layout_applied": "main-horizontal",
+      "apply_exit": 0,
+      "apply_stderr": "",
+      "before": "0|7f70,120x30,0,0{71x30,0,0,1,48x30,72,0,2}|2p\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}|2p",
+      "after": "0|7f70,120x30,0,0{71x30,0,0,1,48x30,72,0,2}|2p\n1|b7b2,120x30,0,0[120x17,0,0,3,120x12,0,18,4]|2p",
+      "changed_windows": [
+        {
+          "window": 1,
+          "before": "1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}|2p",
+          "after": "1|b7b2,120x30,0,0[120x17,0,0,3,120x12,0,18,4]|2p"
+        }
+      ]
+    }
+  ],
+  "verdict": {
+    "control_lands_on_made_current": true,
+    "r1_changed": null,
+    "r2_changed": null,
+    "r4_changed": 1,
+    "pointer_survives_connection": false,
+    "untargeted_applies_without_any_select_window": true,
+    "note": "r4 is what rules 1b/1e rely on: their follow-up runs as its own process that never set a current window. If r4_changed is null, the injected select-layout does nothing at all."
+  },
+  "after_teardown": ""
+}
