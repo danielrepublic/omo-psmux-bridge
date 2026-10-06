@@ -141,7 +141,15 @@ function concurrentTrial(tag, clientA, clientB, pauseMs) {
 // result if the mechanism is last-writer-wins on a global pointer. If A's layout does
 // not appear mid-flight, the mechanism is something else and 9.5's explanation is wrong.
 async function staggeredTrial(tag, clientA, clientB) {
-  p(['select-layout', '-t', S + ':0', 'main-horizontal']);
+  // w0 resets to `main-vertical`, which NEITHER client applies — client A applies
+  // main-horizontal, client B even-vertical. The first version reset w0 to
+  // main-horizontal, i.e. to client A's own layout, which made w0's line identical
+  // before and after no matter what A's apply did. That is precisely the baseline
+  // fault this file has already been corrected for twice: a reset the operation can
+  // reproduce hides the operation. w0 is now the window whose movement is evidence.
+  // `main-vertical` on a two-pane window yields `{71x30 / 48x30}`, a different tree
+  // from both clients' layouts.
+  p(['select-layout', '-t', S + ':0', 'main-vertical']);
   p(['select-layout', '-t', S + ':1', 'even-horizontal']);
   sleep(1200);
   const before = layouts();
