@@ -20,6 +20,7 @@ other claim of theirs is checkable; this file is what makes them checkable.
 
 | File | Bytes | Produced by |
 |---|---|---|
+| `ci-resize-pane-cells-probe.json` | 1268 | `scripts/windows/parity/resize-pane-cells-probe.cjs`, namespace `omo_t23`, session `rc`. Run 37523398790, commit `2e9885e`. Measures CONTRACT.md rule 1c: a bare `-x 99` lands as ~98% of the window, not 99 columns, and the bridge suppresses it. |
 | `ci-concurrent-clients.json` | 3057 | `scripts/windows/parity/concurrent-clients.cjs`, namespace `omo_t22`, session `race`. Run [37521411814](https://github.com/danielrepublic/omo-psmux-bridge/actions/runs/37521411814), commit `4536eb2`. Settles CONTRACT.md section 9.5. |
 | `ci-current-window-survival.json` | 3443 | `scripts/windows/parity/current-window-survival.cjs`, namespace `omo_t21`, session `cur`. Run [37520072031](https://github.com/danielrepublic/omo-psmux-bridge/actions/runs/37520072031), commit `aa382bf`. Settles CONTRACT.md section 9.4. |
 | `ci-main-pane-width-probe.json` | 9236 | `scripts/windows/parity/main-pane-width-probe.cjs`, namespace `omo_t20`, session `mpw`. Latest run 37521905593, commit `1192418`; covers BOTH the width and height axes of rules 1a and 1b, plus step E. |

@@ -1,0 +1,61 @@
+{
+  "namespace": "omo_t23",
+  "session": "rc",
+  "steps": [
+    {
+      "tag": "baseline: main-vertical, nothing resized",
+      "via": "direct",
+      "argv": null,
+      "exit": 0,
+      "stderr": "",
+      "window_width": 120,
+      "main_width": 71,
+      "main_share": 0.5917
+    },
+    {
+      "tag": "DIRECT: resize-pane -x 99 (bare cell count)",
+      "via": "direct",
+      "argv": [
+        "resize-pane",
+        "-t",
+        "rc:0",
+        "-x",
+        "99"
+      ],
+      "exit": 0,
+      "stderr": "",
+      "window_width": 120,
+      "main_width": 117,
+      "main_share": 0.975
+    },
+    {
+      "tag": "THROUGH SHIM: the same argv, which rule 1c suppresses",
+      "via": "shim",
+      "argv": [
+        "resize-pane",
+        "-t",
+        "rc:0",
+        "-x",
+        "99"
+      ],
+      "exit": 0,
+      "stderr": "",
+      "window_width": 120,
+      "main_width": 71,
+      "main_share": 0.5917
+    }
+  ],
+  "expected": {
+    "cells_sent": 99,
+    "if_read_as_cells": 99,
+    "if_read_as_percentage": 117
+  },
+  "verdict": {
+    "rule_1c_defect_present": true,
+    "direct_landed_where": "~117 columns, about 98% of 120",
+    "shim_left_geometry_unchanged": true,
+    "baseline_main": 71,
+    "window_width": 120
+  },
+  "after_teardown": ""
+}

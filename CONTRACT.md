@@ -800,9 +800,34 @@ and under point 2 a flat `[60, 20, 20]` with the first element set to 99 becomes
 either — `119 + 80 = 199` against `197 + 2 + 2 = 201` — and it cannot be the
 output of `resize_pane_absolute`, which adjusts one neighbour and leaves the rest
 alone, so `[119, 80, 80]` with `idx = 0` and `diff = 78` would give
-`[197, 2, 80]`. Nothing captured that run. What would settle it: run `resize-pane
--t %1 -x 99` against a known tree in a throwaway `-L` namespace and store
-`list-panes -a -F '#{pane_left},#{pane_width}'` from both sides of the call.
+`[197, 2, 80]`. Nothing captured that run.
+
+**MEASURED 2026-10-07 — this rule is now observed, not inferred.** Evidence
+`.omo/evidence/ci-resize-pane-cells-probe.json` from
+`scripts/windows/parity/resize-pane-cells-probe.cjs`; run id and commit under test
+in `.omo/evidence/README-parity-ci.md`. Against a 120-column window carrying a
+`main-vertical` two-pane tree:
+
+| arm | main pane | share | reading |
+|---|---|---|---|
+| baseline, nothing resized | 71 | 0.5917 | psmux's ~60% default |
+| `resize-pane -t <pane> -x 99`, **direct** | **117** | **0.975** | read as a PERCENTAGE |
+| the same argv **through the shim** | 71 | 0.5917 | suppressed by rule 1c, geometry untouched |
+
+117 columns is not 99. It is 98% of the window: with the one-column divider,
+119 usable columns times 0.99 is 117. **The cell count arrives as a percentage**,
+which is the whole claim of this rule, and it now rests on an observation rather
+than on a reading of `src/tree.rs`.
+
+The second row is the bridge half. A rule that drops a command is only earning its
+keep if forwarding that command would have done damage, and this is the first
+measurement of that: the identical argv, unrouted, reaches ~98% of the window;
+routed through the bridge, nothing moves at all.
+
+**Scope.** One session, one window, two panes, one client, v3.3.8. Not covered:
+`resize-pane -y`, the `-l` form, a tree nested more than two deep, or the
+percentage form's conversion back to an absolute count, which remains the
+INFERRED `src/server/mod.rs:5462` arithmetic above.
 
 No argument form rescues it. psmux parses a bare `-x` token as an ABSOLUTE value
 and only treats a `%` suffix as a percentage, so there is no spelling of the cell
@@ -2019,23 +2044,29 @@ revision) and of psmux **v3.3.8**. When either is upgraded:
    itself, drop rule 1b; only then drop rule 1c and forward `resize-pane -x` again.
    Dropping 1c first re-exposes the layout to the defect it was suppressing.
 
-   **Rules 1a and 1b are now mechanically checkable, so do not check them by
-   reading.** Both are observed rather than inferred as of 2026-10-07, and
-   `.github/workflows/parity.yml` re-measures them on every run:
-   `main-pane-width-probe.cjs` prints `rule_1a_percent_form_ignored`,
-   `rule_1b_option_alone_inert`, `rule_1b_followup_applies` and
-   `rule_1b_order_matters` as booleans. On a psmux that has learned to parse a
-   percentage, `rule_1a_percent_form_ignored` flips to `false` — that is the
-   retirement signal, and it arrives without anyone deciding to look for it.
-   Retire in the order the booleans go false, not in the order that seems
-   tidy: the dependency is 1a, then 1b, then 1c, and dropping 1c while 1a or 1b
-   still holds re-exposes the layout to the defect being suppressed.
+   **All three now retire on a boolean, not on someone's reading.** All three are
+   measured behaviourally — apply, then read the geometry — and rule 1c's claim
+   has the same shape: a tmux CELL
+   COUNT passed to `resize-pane -x` arrives as a PERCENTAGE. Sending a number
+   whose two readings cannot coincide answers it outright. On a 120-column window
+   `-x 99` gives 117 columns — about 98% of the window after the one-column
+   divider — rather than 99 columns, which is what a cell reading would give.
+   `rule_1c_defect_present: true` in `.omo/evidence/ci-resize-pane-cells-probe.json`.
 
-   Rule 1c has no such probe. Its premise is in `resize_pane_absolute` writing a
-   cell count into a proportions vector (`src/tree.rs:21`/`:31`), so detecting its
-   retirement means checking that `split_with_gaps` now takes absolute input —
-   which is source-reading, and is left as such deliberately: a probe that inferred
-   it would report on the layout rather than on the parser.
+   The same run proves the bridge's half is doing its job: the identical argv
+   through the shim, where rule 1c suppresses it, leaves the geometry untouched
+   at the 60% default. A rule that suppresses a command is only earning its keep
+   if forwarding that command would have done damage, and now that is measured
+   rather than assumed.
+
+   So `parity.yml` prints `rule_1a_percent_form_ignored`,
+   `rule_1b_option_alone_inert`, `rule_1b_followup_applies`,
+   `rule_1b_order_matters`, `height_percent_form_ignored` and
+   `rule_1c_defect_present` on every run, and the retirement signal for each rule
+   arrives without anyone deciding to look for it. Retire in the order the booleans
+   go false, not in the order that seems tidy: the dependency is 1a, then 1b, then
+   1c, and dropping 1c while either of the others still holds re-exposes the layout
+   to the defect being suppressed.
 6. Re-resolve every team-mode citation in section 3.10 by hand, on either
    upgrade (OmO or psmux): the `createTeamLayoutInCallerWindow` sequence, the
    `resolveCallerTmuxSession` display pair, the `TeamModeConfigSchema`
