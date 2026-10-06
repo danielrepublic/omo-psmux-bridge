@@ -1703,12 +1703,34 @@ reports success". 9.1 already established that this cannot be fixed by injecting
 `select-window` issued by a process which then **exits** does not steer a later
 process at all — the untargeted layout does nothing. So a client that selects a
 window and disconnects leaves the server in a state where an untargeted layout is
-a silent no-op. OmO spawns one process per command, which is exactly that shape.
-Whether that makes rules 1b/1e intermittently inert in a real session is **not
-established here**: R4 shows the no-prior-`select-window` case works, R1/R2 show
-the exited-`select-window` case does not, and a real OmO sequence does both in
-some order. This is the open part, and it is now a much narrower question than
-the one 9.3 left.
+a silent no-op, and OmO spawns one process per command, which is exactly that
+shape.
+
+**The sequence rule 1b actually emits was then measured directly, and it works.**
+`main-pane-width-probe.cjs` step E puts a `select-window` from a process that exits
+*between* rule 1b's option-set and its follow-up — the rule's own two commands plus
+one it does not emit:
+
+| step | share |
+|---|---|
+| reset to `main-pane-width 60` | 0.5917 |
+| set `50`, then `select-window` from a process that exits | — |
+| then the follow-up, untargeted `select-layout main-vertical`, in its own process | **0.4917** |
+
+`rule_1b_survives_intervening_select_window: true`. So the intervening selection
+does not disarm the remedy, and the risk this section raised does not apply to the
+sequence the bridge emits.
+
+**What is still not explained, and is not papered over.** R1/R2 and step E disagree
+about what happens after an exited `select-window`: in R1/R2 an untargeted layout
+changed nothing, in E one applied and moved the geometry. The difference between
+the two probes is that E sets a sizing option immediately beforehand. A plausible
+reading is that `apply_layout` did run in R1/R2 but had nothing to change, which
+would make them consistent — but that is a guess about psmux's internals, it is not
+measured, and this document does not record guesses as findings. So the narrow
+question 9.4 was left with is now answered in the direction that matters (the
+bridge's own sequence works) while the general question (when is a bare untargeted
+layout inert, and why) stays open.
 
 **Scope.** One session, one window each of two, sequential, v3.3.8, one client at
 a time. Not covered: genuinely concurrent clients, more than two windows, or any

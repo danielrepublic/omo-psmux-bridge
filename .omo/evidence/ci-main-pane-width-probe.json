@@ -106,6 +106,33 @@
       "main_width": 59,
       "window_width": 120,
       "main_share": 0.4917
+    },
+    {
+      "tag": "E0: reset to 60 for contrast",
+      "invocation": [
+        "(reset)"
+      ],
+      "exit": 0,
+      "stderr": "",
+      "geometry": {
+        "windows": "0|120x30|7f70,120x30,0,0{71x30,0,0,1,48x30,72,0,2}|2p",
+        "panes": "0.0|%1|71x30|0,0\n0.1|%2|48x30|72,0"
+      },
+      "main_width": 71,
+      "window_width": 120,
+      "main_share": 0.5917
+    },
+    {
+      "tag": "E: follow-up AFTER a select-window from an exited process",
+      "exit": 0,
+      "stderr": "",
+      "geometry": {
+        "windows": "0|120x30|7890,120x30,0,0{59x30,0,0,1,60x30,60,0,2}|2p",
+        "panes": "0.0|%1|59x30|0,0\n0.1|%2|60x30|60,0"
+      },
+      "main_width": 59,
+      "window_width": 120,
+      "main_share": 0.4917
     }
   ],
   "verdict": {
@@ -113,6 +140,8 @@
     "rule_1b_option_alone_inert": true,
     "rule_1b_followup_applies": true,
     "rule_1b_order_matters": true,
+    "rule_1b_survives_intervening_select_window": true,
+    "e_share": 0.4917,
     "baseline_share": 0.5917,
     "shares": {
       "baseline: main-vertical, option never set": 0.5917,
@@ -122,7 +151,9 @@
       "C: then untargeted select-layout main-vertical": 0.4917,
       "D: select-layout first, for contrast": 0.4917,
       "D2: then set main-pane-width \"40\"": 0.4917,
-      "D3: geometry after setting the option with no layout after it": 0.4917
+      "D3: geometry after setting the option with no layout after it": 0.4917,
+      "E0: reset to 60 for contrast": 0.5917,
+      "E: follow-up AFTER a select-window from an exited process": 0.4917
     }
   },
   "after_teardown": ""
