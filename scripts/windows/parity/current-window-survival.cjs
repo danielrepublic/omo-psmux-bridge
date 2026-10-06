@@ -20,14 +20,23 @@
 //
 // Three readings, each in its own process so the connections cannot overlap:
 //
-//   R1  set current to window 0, exit.   Then in a NEW process: apply untargeted.
-//   R2  set current to window 1, exit.   Then in a NEW process: apply untargeted.
-//   R3  set current to window 1, and in the SAME process apply untargeted.
+// R1  set current to window 0, exit.   Then in a NEW process: apply untargeted.
+// R2  set current to window 1, exit.   Then in a NEW process: apply untargeted.
+// R3  set current to window 1, and in the SAME process apply untargeted.
 //
 // R3 is the control: 9.3 already showed it lands on window 1. If R1 and R2 both
 // land on the same window as each other, the pointer did not survive and the
 // untargeted call is not following anybody's intent. If R1 lands on window 0 and
 // R2 on window 1, the pointer is server state and survives the connection.
+//
+// THE APPLIED LAYOUT MUST DIFFER FROM BOTH WINDOWS' CURRENT LAYOUTS, or this
+// probe cannot tell "landed here and applied" from "landed nowhere".
+// The windows are reset to main-vertical and even-horizontal before every
+// reading, so applying either of those two would be a no-op on the window it was
+// aiming at, and "no visible change" would be ambiguous. `main-horizontal` is a
+// top/bottom split and differs from both. This is the same blind spot
+// layout-probe.cjs has, documented in CONTRACT.md section 9.3; it is easy to
+// write a probe whose answer is "nothing changed" no matter what psmux does.
 
 const { spawnSync } = require('child_process');
 const path = require('path');
@@ -59,18 +68,23 @@ sleep(1200);
 
 const out = { namespace: NS, session: S, baseline: layouts(), readings: [] };
 
-function reading(tag, setCurrent, applyInSameProcess, applyName) {
+const APPLIED = 'main-horizontal';
+
+function reading(tag, setCurrent, applyInSameProcess) {
   // Reset both windows so each reading starts from the same state.
   p(['select-layout', '-t', S + ':0', 'main-vertical']);
   p(['select-layout', '-t', S + ':1', 'even-horizontal']);
   sleep(900);
+  // Captured AFTER the reset, not from a global: the comparison must be against
+  // the state this reading actually started from.
+  const base = layouts();
 
   const setResult = p(['select-window', '-t', S + ':' + setCurrent]);
   sleep(600);
 
   let applyResult = null;
   if (applyInSameProcess) {
-    applyResult = p(['select-layout', applyName]);
+    applyResult = p(['select-layout', APPLIED]);
     sleep(900);
   }
   const after = layouts();
@@ -81,14 +95,14 @@ function reading(tag, setCurrent, applyInSameProcess, applyName) {
     select_window_exit: setResult.status,
     select_window_stderr: setResult.stderr,
     applied_in_same_process: applyInSameProcess,
-    layout_applied: applyInSameProcess ? applyName : null,
+    layout_applied: APPLIED,
     apply_exit: applyResult ? applyResult.status : null,
     apply_stderr: applyResult ? applyResult.stderr : null,
-    before: out.baseline,
+    before: base,
     after,
     changed_windows: [],
   };
-  const b = out.baseline.split('\n');
+  const b = base.split('\n');
   const a = after.split('\n');
   for (let i = 0; i < Math.max(b.length, a.length); i += 1) {
     if (b[i] !== a[i]) rec.changed_windows.push({ window: i, before: b[i], after: a[i] });
@@ -98,11 +112,11 @@ function reading(tag, setCurrent, applyInSameProcess, applyName) {
 }
 
 // R3 first: the control, and it must reproduce 9.3 or the harness is wrong.
-const r3 = reading('R3 control: set current and apply in ONE process', '1', true, 'main-vertical');
+const r3 = reading('R3 control: set current and apply in ONE process', '1', true);
 
 // R1 and R2: the pointer is set in one process, the layout applied in another.
-const r1 = reading('R1: set current to 0 in one process, apply in ANOTHER', '0', false, 'main-vertical');
-const r2 = reading('R2: set current to 1 in one process, apply in ANOTHER', '1', false, 'main-vertical');
+const r1 = reading('R1: set current to 0 in one process, apply in ANOTHER', '0', false);
+const r2 = reading('R2: set current to 1 in one process, apply in ANOTHER', '1', false);
 
 function changedIndex(rec) {
   return rec.changed_windows.length === 1 ? rec.changed_windows[0].window : null;
