@@ -183,6 +183,16 @@ jobs:
         run: bun scripts/windows/parity/current-window-survival.cjs
         continue-on-error: true
 
+      - name: Run the concurrent-clients probe
+        # Genuinely overlapping clients, which is what team mode creates when
+        # several agents lay out at once. Every other probe runs one process at a
+        # time and therefore cannot see a collision.
+        env:
+          TEMP: ${{ runner.temp }}
+          TMP: ${{ runner.temp }}
+        run: bun scripts/windows/parity/concurrent-clients.cjs
+        continue-on-error: true
+
       - name: Publish whatever the probes produced
         # continue-on-error above means a probe failure must not discard the other
         # probe's output. A run where one probe worked and one did not is still
