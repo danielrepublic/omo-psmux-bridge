@@ -1957,26 +1957,32 @@ and parallel in trials 1-3, so its record is kept **out of `out.trials`** and la
 `phase 2 staggered (serial), NOT pooled with trials 1-3` — pooling a different condition
 into one series is what produced both earlier errors in this file.
 
+**The flaw in that trial, found and fixed.** w0 was first reset to `main-horizontal`,
+which is *also* client A's layout, so w0 sitting unchanged proved nothing — it would
+look identical whether A's apply landed correctly or was dropped. That is the baseline
+fault this document keeps finding: a reset the operation can reproduce hides the
+operation.
+
+w0 now resets to `main-vertical`, which neither client applies (A applies
+`main-horizontal`, B `even-vertical`), yielding `7f70` — `{71x30 / 48x30}`, a tree
+distinct from either. The trial then gives two independent observations:
+
 | sample | w0 | w1 |
 |---|---|---|
-| before | `b7ad` stacked | `7899` side-by-side |
-| after both `select-window` | `b7ad` | `7899` — unchanged, as expected |
-| **mid — after A alone** | `b7ad` | **`b7b2` stacked** |
-| after B | `b7ad` | `42b2` stacked |
+| before | `7f70` | `7899` side-by-side |
+| after both `select-window` | `7f70` | `7899` — unchanged, as expected |
+| **mid — after A alone** | `7f70` — **did not move** | **`b7b2` stacked** |
+| after B | `7f70` | `42b2` stacked |
 
-Client A named **w0** and applied `main-horizontal`. Mid-flight, **w1** moved from
-`7899` to `b7b2`, a `main-horizontal`-shaped tree (120x17 over 120x12) that only A's
-apply could have produced. A's layout was therefore computed — against the pointer B
-had already moved — and then overwritten by B's `even-vertical` (`42b2`). Last-writer-wins
-on a global pointer is confirmed, and "discarded" is now distinguished from "never
+w0 does not move even though it is in a state A's layout differs from, so A's apply
+genuinely did not reach the window A named. w1 moved to `b7b2`, a
+`main-horizontal`-shaped tree (120x17 over 120x12) that only A's apply could have
+produced. So A's layout **was computed — against the pointer B had already moved — and
+then overwritten** by B's `even-vertical` (`42b2`). Last-writer-wins on a global pointer
+is confirmed from both sides, and "discarded" is now distinguished from "never
 computed".
 
-**A flaw in that trial, recorded because it weakens one of its two observations.**
-w0 was reset to `main-horizontal`, which is *also* client A's layout, so w0 sitting
-unchanged proves nothing on its own — it would look identical whether A's apply landed
-there correctly or not. The reset should have been a layout A does not use. The
-conclusion does not rest on w0: w1's mid-flight change to a tree only A can produce is
-independent of it, and that is the load-bearing evidence.
+Pooled trials 1–3 remain `changed: [1]` on this run, and `repair_succeeded: true`.
 
 **Still not covered.** More than two clients, more than two windows, and a real OmO
 team-mode sequence. The tolerance sweep shares the before/after-only limitation, though
