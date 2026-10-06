@@ -658,6 +658,19 @@ reverse order, both in one throwaway `-L` namespace, both outputs stored here.
 | 200 | 4 | 99 | four stacked in the right column |
 | 240 | 2 | 119 | the remainder stacked right |
 
+**The committed probe artifact contains a `119` that is NOT this rule working, and
+it is the single easiest number in this document to misread.** The after-run in
+`.omo/evidence/issue-1-team-layout-probe-after.json` records a 200-column window
+going `%1 0 59` / `%2 60 140` to `%1 0 119` / `%2 120 80`, and 119 is roughly
+200 × 60%. That 60% is **psmux's own default** from
+`src/layout.rs:1096` — the value this whole rule exists to change. If rule 1a
+were working, the main pane would be at 200 × 50% ≈ **99**, which is the number in
+the table above. So that artifact is evidence of the *defect* rule 1a and 1b
+address, not evidence that the fix was applied: the probe exercised a targeted
+`select-layout -t`, never `set-window-option main-pane-width` followed by the
+rule's untargeted `select-layout main-vertical`. Anyone reading `119` as
+confirmation has read psmux's fallback as the bridge's output.
+
 #### Rule 1c — `resize-pane -x` / `-y` is suppressed, not forwarded
 
 When the verb is `resize-pane` or `resizep` and the argv contains a bare `-x` or
@@ -772,6 +785,30 @@ which is why it is a distinct translation kind and a distinct outcome in both lo
 recorded. Nothing else in this document suppresses a command.
 
 ### 3.10 Team-mode visualization: the `createTeamLayoutInCallerWindow` family, and rules 1d, 1e and D0
+
+**What is verified here, and what is not — stated before the rules rather than
+after them.** Every psmux line this section cites is now mechanically re-checked
+against the pinned tree: `bun run contract:verify` reads all 174 citations in this
+document and reports 0 problems, including the 84 on the psmux side. So the
+*premises* quoted below are confirmed present-and-unchanged at v3.3.8.
+
+That is a narrower claim than it looks, and the gap should be named rather than
+assumed away. Verifying a citation proves the quoted text is still on that line.
+It does **not** prove that the rule built on top of it is the right rule, because
+this section and the code implementing it were authored together — so a rule
+resting on a citation here rests on the same author's reading of that line. That
+is the circularity, it is structural, and no amount of re-running the checker
+removes it. Two things do:
+
+1. **Re-run `scripts/windows/parity/team-layout-probe.cjs` and confirm the
+   after-run artifact reproduces** — an independent observation of the behaviour
+   rather than of the source. Needs a Windows host.
+2. **A reader who knows psmux 3.3.8 disagrees with any rule here.** The rules
+   carry file:line citations precisely so that can happen without trusting this
+   document's conclusions.
+
+Until at least one of those happens, treat the *shape* of these rules as
+well-corroborated and their *consequences* as argued rather than demonstrated.
 
 OmO's team-mode visualization is gated separately from the subagent-pane gates
 in section 4. The config key is `team_mode.tmux_visualization`, off by default:
