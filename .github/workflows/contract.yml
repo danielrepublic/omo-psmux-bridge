@@ -1,0 +1,133 @@
+# Verify CONTRACT.md's citations against the two trees it is pinned to.
+#
+# This is a SEPARATE workflow from release.yml on purpose. release.yml triggers on
+# `push: tags: v*`, so a contract check living there would only run when a release
+# is cut — which is far too late to notice that citations rotted while the work
+# accumulated. This one runs on every push and every PR.
+#
+# What it actually buys: CONTRACT.md's preamble used to claim, truthfully, that no
+# automated drift detection existed and that "a citation is exactly as
+# trustworthy as the last person who ran sed on it". That stayed true long enough
+# for the OmO pin to move 5.1.18 -> 5.1.21 and for BOTH psmux checkouts to be
+# deleted, leaving a window in which not one citation in the document could be
+# re-checked by anyone. This workflow closes that window.
+#
+# Exit codes: `contract:verify` exits non-zero if any citation's quoted text is
+# no longer a literal substring of its cited line, or if a pinned tree is missing
+# or at the wrong commit. It exits zero on a clean run. Both the psmux and the
+# OmO halves are checked here; neither is skipped, because a checker that only
+# covers the half it can reach in CI is how the other half rots unnoticed.
+name: contract
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  # Read-only. This workflow needs the repository and nothing else. Declaring
+  # `contents: read` explicitly rather than inheriting a broader grant means a
+  # future edit to this file cannot quietly acquire write access.
+  contents: read
+
+concurrency:
+  group: contract-${{ github.ref }}
+  # Unlike release.yml, cancel-in-progress is TRUE here. A stale contract run on
+  # an old commit has no value once the commit is superseded, and this workflow is
+  # the one place where "the newest answer wins" is unambiguously correct.
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  # Pinned to the same value release.yml uses, and for the same reason: a
+  # floating bun version would make the check non-reproducible, and a difference
+  # in the Bun runtime must never be the reason a contract check disagrees with a
+  # local run.
+  BUN_VERSION: '1.4.2'
+
+jobs:
+  citations:
+    name: CONTRACT.md citations
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Install Bun ${{ env.BUN_VERSION }}
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Materialise the pinned psmux checkout
+        # Clones psmux into .contract/psmux at the exact commit recorded in
+        # scripts/contract/pins.json. That directory is git-ignored: it is a
+        # vendored upstream tree, never part of this repository's source, and it
+        # is what "one checkout, at a known commit" means concretely.
+        run: bun run contract:fetch
+
+      - name: Materialise the pinned OmO bundle
+        # The OmO pin points into the agent's package cache, which does not exist
+        # on a runner. Rather than adding an override flag to the checker — which
+        # would make the pin one thing locally and another in CI, and the pin is
+        # supposed to be the single source of truth — this step builds the tree
+        # exactly where the pin says it lives.
+        #
+        # The install dir comes from `bundleGlob`, NOT from the version: the
+        # cache dir is literally `oh-my-openagent@latest` and only the
+        # package's package.json carries the version. Building `@<version>`
+        # instead would create a tree the checker does not look at.
+        run: |
+          set -euo pipefail
+          version="$(jq -r '.omo.verifiedAgainst' scripts/contract/pins.json)"
+          glob="$(jq -r '.omo.bundleGlob' scripts/contract/pins.json)"
+          resolved="${glob//\$HOME/$HOME}"
+          resolved="${resolved//\{version\}/$version}"
+          target="$(dirname "$resolved")"
+          echo "pin wants ${version} at ${resolved}"
+          mkdir -p "$target"
+          tarball="$(npm view "oh-my-openagent@${version}" dist.tarball)"
+          curl --silent --show-error --location "$tarball" \
+            | tar -xz -C "$target" --strip-components=1
+          # The pin asserts a version. Trust the tarball's own package.json rather
+          # than the directory name, so a pin and a tarball that disagree cannot
+          # pass as agreement.
+          installed="$(jq -r '.version' "${target}/package.json")"
+          if [ "$installed" != "$version" ]; then
+            echo "::error title=bundle-pin-mismatch::pin says ${version} but the tarball contains ${installed}"
+            exit 1
+          fi
+          echo "installed oh-my-openagent@${installed}"
+
+      - name: Verify every citation
+        # Runs once. `tee` inside `if` swallows the exit code without
+        # `pipefail`; keeping the log lets the annotation below name the CAUSE
+        # ("a pin moved") rather than just "exited 1".
+        run: |
+          set -euo pipefail
+          log="$(mktemp)"
+          if bun run contract:verify 2>&1 | tee "$log"; then
+            exit 0
+          fi
+          echo "::error title=contract-citations-stale::CONTRACT.md cites lines that no longer resolve, or a pinned tree is missing or at the wrong commit. See the log above. CONTRACT.md section 14 step 1 says what to do: fix the prose, not the line number — a citation that no longer resolves is a fact about the world that the document is supposed to be reporting."
+          exit 1
+
+      - name: Test suite
+        # The citation check and the test suite are separate concerns and both are
+        # required. A green checker with red tests means the document describes
+        # upstream accurately while the code no longer implements it, which is
+        # the more dangerous of the two failures and is invisible to either check
+        # alone.
+        run: bun test
+
+      - name: Type check
+        run: bunx tsc --noEmit

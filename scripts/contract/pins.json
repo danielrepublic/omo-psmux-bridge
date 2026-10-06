@@ -1,0 +1,12 @@
+{
+  "omo": {
+    "verifiedAgainst": "5.1.21",
+    "bundleGlob": "$HOME/.cache/opencode/packages/oh-my-openagent@latest/node_modules/oh-my-openagent/dist/index.js"
+  },
+  "psmux": {
+    "tag": "v3.3.8",
+    "commit": "66cf61354c473b35d4f0c06c57384fc46d61ffdb",
+    "repo": "https://github.com/psmux/psmux.git",
+    "srcRoot": ".contract/psmux"
+  }
+}

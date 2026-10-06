@@ -11,11 +11,24 @@ Every clause below is one of exactly two things:
 1. **A citation.** Written as `` `index.js:NNNN` → `<exact text>` `` for the OmO
    bundle, or `` `src/<file>.rs:NNNN` → `<exact text>` `` at a stated ref for
    psmux. The quoted text is a literal substring of the cited line. Citations are
-   re-resolved **by hand**, one `sed -n` at a time, by the procedure in "How to
-   re-verify every citation" below. There is **no checker script in this
-   repository** — no `scripts/` entry, no npm script, no CI step — so a citation
-   is exactly as trustworthy as the last person who ran `sed` on it, and no part
-   of this document may claim automated drift detection.
+   re-resolved **mechanically**, by `bun run contract:verify`, which reads every
+   citation in this file, resolves it against the two pinned trees named in
+   section 0, and fails on the first mismatch. It is not a suggestion and it is
+   not advisory: it runs in CI on every push and a red build means a citation
+   here is wrong.
+
+   The verifier is `scripts/contract/verify-citations.ts`, the pins it reads are
+   `scripts/contract/pins.json`, and the trees it needs are materialised by
+   `bun run contract:fetch`. **Added 2026-10-07.** Until then this paragraph
+   said citations were re-resolved by hand and that "there is no checker script
+   in this repository — no `scripts/` entry, no npm script, no CI step", so a
+   citation was "exactly as trustworthy as the last person who ran `sed`". That
+   was true and it lasted a few months: the pin moved from `5.1.18` to `5.1.21`
+   and from `/tmp/opencode/psmux-src` to nothing at all, and for a window no
+   citation in this document could be re-checked by anyone. The prose procedure
+   below is kept because it explains what the checker does, and because the
+   checker's output is only as good as someone's decision to run it — but the
+   enumeration of every citation is now mechanical.
 2. **An inference.** Prefixed `INFERRED:` followed by the reasoning. An
    inference is never dressed up as a citation.
 
@@ -23,10 +36,23 @@ A third category turns up in draft material and is **not admissible**: a
 `Measured on …` / `Verified on …` block whose run left no artifact under version
 control. No script, log or captured output for the section 3.9 geometry tables
 exists in this repository, and the one capture of the section 9 `select-layout`
-result lives in the gitignored `.omo/` scratch tree, which is not this
-repository's record of anything. Where such a block survives, it is marked
-unrecorded and states what would settle it; it is never the ground for a
-conclusion.
+result lives in the `.omo/` scratch tree, which is not this repository's record
+of anything. Where such a block survives, it is marked unrecorded and states
+what would settle it; it is never the ground for a conclusion.
+
+`.omo/` is git-ignored with one exception: `.omo/evidence/` is tracked, and it
+is tracked wholesale rather than file by file. 16 of the 19 `task-*` artifacts
+there are cited by this document or by `scripts/windows/bin/omo-opencode-port.ps1`,
+which ships in the release archive, so a shipped script points at evidence that
+has to exist. The three uncited ones are siblings from the same runs; dropping
+them would be arbitrary, and leaving them untracked-but-visible would put them
+one `git add -A` from being committed by accident.
+
+The exception narrows what "under version control" means here; it does not widen
+it. An artifact outside `.omo/evidence/` — a session transcript, a scratch draft
+— is still not a record of anything, and a claim resting only on one is still
+inadmissible. Section 7.1 had exactly that defect and was corrected on
+2026-10-07.
 
 If a clause is neither a citation, an inference, nor an explicitly marked
 unrecorded observation, it does not belong in this document. Nothing here records
@@ -34,26 +60,46 @@ an aspiration as a fact.
 
 ## How to re-verify every citation
 
-By hand. There is no script: the procedure below is the whole mechanism, and
-section 14 step 1 is a person reading `sed` output, not a green build.
+```bash
+bun run contract:fetch    # materialise both pinned trees
+bun run contract:verify   # check every citation in this file; non-zero on drift
+```
 
-The OmO bundle citations are checked against the pin in section 0.1 with:
+That is the whole mechanism, and section 14 step 1 is now a green build rather
+than a person reading `sed` output. What follows is what the checker does, kept
+because it is the specification it implements — and because when the checker
+disagrees with it, one of the two is a bug worth finding.
+
+Each citation is a backtick-quoted `PATH[:LINE[-LINE]]`, an arrow, and the text
+the cited line is expected to contain. The quoted text is compared as a literal
+substring of the cited line, after one level of markdown unescaping, because
+this file escapes its own quotes: a citation inside a code span carries `\``,
+`\\` and `\"` in the markdown and the bare characters in the source.
+
+A citation whose path is `index.js` resolves against the OmO bundle pin in
+section 0.1; every other path — `src/*.rs`, `docs/*.md`, `installer/*.nsi` —
+resolves against the psmux tree in section 0.2. For a range `A-B`, the expected
+text may be on any single line of the range or span the range joined by newlines.
+
+To do one of these by hand, which is occasionally faster than starting the
+checker when you are chasing a single line:
 
 ```bash
 sed -n 'NNNNp' \
-  $HOME/.cache/opencode/packages/oh-my-openagent@5.1.18/node_modules/oh-my-openagent/dist/index.js
+  $HOME/.cache/opencode/packages/oh-my-openagent@latest/node_modules/oh-my-openagent/dist/index.js
 ```
 
-If that exact tree is not on disk, resolve the number against whatever
-`ls -d $HOME/.cache/opencode/packages/oh-my-openagent@*` returns instead,
-and treat every bundle number as suspect until it has been re-checked. The pin is
-the validity condition (section 14), so an absent pin is not a licence to read
-the nearest version.
+If the pinned tree is not on disk, `contract:verify` reports `PIN_TREE_MISSING`
+rather than quietly resolving against whatever version happens to be installed.
+That is deliberate and it is the pin doing its job: the pin is the validity
+condition (section 14), so an absent pin is not a licence to read the nearest
+version and call it verified.
 
-The psmux citations are checked with the same `sed -n` invocation against
-`src/<file>.rs` inside the pinned checkout named in section 0.2 — **and only that
-checkout**. The same `sed -n` against the wrong tree returns a confident, wrong
-line number, which is worse than no answer at all.
+The psmux citations resolve against `src/<file>.rs` inside the pinned checkout
+named in section 0.2 — **and only that checkout**, which is why the checker
+verifies `git rev-parse HEAD` against the pinned commit before reading anything.
+The same `sed -n` against the wrong tree returns a confident, wrong line number,
+which is worse than no answer at all.
 
 The file is referred to as `index.js` throughout, but its real path is
 `dist/index.js` inside the package.
@@ -64,47 +110,94 @@ The file is referred to as `index.js` throughout, but its real path is
 
 ### 0.1 OmO
 
-The bundle this document is pinned to is **oh-my-openagent 5.1.18**:
+**Which tree to read:** always `@latest`, because that is where OmO actually
+lives and where it keeps living.
 
 ```
-$HOME/.cache/opencode/packages/oh-my-openagent@5.1.18/node_modules/oh-my-openagent/dist/index.js
+$HOME/.cache/opencode/packages/oh-my-openagent@latest/node_modules/oh-my-openagent/dist/index.js
 ```
 
-**Discrepancy on the record.** The work plan (todo 3 and todo 4 reference blocks)
-and the research draft both cite `oh-my-openagent@5.1.17`. That version is **not
-installed on this host**; `5.1.18` was the only one installed when this was
-written. Every citation in this document was
-resolved against **5.1.18**, and the orchestrator spot-checked 20 of the plan's
-line numbers against 5.1.18 before dispatch. The plan's line numbers are correct
-for 5.1.18. Only the version string was stale. **5.1.17 is not installed and must
-never be cited.**
+**Which version this document was last verified against:** **5.1.21**, read from
+that package's own `package.json`. This number is a *record of a past
+verification*, not an install instruction, and the two must not be confused —
+that confusion is what made the pin unusable before.
 
-**Second discrepancy, recorded later.** The pin above is still 5.1.18 and every
-bundle citation in this document was resolved against 5.1.18. The package cache
-on this host no longer holds that tree, though: `ls -d
-$HOME/.cache/opencode/packages/oh-my-openagent@*` now returns
-`oh-my-openagent@5.1.19` and nothing else. Re-resolving all 74 bundle citations
-in this document against 5.1.19 finds every one of them on the same line with the
-same text, so the numbers here are not wrong — but that is a fact about an
-unchanged file, not a property of the pin, and it does not survive the next
-release. Treat 5.1.19 as a new pin to be recorded here before it is cited.
+`scripts/contract/pins.json` carries both halves as `omo.bundleGlob` and
+`omo.verifiedAgainst`, and the checker compares them on every run:
+
+| installed in `@latest` | `omo.verifiedAgainst` | result |
+|---|---|---|
+| 5.1.21 | 5.1.21 | clean |
+| 5.1.22 | 5.1.21 | `PIN_DRIFT`, naming both |
+
+**A `PIN_DRIFT` on the OmO side is routine, not an incident.** OmO ships with the
+agent and moves to a new version often, so `@latest` will outrun this document
+regularly. What `PIN_DRIFT` means is precisely: *re-verify the 90 bundle
+citations against the new bundle, then bump `omo.verifiedAgainst`.* Suppressing
+it would be worse than useless — it would turn "the document is stale" into
+silence, which is the exact failure this whole mechanism exists to prevent.
+
+CI is the deliberate exception. `.github/workflows/contract.yml` installs the
+exact `omo.verifiedAgainst` version from npm rather than `@latest`, so a CI run
+does not depend on which OmO shipped that morning and a green build means the
+same thing today as it did last week. Reproducibility on the machine that
+asserts, freshness on the machine that reads.
+
+**Third discrepancy, recorded 2026-10-07.** The pin above was `5.1.18`; the tree
+for `5.1.18` no longer exists on this host. The second recorded discrepancy
+(§0.1, earlier) had already re-resolved all bundle citations against `5.1.19`
+and found every number still correct. The tree is now at **`5.1.21`**, three
+patch releases further on, and **all 90 bundle citations verify against it**,
+each on its cited line with its cited text. So the line numbers have survived
+three releases — but that is now a *measured* fact about three specific
+releases, recorded here, rather than an assumption carried forward.
+
+The count is 90, not the 74 stated in the earlier discrepancy. 74 was an
+undercount, and it was wrong twice over: a hand pass that only matched citations
+starting a markdown list item sees 87 of the 90, because three are written as
+continuation lines. `bun run contract:verify` counts all 90, which is the number
+that matters and the reason the count is mechanical now.
+
+**5.1.19 → 5.1.21 changed nothing this document depends on.** Every cited line
+in `createTeamLayoutInCallerWindow`, `resolveCallerTmuxSession`, the layout
+triple at `index.js:8914`/`8920-8921`/`8937`, the five payload verbs, the `-e`
+auth environment, and the `TeamModeConfigSchema` default still resolves
+verbatim. The contract's claims survive; the pin did not, which is exactly the
+asymmetry §14 step 1 exists to catch.
 
 ### 0.2 psmux
 
 All psmux citations are from **tag v3.3.8**, commit
-`66cf61354c473b35d4f0c06c57384fc46d61ffdb`, checked out at
-`/tmp/opencode/psmux-src` **outside this repository**. psmux's master branch
-diverges by roughly 17k lines, so line numbers do not transfer between the two
-trees. Every psmux citation in this document states v3.3.8. Nothing here is
-cited from master except where a master-only fact is explicitly labelled as
-such, and those are cited as commits rather than as line numbers.
+`66cf61354c473b35d4f0c06c57384fc46d61ffdb`, checked out at **`.contract/psmux`**
+— inside this repository, git-ignored. psmux's master branch diverges by roughly
+17k lines, so line numbers do not transfer between the two trees. Every psmux
+citation in this document states v3.3.8. Nothing here is cited from master
+except where a master-only fact is explicitly labelled as such, and those are
+cited as commits rather than as line numbers.
 
-**There is a second psmux checkout on this host, and citing it is the exact
-failure this document is written to prevent.** `/tmp/opencode/psmux` is a newer
-grafted clone whose HEAD is `ce07e9a`; it carries no tags, so `git describe`
-there fails outright. Every `sed -n` verification against that path returns a
-real, plausible line number belonging to the wrong source file. The pin is
-`/tmp/opencode/psmux-src` and nothing else.
+**The checkout path moved, 2026-10-07, and this is a correctness fix rather than
+a preference.** The pin used to be `/tmp/opencode/psmux-src`. That path is under
+`/tmp`, so the checkout evaporated, and with it the only way to re-resolve the 74
+psmux citations in this document: on 2026-10-07 both `/tmp/opencode/psmux-src`
+and `/tmp/opencode/psmux` were **absent**, and the document's own validity
+condition (§14) could not be checked at all. A pin that can disappear between
+sessions is not a pin. `.contract/psmux` is git-ignored, so the tree never
+enters version control, and `bun run contract:fetch` recreates it at the pinned
+commit from `scripts/contract/pins.json`.
+
+**Why a single checkout, still.** The original warning about `/tmp/opencode/psmux`
+was that a second, newer clone sat beside the pinned one and returned confident
+wrong line numbers. That hazard is now structural rather than advisory: exactly
+one checkout path is named, in exactly one place (`pins.json`), and the checker
+verifies `git rev-parse HEAD` against the pinned commit before reading a single
+line. A tree at the wrong commit is `PIN_DRIFT`, not a silently wrong answer.
+
+**Re-verified 2026-10-07 against a fresh clone:** all **84** psmux citations
+resolve on their cited line with their cited text — 84, not the 74 the earlier
+discrepancy counted, for the same reason the bundle count moved. The 2
+citations that failed this audit were `omo-psmux-bridge.md:609` and
+`omo-psmux-bridge.md:610`, which are not psmux citations at all; see §7.1, where
+they are demoted to what the preamble's rules require.
 
 INFERRED: this document goes stale the moment either tool is upgraded. The
 version pins above are the whole of the validity condition, so they are stated
@@ -678,6 +771,211 @@ which is why it is a distinct translation kind and a distinct outcome in both lo
 (`kind: "suppressed"`, `outcome: "suppressed"`) with the dropped argv still
 recorded. Nothing else in this document suppresses a command.
 
+### 3.10 Team-mode visualization: the `createTeamLayoutInCallerWindow` family, and rules 1d, 1e and D0
+
+OmO's team-mode visualization is gated separately from the subagent-pane gates
+in section 4. The config key is `team_mode.tmux_visualization`, off by default:
+
+- `index.js:26645` → `var TeamModeConfigSchema = z44.object({`
+- `index.js:26647` → `tmux_visualization: z44.boolean().default(false),`
+
+(The schema runs to `index.js:26656`; the default is the whole of the gating
+fact.) When `resolveCallerTmuxSession` (`index.js:19573-19590`) returns null,
+no layout is attempted at all:
+
+- `index.js:19705` → `deps.log("tmux visualization requires a resolvable caller tmux pane, skipping", { teamRunId });`
+
+The caller session is resolved with two `display` calls carrying `-F`:
+
+- `index.js:19577` → `const sessionResult = await runCommand(tmuxPath, ["display", "-p", "-F", "#{session_id}", "-t", callerPaneId]);`
+- `index.js:19585` → `const windowResult = await runCommand(tmuxPath, ["display", "-p", "-F", "#{session_name}:#{window_index}", "-t", callerPaneId]);`
+
+and the returned strings must match the session and window-target patterns
+(`index.js:19582` tests `TMUX_SESSION_ID_PATTERN` against the session id;
+`index.js:19590` tests `TMUX_WINDOW_TARGET_PATTERN` against the window
+target). Anything that corrupts the `display` output therefore skips the whole
+team layout, which is why rule D0 below is load-bearing rather than cosmetic.
+
+Per member, `createTeamLayoutInCallerWindow` (`index.js:19653-19674`) emits, in
+this order: `list-panes` in the caller window first (via `listPanesInWindow`):
+
+- `index.js:19625` → `const result = await deps.runTmuxCommand(tmuxPath, ["list-panes", "-t", windowTarget, "-F", "#{pane_id}"]);`
+
+then `split-window` (the first split carries `-l 70%`; later splits carry no
+`-l`, splitting the last teammate pane instead):
+
+- `index.js:19637` → `return ["split-window", ...environmentArgs, "-t", callerPaneId, "-h", "-d", "-l", "70%", "-P", "-F", "#{pane_id}", "-c", getPaneWorkingDirectory(member)];`
+
+then a `select-pane` title call:
+
+- `index.js:19664` → `await deps.runTmuxCommand(tmuxPath, ["select-pane", "-t", paneId, "-T", `${TEAM_PANE_TITLE_PREFIX}${member.name}`]);`
+
+then two `set-option -p` calls:
+
+- `index.js:19665` → `await deps.runTmuxCommand(tmuxPath, ["set-option", "-p", "-t", paneId, OMO_ATTACH_SERVER_URL_OPTION2, serverUrl]);`
+- `index.js:19666` → `await deps.runTmuxCommand(tmuxPath, ["set-option", "-p", "-t", paneId, OMO_ATTACH_SESSION_ID_OPTION, member.sessionId]);`
+
+then `send-keys` with the attach command plus `Enter`:
+
+- `index.js:19667` → `await deps.runTmuxCommand(tmuxPath, ["send-keys", "-t", paneId, buildAttachCommand(member, serverUrl), "Enter"]);`
+
+and after all members, a targeted `select-layout` and a caller resize:
+
+- `index.js:19669` → `const layoutResult = await deps.runTmuxCommand(tmuxPath, ["select-layout", "-t", windowTarget, "main-vertical"]);`
+- `index.js:19672` → `const resizeResult = await deps.runTmuxCommand(tmuxPath, ["resize-pane", "-t", callerPaneId, "-x", "30%"]);`
+
+None of these carries a payload, so all classify as `pass-through`, and all
+are handled on the translate stage on the same branch as rules 1a-1c. Three
+further rules carve the carve-out, each pinned to a named psmux defect, plus
+the `display` rewrite that the whole sequence depends on.
+
+#### Rule 1d: `set-option -p ... @omo_attach_*` is suppressed, not forwarded
+
+psmux refuses every pane-scoped option except `remain-on-exit`:
+
+- `src/server/mod.rs:3862` → `other => format!("ERROR: pane-scoped option '{}' is not supported (supported: remain-on-exit)", other),`
+
+and the parse arm that gets there reads the option name as the first
+non-flag argument that is not a `-t` value (`src/server/connection.rs:2355-2415`,
+opening at `src/server/connection.rs:2355` →
+`"set-option" | "set" | "set-window-option" | "setw" => {`).
+
+Suppression is safe because OmO ignores both results: the two calls at
+`index.js:19665-19666` are awaited bare, with no success check and no branch
+on the outcome. `@omo_attach_session_id` has no readers anywhere else in the
+bundle (a search for the string finds only its definition at `index.js:19773`
+and the write at `index.js:19666`). The only reader of
+`@omo_attach_server_url` skips a pane whose URL resolves to null:
+
+- `index.js:9415` → `const rawServerUrl = pane.attachServerUrl || extractAttachServerUrl(pane.commandLine);`
+- `index.js:9416` → `if (rawServerUrl === null)`
+- `index.js:9417` → `continue;`
+
+so absence reads as "unknown", not as failure.
+
+**What the carve-out costs, stated with the rule.** This is the second rule in
+this document (after rule 1c) that performs ZERO backend invocations: no psmux
+command runs at all, and the bridge exits 0. It is recorded as
+`suppressionReason: "psmux-refuses-pane-scoped-options"` in the call log
+(`src/translate.ts` `SuppressionReason`; `src/cli.ts` record key), so the
+dropped argv stays auditable. Measured: through the old shim each of the four
+probe `set-option -p` calls exited 1 with the refusal stderr above
+(`.omo/evidence/issue-1-team-layout-probe-before.json`, direct and shim arms);
+in the after-run the same four argv exit 0 with no backend call
+(`.omo/evidence/issue-1-team-layout-probe-after.json`, shim arm).
+
+The rule is deliberately narrow: verb in the four set-option spellings, a
+bare `-p`, and the option name one of exactly the two `@omo_attach_*` names.
+`remain-on-exit` stays pass-through, `set` without `-p` stays pass-through,
+and no other option name is touched.
+
+#### Rule 1e: the team resize becomes `set-option main-pane-width <n>` plus a re-applied layout
+
+`resize-pane -t <callerPane> -x "30%"` (`index.js:19672`) carries a bare `-x`,
+so rule 1c would suppress it, leaving psmux's 60% default. But this exact
+shape is a PERCENTAGE on `-x` with no `-y` and no `-Z`, and psmux has a sizing
+option that means the same thing: `main-pane-width` is parsed as a bare
+`u16`:
+
+- `src/server/options.rs:527` → `"main-pane-width" => {`
+- `src/server/options.rs:528` → `if let Ok(n) = value.parse::<u16>() { app.main_pane_width = n; }`
+
+read from inside the layout application:
+
+- `src/layout.rs:1094` → `// Determine main-pane percentage`
+- `src/layout.rs:1096` → `let main_v_pct = if app.main_pane_width > 0 { app.main_pane_width.min(95) } else { 60 };`
+
+and consumed by the `main-vertical` arm:
+
+- `src/layout.rs:1129` → `"main-vertical" | "main-v" => {`
+- `src/layout.rs:1136` → `sizes: vec![main_v_pct, 100 - main_v_pct],`
+
+So the bridge rewrites the one caller invocation into `set-option
+main-pane-width <n>` (the digits before the `%`) followed by `select-layout
+main-vertical`, for the same reason rule 1b exists: setting the option
+applies nothing until a layout runs. The `-t` is dropped because
+`main-pane-width` is a window option, not a pane one, and the follow-up
+carries no `-t` for the same reason rule 1b's does.
+
+**What the carve-out costs, stated with the rule.** Like rule 1b, this rule
+turns ONE caller invocation into TWO backend invocations. The log shows
+`verb: "resize-pane"`, `rewritten: true`, and the follow-up reason
+`psmux-reads-main-pane-size-only-inside-apply-layout` (`src/translate.ts`
+`FollowUpReason`; `src/cli.ts` follow-up record).
+
+Gates, exactly: a resize verb, no `-Z`, no `-y`, exactly one bare `-x`, and
+a non-zero whole-number percentage directly after it. `-x <cells>` (no `%`),
+`-y`, `0%`, non-digit values, and any argv carrying both axes keep rule 1c's
+suppression. `-Z` precedence is unchanged: zoom is checked first and forwarded.
+
+The now-MEASURED caller-is-main fact: with a valid target, `select-layout`
+applies and the rule-1e sequence yields `%1` width 59 of 199 (about 30%),
+while forwarding the raw resize yields 59% (`.omo/evidence/issue-1-windows-team-mode-validation.txt`,
+section 2; GitHub issue #1, D2 comment). INFERRED: the rule therefore assumes
+the caller pane is the window's first (main) pane, so `main-pane-width` sizes
+the caller. The inference is from the team splitting the caller pane first
+and `main-vertical` putting the main pane first (`src/layout.rs:1129-1136`);
+the measured widths are what keep it honest.
+
+#### Rule D0: the one non-final `-F` comes off `display` / `display-message`
+
+psmux's client does not recognise `-F` for `display` / `display-message`: the
+client-side match handles `-t`, `-p`, `-d` and `-I` and pushes every other
+element into the message text, which is then joined, quoted and sent as the
+message (`src/main.rs:2799-2865`, opening at `src/main.rs:2799` →
+`"display-message" | "display" => {`). Measured direct on psmux 3.3.8:
+
+- `display -p -F "#{session_id}" -t %1` prints `-F $1303` (tmux 3.7c prints
+  `$0` for the same argv);
+- `display -p -F "#{session_name}:#{window_index}" -t %1` prints `-F p:0`.
+
+Dropping the bare `-F` element is the validated spelling: psmux then prints
+`$1303` / `p:0` (`.omo/evidence/issue-1-windows-team-mode-validation.txt`,
+section 1). The bridge removes exactly the ONE non-final `-F` element, and
+only for these two verbs: every other verb's `-F` is parsed correctly by
+psmux and stays byte-identical.
+
+**What the rewrite costs, stated with the rule.** Recorded as `rewriteReason:
+"psmux-client-treats-display-F-as-message-text"` (`src/translate.ts`
+`RewriteReason`; `src/cli.ts` record key), because the logged argv alone
+cannot say whether the caller omitted the flag or the bridge did. OmO's use
+sites are `index.js:19577` and `index.js:19585`. Without this rule the whole
+team layout is skipped: the corrupted `-F $N` output fails the session-id
+pattern test, `resolveCallerTmuxSession` returns null, and the layout logs
+the skip (measured baseline: `-F $1303` against the pattern at
+`index.js:19582`; `.omo/evidence/issue-1-team-layout-probe-before.json`,
+direct arm).
+
+#### Measured results, with on-disk artifacts
+
+The before/after probe runs replay the team-layout sequence in throwaway `-L`
+namespaces, direct arm plus shim arm, both completing with `cleanup.ok=true`
+and `sessionsLeft=[]`:
+
+- `.omo/evidence/issue-1-team-layout-probe-before.json`: `display` prints
+  `-F $1299` / `-F probe:0`; the corrupted target fails `list-panes -t` and
+  `select-layout -t` with `no server running on session 'tbase1__-F probe'`;
+  all four `set-option -p @omo_attach_*` calls exit 1 with the refusal stderr;
+  `split-window` returns `%2` / `%3`; `send-keys` markers are captured;
+  `select-layout` geometry rows are unchanged (an artifact of the corrupted
+  target, not a layout defect); the dead-pane `kill-pane` exits 1 with
+  `psmux: can't find pane: %2`.
+- `.omo/evidence/issue-1-team-layout-probe-after.json` (staged new binary,
+  SHA-256 recorded in the validation file): `display` prints `$1310` /
+  `probe:0`; `list-panes -t probe:0` exits 0 with `%1`; the four `set-option
+  -p` calls are suppressed at exit 0 with no backend call; `select-layout -t
+  probe:0 main-vertical` exits 0 with geometry 59/140 going to 119/80; the
+  rewritten resize yields 59/140 (about 30%); `send-keys` markers are still
+  captured; the dead-pane `kill-pane` is identical. The direct arm (control)
+  still shows the raw psmux behaviour (`-F $1308`, corrupted-target exit 1),
+  so the treatment's success is attributable to the shim.
+- `.omo/evidence/issue-1-windows-team-mode-validation.txt`: the D0 fix
+  spelling table, the rule-1e geometry table (team splits 59/140, valid-target
+  `select-layout` 119/80, rule-1e sequence 59/140), and the per-command
+  after-run record quoted above.
+
+These are measured observations with on-disk artifacts in this repository, not
+citations and not inferences: each row names the file that holds it.
 
 ---
 
@@ -855,13 +1153,26 @@ invented workaround, it is the documented interface:
 - `docs/tmux_args_reference.md:91` → \`| \`respawn-pane\` | \`respawnp\`, \`resp\` | \`kc:t:\` plus \`-- <command>\` |\`
 
 **Bridge response: insert `--` before the payload** on the `respawn-pane`
-path. The prior session measured the difference directly:
+path. The basis is the source read above, not a runtime capture: the operand is
+read only behind `--`, and the reference table documents only the `--` form.
 
-- `omo-psmux-bridge.md:609` → \`| \`respawn-pane -k -t %1 <命令>\` | ❌ 沒有 |\`
-- `omo-psmux-bridge.md:610` → \`| \`respawn-pane -k -t %1 -- <命令>\` | ✅ 有 |\`
+**Withdrawn 2026-10-07: the "measured the difference directly" claim.** This
+paragraph previously read "The prior session measured the difference directly"
+and supported it with two lines from `omo-psmux-bridge.md:609-610`, comparing
+`respawn-pane -k -t %1 <command>` against the `--` form. That file is the local
+session transcript, which `.gitignore` excludes from this repository, so those
+two lines are not a record this repository holds of anything. Under the
+preamble's third category they are **inadmissible**: a measurement whose run
+left no artifact under version control is never the ground for a conclusion.
+They are removed rather than restated.
 
-The pane id was unchanged in both cases, so `--` changes only whether the command
-is read. It does not change pane identity or layout.
+The conclusion is unaffected, because it never needed them. `insert --` rests on
+`src/server/connection.rs:2093`/`:2102`/`:2103`/`:2106` — the operand is
+unreachable without `--` — together with `docs/tmux_args_reference.md:91`, which
+documents `-- <command>` as the interface. All five are citations that
+`bun run contract:verify` re-checks. What is withdrawn is the *strength* of the
+claim, not its direction: this was verified by reading psmux, and no artifact
+here records anyone watching the pane fail to start.
 
 INFERRED: inserting `--` changes the meaning of argv OmO emitted, so it is a
 translation and not a passthrough, and it is confined to the `respawn-pane`
@@ -950,14 +1261,21 @@ a named tag. It is never computed by comparing version numbers.
 | Strip the `%` from `main-pane-width` / `main-pane-height` | 3.9 rule 1a, `options.rs:527` `u16` parse of a percentage | `null` | not yet identified | `null` | `null` | `null` | stop stripping; OmO's `50%` will parse on its own |
 | Re-apply the consuming layout after the sizing option | 3.9 rule 1b, `layout.rs:1094-1096` reads the option only inside `apply_layout` | `null` | not yet identified | `null` | `null` | `null` | stop injecting the follow-up |
 | Suppress `resize-pane -x` / `-y` | 3.9 rule 1c, `window_ops.rs:1771-1796` writes a cell count into a percentage array | `null` | not yet identified | `null` | `null` | `null` | forward the command again, and only once 1a and 1b are both retired |
+| Drop the non-final `-F` on `display` / `display-message` | 3.10 rule D0, `main.rs:2799-2865` folds `-F` into the message text | `null` | not yet identified | `null` | `null` | `null` | stop dropping `-F`; forward the argv byte-identically once the psmux client parses `-F` as the format selector for these two verbs |
+| Suppress `set-option -p ... @omo_attach_*` | 3.10 rule 1d, `mod.rs:3862` refuses pane-scoped options | `null` | not yet identified | `null` | `null` | `null` | stop suppressing; forward the options once psmux stores arbitrary pane options |
+| Rewrite the team `resize-pane -t <pane> -x "<n>%"` to `set-option main-pane-width <n>` plus `select-layout main-vertical` | 3.10 rule 1e, `connection.rs:1767-1778` has no percentage spelling that reaches psmux as a cell count | `null` | not yet identified | `null` | `null` | `null` | forward the resize again once psmux's `-x <n>%` sizes the pane correctly |
 
-The last three rows are seeded exactly like the first three, and for the same
+The last six rows are seeded exactly like the first three, and for the same
 reason: a semver string cannot prove that an upstream fix is present, so the
 commit is `null` until someone runs the ancestry check named in section 8.1. The
 retirement action is stated in each row because the three layout workarounds are
 **not** independent of one another: rule 1c may only be dropped once 1a and 1b are
 gone, or the suppressed `resize-pane` would become the only thing setting the
-geometry and psmux would still destroy it.
+geometry and psmux would still destroy it. Of the three new rows, D0 and 1d
+retire independently of every other row; rule 1e's rewrite exists to produce
+the geometry rules 1a and 1b would otherwise produce for the caller pane, so
+forwarding the raw team resize again is only correct once psmux sizes it
+correctly, whatever the state of the other rows.
 
 Full commit hashes, for exactness:
 
@@ -1100,6 +1418,25 @@ with section 9.1 and settles nothing beyond the single-window case, which is
 precisely what the second probe exists to widen. Until a run's output is
 committed here, both options stay open.
 
+**Contributing evidence, not a decision.** The team-mode after-run applies a
+TARGETED `select-layout` and the geometry moves: `select-layout -t probe:0
+main-vertical` exits 0 with `%1 0 59` / `%2 60 140` / `%3 60 140` going to
+`%1 0 119` / `%2 120 80` / `%3 120 80`
+(`.omo/evidence/issue-1-team-layout-probe-after.json`, shim arm). That
+targeted call travels psmux's validated temporary-focus path, whose source is:
+
+- `src/server/connection.rs:1032` → `// Validated temporary focus (issue #545): the server resolves the`
+
+with the focus request itself dispatched at:
+
+- `src/server/mod.rs:1884` → `CtrlReq::FocusTargetTemp { win, win_is_id, win_name, pane, pane_is_id, resp } => {`
+
+INFERRED: the targeted form therefore has both a mechanism (temporary focus
+resolves the window before the command runs) and a measured application, which
+is more than the untargeted form has. This does NOT close the no-`-t`
+question: Option A and Option B above remain open for the untargeted form,
+and nothing here decides which window an untargeted `select-layout` acts on.
+
 ---
 
 ## 10. The `#{pane_start_command}` trap
@@ -1241,13 +1578,25 @@ the plan's todo 3 and todo 4 reference blocks, which are correct for 5.1.18.
 
 ## 14. Maintenance
 
-This document is only true of oh-my-openagent **5.1.18** and psmux **v3.3.8**.
-When either is upgraded:
+This document is only true of the oh-my-openagent recorded as
+`omo.verifiedAgainst` in `scripts/contract/pins.json` (**5.1.21** at this
+revision) and of psmux **v3.3.8**. When either is upgraded:
 
-1. Re-resolve every citation by hand, per the procedure in the preamble. One
-   citation that no longer resolves means the contract changed. There is no
-   checker to run and no `MISMATCH` line to wait for; this step is a person with
-   `sed`.
+1. Run `bun run contract:fetch && bun run contract:verify`. This step used to be
+   "a person with `sed`" and said so, because there was no checker to run; it is
+   mechanical as of 2026-10-07 and runs in CI on every push. A non-zero exit means
+   at least one citation no longer resolves, which means the contract changed —
+   read the reported line, do not bulk-rewrite the numbers to make it green. One
+   citation that no longer resolves is a fact about the world that this document
+   is supposed to be reporting, so fix the prose, not the number. Note that a
+   *passing* run means only that the quoted text is still on the cited line; it
+   does not mean the conclusion drawn from that line is still correct. Steps 2
+   through 8 are what cover that, and they remain human work.
+
+   An OmO-side `PIN_DRIFT` additionally requires bumping `omo.verifiedAgainst` in
+   `scripts/contract/pins.json` once the re-verification passes. That bump is the
+   last step, not the first: re-verify first, because a pin that claims a version
+   nobody checked against is worse than a pin that is honestly behind.
 2. Re-check `respawn-window` for absence from the bundle, since its presence
    would make section 7.3 a live path.
 3. Re-check the `-e` handling table in section 7.2, verb by verb.
@@ -1258,5 +1607,21 @@ When either is upgraded:
    percentage, drop rule 1a; if `apply_layout` reads the sizing option outside
    itself, drop rule 1b; only then drop rule 1c and forward `resize-pane -x` again.
    Dropping 1c first re-exposes the layout to the defect it was suppressing.
+6. Re-resolve every team-mode citation in section 3.10 by hand, on either
+   upgrade (OmO or psmux): the `createTeamLayoutInCallerWindow` sequence, the
+   `resolveCallerTmuxSession` display pair, the `TeamModeConfigSchema`
+   defaults, the `mod.rs` pane-option refusal, the `options.rs` / `layout.rs`
+   sizing path, and the `main.rs` display-client parse. One citation that no
+   longer resolves means the team-mode contract changed.
+7. Re-check the `display` `-F` classification in the new psmux client source:
+   if `-F` is parsed as the format selector for `display` / `display-message`,
+   retire rule D0 per section 8.2; other verbs' `-F` was never rewritten and
+   needs no check.
+8. Re-check pane-option support in the new psmux server source: if psmux
+   stores arbitrary pane options, retire rule 1d per section 8.2. Only then
+   revisit the rules: re-run the ancestry check in section 8.1 for any
+   candidate fix commit, and re-measure the team-layout probe before changing
+   rule 1e, since its caller-is-main assumption rests on a measured run, not
+   on source alone.
 
 Until step 1 passes for every citation, treat any bridge behaviour as unverified.

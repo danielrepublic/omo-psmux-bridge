@@ -1,8 +1,24 @@
 # Session transcripts — local working artifacts, not source
 omo-psmux-bridge.md
 
-# Agent tooling state
-.omo/
+# Agent tooling state. `.omo/` is scratch: session transcripts, run-continuation
+# pointers, drafts. None of it is a record this repository keeps.
+#
+# `.omo/evidence/` is the deliberate exception and IS tracked, wholesale. This is
+# not a tidy-up allowance for one or two cited files — it is the evidence
+# directory. 16 of the 19 `task-*` files here are cited by CONTRACT.md or by
+# `scripts/windows/bin/omo-opencode-port.ps1`, which SHIPS in the release
+# archive, so a shipped script points at evidence that has to exist. CONTRACT.md
+# also rejects any measurement whose run left nothing under version control.
+#
+# They were previously force-added with `git add -f`, leaving them
+# tracked-but-claimed-ignored: the rule and the index disagreed, so the next
+# `git clean -xfd` or a fresh clone disagreed too. Naming the exception makes
+# the two agree on purpose. Tracking the directory rather than a hand-picked
+# subset also avoids the opposite trap, where uncited siblings sit untracked and
+# visible, one `git add -A` away from being committed by accident.
+.omo/*
+!.omo/evidence/
 
 # OS / editor noise
 .DS_Store
@@ -14,3 +30,10 @@ dist/
 
 # Dependencies
 node_modules/
+
+# Pinned upstream source checkouts used to verify CONTRACT.md citations.
+# `.contract/psmux` is a full git clone (21M, own .git) pinned to the commit
+# recorded in scripts/contract/pins.json. `bun run contract:fetch` recreates it.
+# It must never be committed: it is a vendored upstream tree, not this project's
+# source, and its .git would turn it into a broken nested repo.
+.contract/
