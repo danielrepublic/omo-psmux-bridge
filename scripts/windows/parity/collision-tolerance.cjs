@@ -84,8 +84,22 @@ async function control() {
     const before = layouts();
     p(['select-layout', '-t', S + ':1', name]);
     sleep(700);
-    named[name] = { baseline, applied: before !== layouts() };
+    const after = layouts();
+    named[name] = { baseline, observed: after, applied: before !== after };
   }
+
+  // The reason `tiled` had to be replaced as B was an INFERENCE, now measured.
+  // CONTRACT.md stated as fact that psmux reports `tiled` back as `even-horizontal`
+  // on a two-pane window. Nothing had ever observed that string — it was deduced
+  // from a sweep that scored every gap NONE, which is consistent with an alias but
+  // also with a dozen other causes. So ask directly: put w1 in even-horizontal and
+  // apply tiled, then record what psmux actually reports.
+  p(['select-layout', '-t', S + ':1', 'even-horizontal']);
+  sleep(700);
+  const tiledBase = layouts();
+  p(['select-layout', '-t', S + ':1', 'tiled']);
+  sleep(900);
+  const tiledAfter = layouts();
 
   p(['select-layout', '-t', S + ':1', BASELINE_FOR[A]]);
   sleep(700);
@@ -96,6 +110,14 @@ async function control() {
   return {
     layout_names_accepted: named,
     untargeted_applies_with_pointer_on_w1: before !== layouts(),
+    // The aliasing question, answered by observation rather than by inference.
+    // `aliased_with_reset` true means tiled on a two-pane window is reported as
+    // even-horizontal, which is what made every earlier trial invisible.
+    tiled_aliasing: {
+      baseline: tiledBase,
+      after_tiled: tiledAfter,
+      aliased_with_reset: tiledBase === tiledAfter,
+    },
   };
 }
 
