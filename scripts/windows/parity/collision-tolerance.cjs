@@ -1,7 +1,16 @@
 'use strict';
-// VOID — this probe does not measure what it claims. Kept because the reason it
-// fails is itself the useful finding, and because deleting a negative result is how
-// the next person repeats it.
+// REPAIRED 2026-10-07, commits f79cc3a onward. This probe WAS void — it reported
+// `NONE` at every gap and had no way to tell "no interference" from "nothing could
+// have applied" — and it now carries the control that closes that gap. The failed
+// version's reasoning is kept below because it is what motivated the control, and
+// because deleting a negative result is how the next person repeats it.
+//
+// The first repair attempt was itself wrong twice over, and both errors are kept
+// here too. It blamed the layout names, which test_layout.rs:159 shows are valid;
+// and its control checked `tiled` against an `even-horizontal` baseline, which on a
+// two-pane window is the same split, so it scored a successful apply as a failure.
+// A control that cannot distinguish "applied" from "applied and identical to the
+// baseline" is not a control.
 //
 // WHAT IT WAS FOR
 // Section 9.5 knows a collision is real, non-reproducible, and self-healing. What
@@ -34,9 +43,9 @@
 // after this one should carry one. "Nothing changed" must never be reportable
 // without a same-trial demonstration that something could have changed.
 //
-// Retiring the sweep rather than fixing it in place: a correct version needs a
-// session state where a layout reliably applies first, and establishing that is
-// the open question in 9.4, not a prerequisite this probe can assume away.
+// NO LONGER VOID. The control below was added and this sweep is now able to report
+// a tolerance number, or to report that it cannot — and the second case is now
+// visible rather than silent, which is the whole reason the control exists.
 //
 // REOPENED 2026-10-07, commit 83c3420. The paragraph above is now false. Section
 // 9.4's open question was answered: the current-window pointer DOES survive the
@@ -62,18 +71,23 @@
 // So the generalisable shape of the fix, which survives the falsification: for an
 // untargeted command, prove the invocation is capable of doing something before
 // concluding that it did nothing.
+// Each name is checked against a baseline it cannot possibly equal, or the check
+// measures the baseline instead of psmux.
+const BASELINE_FOR = { 'main-vertical': 'even-horizontal', tiled: 'main-vertical' };
+
 async function control() {
   const named = {};
   for (const name of [A, B]) {
-    p(['select-layout', '-t', S + ':1', 'even-horizontal']);
+    const baseline = BASELINE_FOR[name];
+    p(['select-layout', '-t', S + ':1', baseline]);
     sleep(700);
     const before = layouts();
     p(['select-layout', '-t', S + ':1', name]);
     sleep(700);
-    named[name] = before !== layouts();
+    named[name] = { baseline, applied: before !== layouts() };
   }
 
-  p(['select-layout', '-t', S + ':1', 'even-horizontal']);
+  p(['select-layout', '-t', S + ':1', BASELINE_FOR[A]]);
   sleep(700);
   const before = layouts();
   await spawnP(['select-window', '-t', S + ':1']);
@@ -105,7 +119,21 @@ const spawnP = (args) => new Promise((resolve) => {
 });
 
 const layouts = () => p(['list-windows', '-a', '-F', '#{window_index}|#{window_layout}']).stdout;
-const A = 'main-horizontal'; // A's layout, a top/bottom split neither window starts in
+// Both must differ from the reset layout of w1 (`even-horizontal`) or the control
+// cannot tell "applied" from "applied and identical to the reset state".
+//
+// The first version of this probe used main-horizontal for A, and the control
+// reported `tiled: false` — which contradicted test_layout.rs:159, which lists
+// tiled as accepted. The likely reason is the control's own baseline, not psmux:
+// `tiled` on a two-pane window is a balanced split, which is what
+// `even-horizontal` already is, so applying it left the observable state
+// unchanged and the control scored that as "not applied". The control was
+// measuring its own reset, not psmux.
+//
+// So A is main-vertical here, which differs from the even-horizontal reset in
+// orientation, and a successful `tiled` apply is likewise detectable because it
+// follows main-vertical rather than replacing it.
+const A = 'main-vertical';    // A's layout, a left/right split
 const B = 'tiled';           // B's layout, an even split
 
 function classify(before, after) {
@@ -170,7 +198,7 @@ async function trial(gapMs) {
   // void regardless of what the trials say.
   out.control = await control();
   out.verdict_void_reason = null;
-  if (!Object.values(out.control.layout_names_accepted).every(Boolean)) {
+  if (!Object.values(out.control.layout_names_accepted).every((r) => r.applied)) {
     out.verdict_void_reason = 'a layout name in the sweep is not accepted by psmux';
   } else if (!out.control.untargeted_applies_with_pointer_on_w1) {
     out.verdict_void_reason =
