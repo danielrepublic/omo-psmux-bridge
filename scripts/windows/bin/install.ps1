@@ -18,9 +18,14 @@
         is a silent-failure factory.
       * `setx`-free, no `~/.psmux.conf` touch, no machine PATH touch.
 
-.PARAMETER BinDir
-    Directory to put on the PATH. Defaults to the directory this script lives in,
-    which is the bridge bin directory in a real installation.
+.PARAMETER SourceRoot
+    Directory to copy the payload from. Defaults to the parent of this script's
+    own directory, which is correct for an extracted release zip and an
+    already-installed tree alike.
+
+.PARAMETER InstallRoot
+    Directory to install into. Defaults to %LOCALAPPDATA%\opencode-psmux-bridge,
+    which is also the path the shim derives its own state directory from.
 
 .OUTPUTS
     ASCII `KEY=VALUE` lines prefixed `[install]`, suitable for grepping.
@@ -34,7 +39,7 @@ param(
     # Defaults to the parent of this script's own directory, which is correct both
     # for an extracted release zip (opencode-psmux-bridge\bin\install.ps1) and for
     # an already-installed tree (%LOCALAPPDATA%\opencode-psmux-bridge\bin\...).
-    [string] $SourceRoot
+    [string] $SourceRoot,
 
     # Where the payload is going. Defaults to the documented install location,
     # which is also the path the shim derives its own state directory from.
