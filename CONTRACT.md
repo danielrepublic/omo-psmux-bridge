@@ -577,16 +577,34 @@ fails, the `if let Ok(n)` arm never fires, and there is no error: the option is
 simply never set. tmux accepts `50%`, so OmO's spelling is correct and psmux's
 parser is the defect.
 
-**Unrecorded, not measured.** No capture of this comparison exists in version
-control anywhere in this repository, so the two widths below are the source's
-arithmetic rather than an observation: INFERRED: `main_v_pct` falls back to `60`
-while the option is unset (`src/layout.rs:1096`), and `"50%".parse::<u16>()`
-fails where `"50".parse::<u16>()` succeeds (`src/server/options.rs:528`), so in a
-199-column window `set-window-option main-pane-width "50%"` should leave the main
-pane at 119 columns — psmux's own 60% default — and `… "50"` should give 99.
-What would settle it: `list-panes -a -F '#{pane_width}'` before and after each
-call, in a throwaway `-L` namespace, with the output captured into this
-repository.
+**Partly corroborated by psmux's own test suite, 2026-10-07.** Two independent
+supports for the premise, neither of which is a measurement of this bridge:
+
+- `tests-rs/test_config_exhaustive.rs:1467` → `fn cli_set_main_pane_width() {`
+- `tests-rs/test_config_exhaustive.rs:1470` → `assert_eq!(app.main_pane_width, 60);`
+
+That test drives `set-option -g main-pane-width 60` and asserts the option lands,
+so **the integer path is asserted by psmux's authors, not merely read off a
+source line.** The rejection of `"50%"` is then not an empirical claim at all but
+a guarantee of the language: `str::parse::<u16>` accepts only decimal digits, and
+there is no trailing-character allowance, so a `%` cannot survive it. Between the
+two, this rule's premise no longer rests on the author's reading of two lines.
+
+**The width arithmetic below is still not measured.** Having established that
+`50` stores 50 and `50%` stores nothing, the remaining step — that a stored 50
+then yields a 99-cell main pane in a 200-column window — is a claim about
+`apply_layout`, and `apply_layout` has **no test coverage in psmux at all**: a
+search for `apply_layout` across `tests-rs/` returns zero hits. So the last step
+is inference over `src/layout.rs:1094-1145`, unaided by any upstream assertion.
+INFERRED: `main_v_pct` falls back to `60` while the option is unset
+(`src/layout.rs:1096`), so `set-window-option main-pane-width "50%"` leaves the
+main pane at ~119 cells in a 200-column window — psmux's own 60% default — and
+`… "50"` gives ~99.
+
+What would settle it, and it is the same probe either way: `list-panes -a -F
+'#{pane_width}'` before and after each call, in a throwaway `-L` namespace, with
+both outputs captured into this repository. Until then the *storage* half of this
+rule is corroborated and its *geometry* half is argued.
 
 A value with no `%`, or any other option name, is forwarded byte-identically.
 
@@ -639,8 +657,21 @@ discarded: OmO spawns its own layout calls with `stdout: "ignore", stderr:
 a code (`index.js:8918`, `index.js:8922`), and the primary command's exit code is
 the only one OmO branches on (`index.js:8415`).
 
-**Unrecorded, not measured.** The geometry below is what the cited lines imply,
-not a result: no capture of it exists in version control in this repository.
+**Unrecorded, not measured, and not even partly corroborated.** The geometry below
+is what the cited lines imply, not a result: no capture of it exists in version
+control in this repository. Unlike rule 1a, **nothing here can be upgraded by
+psmux's own tests, because `apply_layout` has no test coverage upstream** — a
+search for `apply_layout` across `tests-rs/` at v3.3.8 returns zero hits. So
+while rule 1a's storage half is now asserted by psmux's authors
+(`tests-rs/test_config_exhaustive.rs:1470`), this rule's entire premise — that
+setting the option applies nothing until a layout runs, and that a layout then
+sizes the main pane from it — is inference over `src/layout.rs:1094-1145` with no
+upstream assertion behind it whatsoever.
+
+That asymmetry is the reason the probe below is not optional bookkeeping. Rule 1a
+is well founded; this rule is the one carrying the layout, and it rests on the
+least-tested function in the psmux codebase.
+
 INFERRED: with `main_pane_width = 50`, `src/layout.rs:1144` builds
 `sizes: vec![50, 50]` at the root and `src/layout.rs:1140-1141` gives the
 right-hand column `equal_sizes` shares, so a 200-column window should show a main
