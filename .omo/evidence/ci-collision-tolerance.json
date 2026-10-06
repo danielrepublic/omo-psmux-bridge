@@ -12,9 +12,29 @@
       "changed_windows": [
         1
       ],
+      "sample_was_midflight": true,
+      "a_landed_on": [
+        1
+      ],
+      "a_landed": true,
       "invocations_ok": true,
       "before": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}",
-      "after": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]\n1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]"
+      "mid": null,
+      "after": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]\n1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]",
+      "t_start": 1791320239687,
+      "t_apply_a": 1791320239690,
+      "t_apply_b": 1791320239694,
+      "t_end": 1791320240972,
+      "poller": {
+        "samples_in_window": 27,
+        "distinct_w1_states": [
+          "1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]"
+        ],
+        "a_layout_observed_count": 0,
+        "a_first_seen_ms_after_apply_a": null,
+        "b_layout_observed_count": 27
+      },
+      "mid_source": "in-process sample was never mid-flight (equal to `after` at every gap); see poller"
     },
     {
       "gap_ms": 50,
@@ -22,9 +42,28 @@
       "changed_windows": [
         1
       ],
+      "sample_was_midflight": false,
+      "a_landed_on": null,
+      "a_landed": false,
       "invocations_ok": true,
       "before": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}",
-      "after": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]\n1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]"
+      "mid": null,
+      "after": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]\n1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]",
+      "t_start": 1791320242364,
+      "t_apply_a": 1791320242367,
+      "t_apply_b": 1791320242438,
+      "t_end": 1791320243718,
+      "poller": {
+        "samples_in_window": 28,
+        "distinct_w1_states": [
+          "1|7f79,120x30,0,0{71x30,0,0,3,48x30,72,0,4}",
+          "1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]"
+        ],
+        "a_layout_observed_count": 2,
+        "a_first_seen_ms_after_apply_a": 1,
+        "b_layout_observed_count": 26
+      },
+      "mid_source": "in-process sample was never mid-flight (equal to `after` at every gap); see poller"
     },
     {
       "gap_ms": 150,
@@ -32,9 +71,28 @@
       "changed_windows": [
         1
       ],
+      "sample_was_midflight": false,
+      "a_landed_on": null,
+      "a_landed": false,
       "invocations_ok": true,
       "before": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}",
-      "after": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]\n1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]"
+      "mid": null,
+      "after": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]\n1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]",
+      "t_start": 1791320245079,
+      "t_apply_a": 1791320245082,
+      "t_apply_b": 1791320245242,
+      "t_end": 1791320246522,
+      "poller": {
+        "samples_in_window": 31,
+        "distinct_w1_states": [
+          "1|7f79,120x30,0,0{71x30,0,0,3,48x30,72,0,4}",
+          "1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]"
+        ],
+        "a_layout_observed_count": 4,
+        "a_first_seen_ms_after_apply_a": -2,
+        "b_layout_observed_count": 27
+      },
+      "mid_source": "in-process sample was never mid-flight (equal to `after` at every gap); see poller"
     },
     {
       "gap_ms": 400,
@@ -42,9 +100,28 @@
       "changed_windows": [
         1
       ],
+      "sample_was_midflight": false,
+      "a_landed_on": null,
+      "a_landed": false,
       "invocations_ok": true,
       "before": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}",
-      "after": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]\n1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]"
+      "mid": null,
+      "after": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]\n1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]",
+      "t_start": 1791320247871,
+      "t_apply_a": 1791320247874,
+      "t_apply_b": 1791320248284,
+      "t_end": 1791320249564,
+      "poller": {
+        "samples_in_window": 36,
+        "distinct_w1_states": [
+          "1|7f79,120x30,0,0{71x30,0,0,3,48x30,72,0,4}",
+          "1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]"
+        ],
+        "a_layout_observed_count": 9,
+        "a_first_seen_ms_after_apply_a": 26,
+        "b_layout_observed_count": 27
+      },
+      "mid_source": "in-process sample was never mid-flight (equal to `after` at every gap); see poller"
     },
     {
       "gap_ms": 1000,
@@ -52,9 +129,28 @@
       "changed_windows": [
         1
       ],
+      "sample_was_midflight": false,
+      "a_landed_on": null,
+      "a_landed": false,
       "invocations_ok": true,
       "before": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}",
-      "after": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]\n1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]"
+      "mid": null,
+      "after": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]\n1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]",
+      "t_start": 1791320250935,
+      "t_apply_a": 1791320250938,
+      "t_apply_b": 1791320251942,
+      "t_end": 1791320253212,
+      "poller": {
+        "samples_in_window": 47,
+        "distinct_w1_states": [
+          "1|7f79,120x30,0,0{71x30,0,0,3,48x30,72,0,4}",
+          "1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]"
+        ],
+        "a_layout_observed_count": 21,
+        "a_first_seen_ms_after_apply_a": 35,
+        "b_layout_observed_count": 26
+      },
+      "mid_source": "in-process sample was never mid-flight (equal to `after` at every gap); see poller"
     },
     {
       "gap_ms": 2500,
@@ -62,25 +158,57 @@
       "changed_windows": [
         1
       ],
+      "sample_was_midflight": false,
+      "a_landed_on": null,
+      "a_landed": false,
       "invocations_ok": true,
       "before": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}",
-      "after": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]\n1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]"
+      "mid": null,
+      "after": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]\n1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]",
+      "t_start": 1791320254570,
+      "t_apply_a": 1791320254573,
+      "t_apply_b": 1791320257091,
+      "t_end": 1791320258371,
+      "poller": {
+        "samples_in_window": 80,
+        "distinct_w1_states": [
+          "1|7f79,120x30,0,0{71x30,0,0,3,48x30,72,0,4}",
+          "1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]"
+        ],
+        "a_layout_observed_count": 53,
+        "a_first_seen_ms_after_apply_a": 12,
+        "b_layout_observed_count": 27
+      },
+      "mid_source": "in-process sample was never mid-flight (equal to `after` at every gap); see poller"
     }
   ],
   "control": {
     "layout_names_accepted": {
       "main-vertical": {
         "baseline": "even-horizontal",
+        "observed": "0|42ad,120x30,0,0[120x14,0,0,1,120x15,0,15,2]\n1|7f79,120x30,0,0{71x30,0,0,3,48x30,72,0,4}",
         "applied": true
       },
       "even-vertical": {
         "baseline": "main-vertical",
+        "observed": "0|42ad,120x30,0,0[120x14,0,0,1,120x15,0,15,2]\n1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]",
         "applied": true
       }
     },
-    "untargeted_applies_with_pointer_on_w1": true
+    "untargeted_applies_with_pointer_on_w1": true,
+    "tiled_aliasing": {
+      "baseline": "0|42ad,120x30,0,0[120x14,0,0,1,120x15,0,15,2]\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}",
+      "after_tiled": "0|42ad,120x30,0,0[120x14,0,0,1,120x15,0,15,2]\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}",
+      "aliased_with_reset": true
+    }
   },
   "verdict_void_reason": null,
+  "poller": {
+    "total_samples": 415,
+    "a_tree": "1|7f79,120x30,0,0{71x30,0,0,3,48x30,72,0,4}",
+    "b_tree": "1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]",
+    "usable": true
+  },
   "verdict": {
     "control_passed": true,
     "invocations_all_succeeded": true,
@@ -94,7 +222,17 @@
     },
     "smallest_undisturbed_gap_ms": 0,
     "clean_outcomes": 6,
-    "disturbed_outcomes": 0
+    "disturbed_outcomes": 0,
+    "a_observed_by_gap": {
+      "0": 0,
+      "50": 2,
+      "150": 4,
+      "400": 9,
+      "1000": 21,
+      "2500": 53
+    },
+    "a_observed_at_every_gap": false,
+    "in_process_sample_ever_midflight": true
   },
   "after_teardown": ""
 }

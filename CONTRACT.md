@@ -1850,12 +1850,52 @@ and exited, which is why `NONE` was expected at every gap. That expectation was
 built on a baseline collision. Once the baseline stopped being reproducible, layouts
 applied at every gap including zero. There was no inertness to find.
 
-**What this sweep still cannot tell you.** It samples only before and after, so it
-cannot distinguish "A applied, then B applied" from "only B applied" — A's effect is
-overwritten either way, and both produce `CHANGED_ONE` on w1. So it shows the
-outcome is *deterministic and clean*, not that both clients' calls did their job. A
-mid-flight sample between the two calls would settle it, and is the obvious next
-probe.
+**A concurrent poller settles what the sweep could not.** The sweep samples only
+before and after, so `CHANGED_ONE` on w1 is equally consistent with "A applied then B
+overwrote it" and "only B applied" — B's layout is the end state either way, and A's
+effect is gone before anything looks.
+
+The obvious fix — sample between the two applies — does not work, and the artifact
+shows why. `layouts()` is a `spawnSync`, so it blocks the event loop and both applies
+have finished by the time it returns. The first attempt recorded `mid` and, at every
+gap, `mid` was byte-identical to `after`: the sample was the end state wearing a
+mid-flight label, and `a_landed_at_every_gap: true` was crediting A for a change B had
+already made. Moving the sample earlier is not available either — it delays B's spawn
+and changes the very gap the sweep exists to vary.
+
+So the observer is replaced rather than repositioned. A **second process** polls
+`list-windows` on its own clock, appending `{t, windows}` per snapshot, while the sweep
+issues its applies. Each trial brackets itself with timestamps and the two timelines
+are joined afterwards, so observing delays nothing it observes. A's and B's expected
+trees come from the control, which already records what each name produces, so the
+comparison is against a measured reference.
+
+| gap (ms) | 0 | 50 | 150 | 400 | 1000 | 2500 |
+|---|---|---|---|---|---|---|
+| snapshots taken in the trial window | 27 | 28 | 31 | 36 | 47 | 80 |
+| distinct states w1 held | **1** | **2** | **2** | **2** | **2** | **2** |
+| snapshots showing A's layout | **0** | 2 | 4 | 9 | 21 | 53 |
+| first sighting, ms after A's apply | — | 1 | −2 | 26 | 35 | 12 |
+
+**A's layout is delivered and then overwritten, at every gap the poller can resolve.**
+From 50 ms upward w1 genuinely holds two different states — A's tree, then B's — and A's
+first appearance is always within ~35 ms of its apply. That is the discarded-work
+mechanism of 9.5, measured here without disturbing the sequence.
+
+**At gap 0 the poller saw nothing, and that is the observer's limit rather than psmux's.**
+The poller polls through `spawnSync`, so its real interval is tens of milliseconds —
+longer than the whole gap. `a_observed_by_gap` reports this per gap precisely so that
+"not observed at gap 0" stays distinguishable from "not observed anywhere". The sweep's
+tolerance conclusion is unaffected: it concerns whether a *disturbed* outcome appears,
+and none did at any gap.
+
+**One overstatement of my own, caught by the key added to catch it.** The in-process
+sample was described as *never* mid-flight, on the strength of one run where it was not.
+`in_process_sample_ever_midflight` records that it was, at least once, in a later run —
+which is what an unreliable observer looks like, as opposed to an impossible one. The
+claim that survives is the weaker and correct one: the in-process sample is not a
+trustworthy mid-flight observer, which is why the poller exists. `mid` is `null` in every
+trial and `mid_source` says why.
 
 **The rule, learned twice.** A probe that concludes "nothing happened" from an
 unchanged end state must be able to prove the operation *could* have changed that
