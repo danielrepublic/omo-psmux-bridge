@@ -155,16 +155,22 @@ function concurrentTrial(tag, clientA, clientB, pauseMs) {
   p(['select-layout', '-t', S + ':1', 'tiled']);
   sleep(1500);
   const recovered = layouts();
-  const wanted = [
-    p(['list-windows', '-t', S + ':0', '-F', '#{window_layout}']).stdout,
-    p(['list-windows', '-t', S + ':1', '-F', '#{window_layout}']).stdout,
-  ];
+  // `list-windows -t` does NOT filter: both targeted calls return every window, so
+  // asking for one window's layout yields the whole list and comparing that
+  // against a per-window reference can never match. The first run of this repair
+  // check reported repair_succeeded: false for exactly that reason, while the
+  // geometry in the artifact was in fact correct. The reference is therefore the
+  // whole window list, read once, and the comparison is index-for-index on it.
+  const wantedLayouts = p(['list-windows', '-a', '-F', '#{window_index}|#{window_layout}']).stdout
+    .split('\n').map((l) => l.split('|')[1]);
+  const recoveredLayouts = recovered.split('\n').map((l) => l.split('|')[1]);
   out.recovery = {
     after_collision: collided.after,
     after_targeted_repair: recovered,
-    wanted_layouts: wanted,
-    repair_succeeded: recovered.split('\n').map((l) => l.split('|')[1]).join('|')
-      === wanted.join('|'),
+    wanted_layouts: wantedLayouts,
+    recovered_layouts: recoveredLayouts,
+    repair_succeeded: wantedLayouts.length === recoveredLayouts.length
+      && wantedLayouts.every((w, i) => w === recoveredLayouts[i]),
   };
 
   const landing = (rec) => rec.changed_windows.map((w) => w.window).sort();
