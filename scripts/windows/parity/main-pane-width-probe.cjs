@@ -110,6 +110,26 @@ const d = record('D: select-layout first, for contrast', p(['select-layout', 'ma
 record('D2: then set main-pane-width "40"', p(['set-window-option', 'main-pane-width', '40']));
 const d2 = record('D3: geometry after setting the option with no layout after it', { invocation: ['(none)'], status: 0, stderr: '' });
 
+// E — the risk section 9.4 raises, applied to rule 1b rather than to select-layout
+// on its own. Its survival probe found that a `select-window` issued by a process
+// which then EXITS leaves an untargeted layout doing nothing at all. Every step
+// above is a bare option-set followed by a bare layout, with no `select-window`
+// anywhere. A real OmO session is not guaranteed to be that tidy, so: put a
+// `select-window` from a process that exits BETWEEN rule 1b's option and its
+// follow-up, and see whether the follow-up still applies the stored size.
+//
+// This is the sequence rule 1b actually emits, plus one command it does not emit.
+// If the share still reaches ~0.5, the intervening selection is harmless. If it
+// stays at 0.6, then rule 1b's remedy is conditional on nothing else having
+// touched the window in between, which is a property worth knowing.
+p(['set-window-option', 'main-pane-width', '60']);
+p(['select-layout', 'main-vertical']);
+sleep(1200);
+record('E0: reset to 60 for contrast', { invocation: ['(reset)'], status: 0, stderr: '' });
+p(['set-window-option', 'main-pane-width', '50']);
+p(['select-window', '-t', S + ':0']);
+const e = record('E: follow-up AFTER a select-window from an exited process', p(['select-layout', 'main-vertical']));
+
 // Verdict computed here rather than left to the reader, because the whole point
 // is that a bare percentage with no denominator is not evidence.
 out.verdict = {
@@ -117,6 +137,12 @@ out.verdict = {
   rule_1b_option_alone_inert: b.main_share === base.main_share,
   rule_1b_followup_applies: c.main_share !== null && Math.abs(c.main_share - 0.5) < 0.03,
   rule_1b_order_matters: d2.main_share === c.main_share,
+  // E: does an intervening `select-window` from a process that exits disarm the
+  // follow-up? Null when the share is unreadable, which is not the same as false.
+  rule_1b_survives_intervening_select_window: e.main_share === null
+    ? null
+    : Math.abs(e.main_share - 0.5) < 0.03,
+  e_share: e.main_share,
   baseline_share: base.main_share,
   shares: Object.fromEntries(out.steps.map((s) => [s.tag, s.main_share])),
 };
