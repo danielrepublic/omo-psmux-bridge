@@ -759,6 +759,35 @@ count that means "cell count" to it:
 - `src/server/connection.rs:1768` → `if let Some(pct) = xval.strip_suffix('%').and_then(|n| n.parse::<u8>().ok()) {`
 - `src/server/connection.rs:1770` → `} else if let Ok(abs) = xval.parse::<u16>() {`
 
+**The parser looks correct, and stopping there concludes this rule is
+unnecessary. That conclusion is wrong, and the mistake is worth naming because it
+is the obvious one.** The two cited lines really do route a bare `-x 99` to
+`ResizePaneAbsolute` rather than to the percentage arm — read in isolation they
+look like working tmux semantics, and a reader who stops at the parse will
+conclude rule 1c is superfluous.
+
+The defect is one layer down, in what `resize_pane_absolute` does with the number:
+
+- `src/window_ops.rs:1782` → `let new = target.max(1);`
+- `src/window_ops.rs:1784` → `sizes[idx] = new;`
+
+`sizes` is a vector of **proportions, not pixels**, and this is settled by the
+consumer rather than by the writer. `split_with_gaps` normalises:
+
+- `src/tree.rs:21` → `let total_pct: u32 = sizes.iter().map(|&s| s as u32).sum();`
+- `src/tree.rs:31` → `let s = ((total_available as u32 * pct as u32) / total_pct) as u16;`
+
+The variable is named `total_pct`, the divisor is the sum, and each child is a
+share of the whole. So a cell count written into `sizes` is re-read as a
+percentage of the window. Worked through, against the `[60, 40]` root below:
+`sizes[0] = 99`, `diff = 99 - 60 = 39`, `sizes[1] = (40 - 39).max(1) = 1`, and
+`split_with_gaps` then hands the main pane `total_available * 99 / 100`.
+
+**`-x 99` therefore yields 99% of the window's width, not 99 columns.** That is
+the whole defect, and it is invisible at the parse site. Anything that stops at
+`connection.rs:1768`/`1770` will conclude this bridge suppresses a command psmux
+handles correctly, and that conclusion is wrong.
+
 What the cited parser settles without a host run, and what it does not:
 
 - `-x -20`: `strip_suffix('%')` yields nothing and `parse::<u16>()` fails on a
