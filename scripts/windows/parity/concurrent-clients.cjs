@@ -56,35 +56,41 @@ sleep(1500);
 
 const out = { namespace: NS, session: S, baseline: layouts(), trials: [] };
 
-// Each trial resets both windows, then starts two processes at once. The pause
-// between select-window and select-layout is what creates the overlap: without it
-// the first process finishes before the second starts and the trial measures
-// nothing about concurrency.
-function concurrentTrial(tag, targetA, layoutA, targetB, layoutB, pauseMs) {
+// Both phases run as pairs of genuinely overlapping psmux processes.
+//
+// An earlier version drove each client through `cmd.exe /c "…"` to get a pause
+// between its two commands. It never ran: quoting a Windows path through Node's
+// spawn into cmd.exe produced `\"C:\\…\\tmux.exe\"` as a literal, and every
+// invocation exited 1. Both trials then reported "nothing changed", which read as
+// a finding and was not one. So: no shell, direct spawn, and the overlap comes
+// from starting a pair at the same time rather than from pausing inside one.
+const spawnP = (args) => new Promise((resolve) => {
+  const ps = spawn(REAL, ['-L', NS].concat(args), { windowsHide: true });
+  let stderr = '';
+  ps.stderr.on('data', (d) => { stderr += String(d); });
+  ps.on('close', (code) => resolve({ args, exit: code, stderr: stderr.trim() }));
+});
+
+// Each trial resets both windows, then runs both clients with their two phases
+// overlapped.
+function concurrentTrial(tag, clientA, clientB, pauseMs) {
   p(['select-layout', '-t', S + ':0', 'main-vertical']);
   p(['select-layout', '-t', S + ':1', 'even-horizontal']);
   sleep(1200);
   const before = layouts();
 
-  // Both psmux calls live inside ONE spawned shell, so the pause between them
-  // belongs to a single process and the overlap is real rather than a gap between
-  // two spawnSync round-trips.
-  const run = (target, layout) => new Promise((resolve) => {
-    const ps = spawn(
-      'cmd.exe',
-      ['/d', '/s', '/c', [
-        `"${REAL}" -L ${NS} select-window -t ${target}`,
-        pauseMs ? `&& timeout /t ${Math.ceil(pauseMs / 1000)} /nobreak >nul` : '',
-        `&& "${REAL}" -L ${NS} select-layout ${layout}`,
-      ].filter(Boolean).join(' ')],
-      { windowsHide: true },
-    );
-    let stderr = '';
-    ps.stderr.on('data', (d) => { stderr += String(d); });
-    ps.on('close', (code) => resolve({ target, layout, exit: code, stderr: stderr.trim() }));
-  });
-
-  return Promise.all([run(targetA, layoutA), run(targetB, layoutB)]).then((results) => {
+  return Promise.all([
+    // Phase 1: both clients name a different window, at the same time.
+    spawnP(['select-window', '-t', clientA.target]),
+    spawnP(['select-window', '-t', clientB.target]),
+  ]).then((selects) => new Promise((resolve) => {
+    sleep(pauseMs);
+    // Phase 2: both apply an untargeted layout, at the same time.
+    Promise.all([
+      spawnP(['select-layout', clientA.layout]),
+      spawnP(['select-layout', clientB.layout]),
+    ]).then((applies) => resolve({ selects, applies }));
+  })).then((r) => {
     sleep(1500);
     const after = layouts();
     const b = before.split('\n');
@@ -93,7 +99,16 @@ function concurrentTrial(tag, targetA, layoutA, targetB, layoutB, pauseMs) {
     for (let i = 0; i < Math.max(b.length, a.length); i += 1) {
       if (b[i] !== a[i]) changed.push({ window: i, before: b[i], after: a[i] });
     }
-    const rec = { tag, pause_ms: pauseMs, before, after, results, changed_windows: changed };
+    const rec = {
+      tag,
+      pause_ms: pauseMs,
+      client_a: { target: clientA.target, layout: clientA.layout },
+      client_b: { target: clientB.target, layout: clientB.layout },
+      invocations: [...r.selects, ...r.applies],
+      before,
+      after,
+      changed_windows: changed,
+    };
     out.trials.push(rec);
     return rec;
   });
@@ -104,8 +119,8 @@ function concurrentTrial(tag, targetA, layoutA, targetB, layoutB, pauseMs) {
   // window does not already have.
   const t1 = await concurrentTrial(
     'two clients, distinct targets, concurrent',
-    S + ':0', 'main-horizontal',
-    S + ':1', 'tiled',
+    { target: S + ':0', layout: 'main-horizontal' },
+    { target: S + ':1', layout: 'tiled' },
     700,
   );
 
@@ -113,22 +128,34 @@ function concurrentTrial(tag, targetA, layoutA, targetB, layoutB, pauseMs) {
   // concurrency matter or would this happen anyway".
   const t2 = await concurrentTrial(
     'two clients, distinct targets, long pause',
-    S + ':0', 'main-horizontal',
-    S + ':1', 'tiled',
+    { target: S + ':0', layout: 'main-horizontal' },
+    { target: S + ':1', layout: 'tiled' },
     2500,
   );
 
   const landing = (rec) => rec.changed_windows.map((w) => w.window).sort();
+
+  // A trial whose invocations did not all succeed has measured NOTHING, and
+  // "nothing changed" is exactly what a broken trial looks like. The first run of
+  // this probe reported an empty result for both trials for precisely that
+  // reason — every cmd.exe invocation exited 1 — and it read as a finding.
+  // So the verdict refuses to speak unless the mechanism demonstrably ran.
+  const failed = out.trials.flatMap((t) => t.invocations.filter((i) => i.exit !== 0));
+  const measured = failed.length === 0;
+
   out.verdict = {
+    invocations_all_succeeded: measured,
+    failed_invocations: failed.map((f) => ({ args: f.args, exit: f.exit, stderr: f.stderr.slice(0, 200) })),
     concurrent_landed: landing(t1),
     serialised_landed: landing(t2),
     // The decision-relevant question: did both clients get their own window, or
     // did they collide on one because `active_idx` is global server state?
-    both_got_their_own_window: JSON.stringify(landing(t1)) === JSON.stringify([0, 1]),
-    collided_on_one_window: landing(t1).length === 1,
+    both_got_their_own_window: measured && JSON.stringify(landing(t1)) === JSON.stringify([0, 1]),
+    collided_on_one_window: measured && landing(t1).length === 1,
     // If concurrency and serialisation give the same answer, the trial is not
     // measuring concurrency at all and the verdict should not be read as one.
-    concurrency_changed_the_outcome: JSON.stringify(landing(t1)) !== JSON.stringify(landing(t2)),
+    concurrency_changed_the_outcome:
+      measured && JSON.stringify(landing(t1)) !== JSON.stringify(landing(t2)),
   };
 
   p(['kill-session', '-t', S]);
