@@ -574,17 +574,32 @@ jobs:
           # scratch so __MACOSX/ and .DS_Store cannot be present, and excluding
           # them by name means a future step that copies a developer's home
           # directory into the stage still cannot ship Finder debris.
-          zip -r -9 "$ZIP_PATH" "$STAGE_PKG" \
+          #
+          # -D stores no DIRECTORY entries. Without it `zip -r` records one entry
+          # per directory (`opencode-psmux-bridge/`, `.../bin/`, `.../runtime/`),
+          # and then `unzip -l` counts 14 entries against 11 files. The archive
+          # would still be correct -- an extraction recreates the directories from
+          # the file paths -- but a count that silently includes directories is not
+          # a count a reader can check against the tree, and the count IS the gate
+          # that proves the zip is what was staged. Fewer, honest entries.
+          zip -r -9 -D "$ZIP_PATH" "$STAGE_PKG" \
             -x '*__MACOSX*' '*/.DS_Store' '.DS_Store' > /dev/null
 
           # Read the archive back rather than trusting the staging directory:
           # the zip is what a user receives, so the zip is what gets counted.
           ZIP_LIST_TOTALS=$(unzip -l "$ZIP_PATH" | tail -n 1)
           ZIP_UNCOMP_BYTES=$(printf '%s\n' "$ZIP_LIST_TOTALS" | awk '{print $1}')
-          ZIP_FILE_COUNT=$(printf '%s\n' "$ZIP_LIST_TOTALS" | awk '{print $2}')
 
-          if ! printf '%s\n' "$ZIP_FILE_COUNT" | grep -Eq '^[0-9]+$'; then
-            echo "::error title=archive::could not read a file count out of 'unzip -l $ZIP_PATH' (last line was: ${ZIP_LIST_TOTALS}). The archive may be truncated or corrupt."
+          # Files only, counted independently of whether -D was honoured. Taking
+          # the count from `unzip -l`'s totals row would silently change meaning
+          # if directory entries came back, which is exactly the confusion this
+          # step exists to catch. `awk` always exits 0, so an empty archive
+          # reaches the comparison below and fails there with a real message,
+          # rather than aborting on `grep`'s exit code under `set -e`.
+          ZIP_FILE_COUNT=$(unzip -Z1 "$ZIP_PATH" | awk '!/\/$/' | wc -l)
+
+          if ! printf '%s\n' "$ZIP_UNCOMP_BYTES" | grep -Eq '^[0-9]+$'; then
+            echo "::error title=archive::could not read an uncompressed size out of 'unzip -l $ZIP_PATH' (last line was: ${ZIP_LIST_TOTALS}). The archive may be truncated or corrupt."
             exit 1
           fi
 
