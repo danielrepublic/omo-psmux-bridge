@@ -1949,10 +1949,39 @@ is discarded before dispatch. The mitigation available is the one measured above
 later targeted call repairs it, so the exposure is a dropped layout for one frame, not
 a permanently mislaid-out session.
 
-**Not established.** Whether A's layout landed briefly on w1 before B overwrote it is
-not observable here — the probe samples before and after, so "discarded" and "never
-computed" look identical, the same limitation the tolerance sweep has. More than two
-clients, more than two windows, and a real OmO team-mode sequence remain uncovered.
+**The mechanism is now measured, not inferred.** Trials 1-3 start both applies with
+`Promise.all`, so nothing is observable between them and `changed: [1]` is equally
+consistent with A's layout being computed and overwritten and with it never being
+computed. A fourth trial staggers phase 2 and samples the gap. Phase 2 is serial there
+and parallel in trials 1-3, so its record is kept **out of `out.trials`** and labelled
+`phase 2 staggered (serial), NOT pooled with trials 1-3` — pooling a different condition
+into one series is what produced both earlier errors in this file.
+
+| sample | w0 | w1 |
+|---|---|---|
+| before | `b7ad` stacked | `7899` side-by-side |
+| after both `select-window` | `b7ad` | `7899` — unchanged, as expected |
+| **mid — after A alone** | `b7ad` | **`b7b2` stacked** |
+| after B | `b7ad` | `42b2` stacked |
+
+Client A named **w0** and applied `main-horizontal`. Mid-flight, **w1** moved from
+`7899` to `b7b2`, a `main-horizontal`-shaped tree (120x17 over 120x12) that only A's
+apply could have produced. A's layout was therefore computed — against the pointer B
+had already moved — and then overwritten by B's `even-vertical` (`42b2`). Last-writer-wins
+on a global pointer is confirmed, and "discarded" is now distinguished from "never
+computed".
+
+**A flaw in that trial, recorded because it weakens one of its two observations.**
+w0 was reset to `main-horizontal`, which is *also* client A's layout, so w0 sitting
+unchanged proves nothing on its own — it would look identical whether A's apply landed
+there correctly or not. The reset should have been a layout A does not use. The
+conclusion does not rest on w0: w1's mid-flight change to a tree only A can produce is
+independent of it, and that is the load-bearing evidence.
+
+**Still not covered.** More than two clients, more than two windows, and a real OmO
+team-mode sequence. The tolerance sweep shares the before/after-only limitation, though
+its question — whether either layout applied — is answered, since its control applies
+one and observes it.
 
 **Scope.** One session, two windows, two clients, v3.3.8.
 

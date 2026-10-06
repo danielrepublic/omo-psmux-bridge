@@ -108,12 +108,12 @@
         }
       ],
       "before": "0|7f70,120x30,0,0{71x30,0,0,1,48x30,72,0,2}|2p\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}|2p",
-      "after": "0|7f70,120x30,0,0{71x30,0,0,1,48x30,72,0,2}|2p\n1|b7b2,120x30,0,0[120x17,0,0,3,120x12,0,18,4]|2p",
+      "after": "0|7f70,120x30,0,0{71x30,0,0,1,48x30,72,0,2}|2p\n1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]|2p",
       "changed_windows": [
         {
           "window": 1,
           "before": "1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}|2p",
-          "after": "1|b7b2,120x30,0,0[120x17,0,0,3,120x12,0,18,4]|2p"
+          "after": "1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]|2p"
         }
       ]
     },
@@ -175,6 +175,72 @@
       ]
     }
   ],
+  "staggered": {
+    "tag": "staggered phase 2, sampled between the two applies",
+    "condition": "phase 2 staggered (serial), NOT pooled with trials 1-3",
+    "client_a": {
+      "target": "race:0",
+      "layout": "main-horizontal"
+    },
+    "client_b": {
+      "target": "race:1",
+      "layout": "even-vertical"
+    },
+    "invocations": [
+      {
+        "args": [
+          "select-window",
+          "-t",
+          "race:0"
+        ],
+        "exit": 0,
+        "stderr": ""
+      },
+      {
+        "args": [
+          "select-window",
+          "-t",
+          "race:1"
+        ],
+        "exit": 0,
+        "stderr": ""
+      },
+      {
+        "args": [
+          "select-layout",
+          "main-horizontal"
+        ],
+        "exit": 0,
+        "stderr": ""
+      },
+      {
+        "args": [
+          "select-layout",
+          "even-vertical"
+        ],
+        "exit": 0,
+        "stderr": ""
+      }
+    ],
+    "before": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]|2p\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}|2p",
+    "after_selects": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]|2p\n1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}|2p",
+    "mid": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]|2p\n1|b7b2,120x30,0,0[120x17,0,0,3,120x12,0,18,4]|2p",
+    "after": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]|2p\n1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]|2p",
+    "changed_by_a_alone": [
+      {
+        "window": 1,
+        "before": "1|7899,120x30,0,0{59x30,0,0,3,60x30,60,0,4}|2p",
+        "after": "1|b7b2,120x30,0,0[120x17,0,0,3,120x12,0,18,4]|2p"
+      }
+    ],
+    "changed_by_b_alone": [
+      {
+        "window": 1,
+        "before": "1|b7b2,120x30,0,0[120x17,0,0,3,120x12,0,18,4]|2p",
+        "after": "1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]|2p"
+      }
+    ]
+  },
   "recovery": {
     "after_collision": "0|7f70,120x30,0,0{71x30,0,0,1,48x30,72,0,2}|2p\n1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]|2p",
     "after_targeted_repair": "0|b7ad,120x30,0,0[120x17,0,0,1,120x12,0,18,2]|2p\n1|42b2,120x30,0,0[120x14,0,0,3,120x15,0,15,4]|2p",
