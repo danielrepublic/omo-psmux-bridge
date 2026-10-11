@@ -29,7 +29,7 @@
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -697,8 +697,13 @@ function helperSuite({ label, exe, slow, lossyNativeBinding }: SuiteOptions): vo
           "0",
           ...tokens,
         ]);
-        // Then: --cwd was honoured, so the pane started where it was told to
-        expect(observed.cwd.toLowerCase()).toBe(dir.toLowerCase());
+        // Then: --cwd was honoured, so the pane started where it was told to.
+        // By filesystem identity, not by string: Windows spells one directory
+        // several ways. CI's profile `runneradmin` exceeds 8.3, so `RUNNER~1`
+        // also names it; a profile like `Daniel` has no alias to catch this.
+        const reported = realpathSync.native(observed.cwd);
+        const requested = realpathSync.native(dir);
+        expect(reported).toBe(requested);
       });
 
       qa("the pane command's own exit code is propagated", () => {
