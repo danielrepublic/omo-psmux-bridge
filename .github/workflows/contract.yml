@@ -148,3 +148,25 @@ jobs:
 
       - name: Type check
         run: bunx tsc --noEmit
+
+  windows-tests:
+    name: Native Windows regression tests
+    runs-on: windows-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Install Bun ${{ env.BUN_VERSION }}
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies
+        shell: pwsh
+        run: bun install --frozen-lockfile
+
+      - name: Run tests on Windows
+        shell: pwsh
+        run: bun test
