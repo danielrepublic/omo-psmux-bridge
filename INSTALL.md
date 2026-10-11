@@ -4,7 +4,7 @@ A `tmux` shim, so that opencode's `oh-my-openagent` (OmO) plugin can open subage
 panes under [psmux](https://github.com/psmux/psmux) instead of real tmux. No WSL,
 no Git Bash, no Cygwin.
 
-Verified against **psmux 3.3.8**.
+Verified against **psmux 3.3.8** and **OmO 5.1.30**.
 
 ---
 
@@ -28,18 +28,30 @@ plugin.
 `[opencode].tmux.enabled` defaults to **`false`** in the OmO plugin. With it off,
 the plugin never attempts to spawn a pane — so there is nothing to report.
 
-Open your opencode config (`opencode.json` or `opencode.jsonc`) and make sure it
-contains:
+There are two different configuration files. Register the plugin in your
+OpenCode config (`opencode.json` or `opencode.jsonc`):
 
 ```json
 {
-  "plugin": ["oh-my-openagent@5.1.18"],
-
-  "tmux": { "enabled": true }
+  "plugin": ["oh-my-openagent@5.1.30"]
 }
 ```
 
-Merge it into the config you already have; do not replace the whole file.
+Enable the pane integration in your **OmO** config,
+`%USERPROFILE%\.omo\omo.jsonc`, not in the OpenCode config:
+
+```json
+{
+  "[opencode]": {
+    "tmux": { "enabled": true }
+  }
+}
+```
+
+Merge these settings into the files you already have; do not replace either
+whole file or overwrite an existing `[opencode]` block. OmO also accepts
+`omo.json` when `omo.jsonc` is absent. A project's `.omo/omo.jsonc` can override
+user settings, so check that file too when a project behaves differently.
 
 The installer **reports** this setting and warns you if it is off. It does not
 edit the file for you, because that file is yours and a setting applied silently
@@ -110,11 +122,14 @@ Now subagent panes should open.
 ## Team mode
 
 OmO's team visualization (`team_create` and friends) needs one more setting
-beyond Step 0. In the same opencode config:
+beyond Step 0. Add it alongside `tmux` in the same OmO `[opencode]` block:
 
 ```json
 {
-  "team_mode": { "enabled": true, "tmux_visualization": true }
+  "[opencode]": {
+    "tmux": { "enabled": true },
+    "team_mode": { "enabled": true, "tmux_visualization": true }
+  }
 }
 ```
 
@@ -163,7 +178,8 @@ bin\uninstall.ps1
 bin\bridge-doctor.ps1  bin\bridge-doctor.cmd
 bin\psmux.cmd  bin\opencode.cmd  bin\omo-opencode-port.ps1
 runtime\Start-PaneFromDescriptor.ps1
-state\                           call log, created on first use
+bin\state\                       shim call log, created on first use
+state\                           per-pane helper traces, created on first use
 ```
 
 That `bin` directory is first on `PATH` and therefore **shadows** three command
@@ -197,7 +213,7 @@ psmux that was already running, every pane that server opens will keep resolving
 the old `tmux`. Quit psmux entirely and start it again.
 
 Every invocation is also logged to
-`%LOCALAPPDATA%\opencode-psmux-bridge\state\shim-calls.jsonl`, one line per
+`%LOCALAPPDATA%\opencode-psmux-bridge\bin\state\shim-calls.jsonl`, one line per
 call, with credential values redacted.
 
 ---
@@ -213,7 +229,8 @@ order, never touches the machine `PATH`, and reports whether the directory itsel
 could be deleted right now. Deleting
 `%LOCALAPPDATA%\opencode-psmux-bridge` afterwards leaves nothing behind.
 
-Remember to also set `"tmux": { "enabled": false }` or remove the key in Step 0,
+Remember to also set `"tmux": { "enabled": false }` or remove the key in the
+OmO `[opencode]` block from Step 0,
 otherwise opencode still believes it should be managing panes.
 
 ---
