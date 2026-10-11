@@ -217,9 +217,17 @@ function Get-PsmuxBackend {
     }
 }
 
-# The opencode configuration file: where the OmO plugin is declared and where
-# tmux.enabled lives. Returns '' when there is none, which is a legitimate state
-# for a machine that has opencode installed but not yet configured.
+# The OPENCODE configuration file: the one that declares plugins. This is NOT the
+# file that carries tmux.enabled -- see Get-OmoConfigPath for that, and the
+# distinction is the whole reason both functions exist.
+#
+# Confusing the two is not a style problem. `tmux.enabled` is read by
+#   isTmuxIntegrationEnabled(pluginConfig)  -> pluginConfig.tmux?.enabled ?? false
+# (index.js:141083-141084), and pluginConfig is the `[opencode]` block of the OMO
+# config chain (index.js:26288-26302, appendViews(..., block, "[opencode].")).
+# Probing the opencode config for a top-level "tmux" block therefore reports on a
+# key that is never read, in a file that never carries it, so the installer could
+# print TRUE while panes still did not appear, or FALSE on a fully working setup.
 function Get-OpencodeConfigPath {
     $roots = @()
     if (-not [string]::IsNullOrEmpty($env:USERPROFILE)) {
@@ -240,38 +248,161 @@ function Get-OpencodeConfigPath {
     return ''
 }
 
-# Whether the opencode config turns the tmux integration on.
+# The OMO user config file -- the one that actually gates subagent panes.
 #
-# A TEXTUAL probe, deliberately not a JSONC parse. `opencode.jsonc` is JSON with
-# comments and trailing commas; parsing it properly needs a real parser, and a
-# hand-rolled one that is confidently wrong is worse than a probe that admits what
-# it knows. Only two facts matter here: is there a tmux block, and does its
-# `enabled` read true. Five honest answers:
+# Resolved exactly the way the installed bundle resolves it, so this installer
+# cannot advise about a file OmO never opens:
 #
-#   NO_CONFIG  no opencode config found at all
-#   UNREADABLE a config exists but could not be read
-#   ABSENT     a config exists, with no tmux block, or none with enabled in it
-#   FALSE      a tmux block exists and its enabled is false
-#   TRUE       a tmux block exists and its enabled is true
+#   index.js:21410  function resolveHomeDir(env = process.env) {
+#   index.js:21411    const homeDir = env.HOME ?? env.USERPROFILE ?? process.cwd();
+#   index.js:21420  function detectUserOmoJsonPath(env, fileSystem) {
+#   index.js:21422    const jsoncPath = join(configDir, "omo.jsonc");
+#   index.js:21423    if (fileSystem.existsSync(jsoncPath)) return jsoncPath;
+#   index.js:21425    const jsonPath = join(configDir, "omo.json");
+#   index.js:21426    return fileSystem.existsSync(jsonPath) ? jsonPath : jsoncPath;
 #
-# The 400-character bound on the block body stops an unrelated `enabled` further
-# down the file from being read as this one.
-function Read-TmuxEnabled {
+# `??` is NULL coalescing, not truthiness: an EMPTY HOME still wins over
+# USERPROFILE. -not [string]::IsNullOrEmpty would diverge here, so this tests
+# $null exactly as the bundle does. Returns '' only when no home is derivable.
+function Get-OmoConfigPath {
+    $homeDir = ''
+    if ($null -ne $env:HOME) { $homeDir = $env:HOME }
+    elseif ($null -ne $env:USERPROFILE) { $homeDir = $env:USERPROFILE }
+    else { $homeDir = (Get-Location).Path }
+    if ([string]::IsNullOrEmpty($homeDir)) { return '' }
+    $configDir = Join-Path $homeDir '.omo'
+    $jsoncPath = Join-Path $configDir 'omo.jsonc'
+    if (Test-Path -LiteralPath $jsoncPath) { return $jsoncPath }
+    $jsonPath = Join-Path $configDir 'omo.json'
+    if (Test-Path -LiteralPath $jsonPath) { return $jsonPath }
+    # Neither exists: report the path OmO expects, so the advice names a real
+    # location instead of an empty string.
+    return $jsoncPath
+}
+
+# JSONC -> plain JSON, as a parse-ready string.
+#
+# Two transforms, both required for a truthful answer and neither optional:
+#
+#   * Comments. The old probe was a raw regex over the raw text, so a config whose
+#     only match was the line
+#         // "[opencode]" "tmux" "enabled" true
+#     reported TRUE. That decoy is not hypothetical -- commented-out config is the
+#     normal way a user disables a setting. Stripping must be STRING-aware, or the
+#     `//` inside the `https://` of a `$schema` value eats the rest of the document.
+#   * Trailing commas. They are legal in JSONC and ConvertFrom-Json in Windows
+#     PowerShell 5.1 rejects them, so without this an ordinary omo.jsonc reports
+#     UNPARSEABLE and the installer tells a correctly configured user to go fix a
+#     file that is already right.
+#
+# The comment lexer is the same algorithm the doctor uses; it is repeated rather
+# than shared because the installer must run before anything is installed, so it
+# cannot depend on the doctor being present.
+function ConvertTo-PlainJsonText {
+    param([string] $Text)
+
+    $sb = New-Object System.Text.StringBuilder $Text.Length
+    $inString = $false; $inLine = $false; $inBlock = $false; $escaped = $false
+    for ($i = 0; $i -lt $Text.Length; $i++) {
+        $c = [char]$Text[$i]
+        $n = [char]0
+        if ($i + 1 -lt $Text.Length) { $n = [char]$Text[$i + 1] }
+        if ($inLine) {
+            if ($c -eq "`n") { $inLine = $false; [void]$sb.Append($c) }
+            continue
+        }
+        if ($inBlock) {
+            if ($c -eq '*' -and $n -eq '/') { $inBlock = $false; $i++ }
+            elseif ($c -eq "`n") { [void]$sb.Append($c) }
+            continue
+        }
+        if ($inString) {
+            [void]$sb.Append($c)
+            if ($escaped) { $escaped = $false }
+            elseif ($c -eq '\') { $escaped = $true }
+            elseif ($c -eq '"') { $inString = $false }
+            continue
+        }
+        if ($c -eq '"') { $inString = $true; [void]$sb.Append($c); continue }
+        if ($c -eq '/' -and $n -eq '/') { $inLine = $true; $i++; continue }
+        if ($c -eq '/' -and $n -eq '*') { $inBlock = $true; $i++; continue }
+        [void]$sb.Append($c)
+    }
+
+    # Second pass: drop a comma that is followed only by whitespace and then a
+    # closing brace or bracket. Still string-aware -- a comma inside a string
+    # value is content, not punctuation.
+    $plain = New-Object System.Text.StringBuilder $sb.Length
+    $inString = $false; $escaped = $false
+    for ($i = 0; $i -lt $sb.Length; $i++) {
+        $c = [char]$sb[$i]
+        if ($inString) {
+            [void]$plain.Append($c)
+            if ($escaped) { $escaped = $false }
+            elseif ($c -eq '\') { $escaped = $true }
+            elseif ($c -eq '"') { $inString = $false }
+            continue
+        }
+        if ($c -eq '"') { $inString = $true; [void]$plain.Append($c); continue }
+        if ($c -eq ',') {
+            $j = $i + 1
+            while ($j -lt $sb.Length -and [char]::IsWhiteSpace([char]$sb[$j])) { $j++ }
+            if ($j -lt $sb.Length) {
+                $next = [char]$sb[$j]
+                if ($next -eq '}' -or $next -eq ']') { continue }
+            }
+        }
+        [void]$plain.Append($c)
+    }
+    return $plain.ToString()
+}
+
+# Whether the OMO config turns the tmux integration on, read as
+# `[opencode]` -> `tmux` -> `enabled` from the PARSED document.
+#
+# Six honest answers, each of which is a different thing to tell the user:
+#
+#   NO_CONFIG   no omo config file was found at all
+#   UNREADABLE  a config exists but could not be read from disk
+#   UNPARSEABLE a config exists and is not valid JSONC
+#   ABSENT      parsed fine, but no `[opencode]`, or no `tmux`, or no `enabled`
+#   FALSE       present and explicitly false
+#   TRUE        present and explicitly true
+#
+# Only a real JSON boolean true counts. `"enabled": "true"` is a STRING, the
+# loader's `pluginConfig.tmux?.enabled ?? false` would read it as falsy, and
+# telling the user their panes should work would be the exact silent failure this
+# whole check exists to prevent.
+function Read-OmoTmuxEnabled {
     param([string] $Path)
 
     if ([string]::IsNullOrEmpty($Path)) { return 'NO_CONFIG' }
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return 'NO_CONFIG' }
+    $text = ''
     try {
         $text = [System.IO.File]::ReadAllText($Path)
     } catch {
         return 'UNREADABLE'
     }
 
-    $block = [regex]::Match($text, '"tmux"\s*:\s*\{(?<body>[^}]{0,400})\}')
-    if (-not $block.Success) { return 'ABSENT' }
+    $json = $null
+    try {
+        $json = (ConvertTo-PlainJsonText -Text $text) | ConvertFrom-Json -ErrorAction Stop
+    } catch {
+        return 'UNPARSEABLE'
+    }
+    if ($null -eq $json) { return 'UNPARSEABLE' }
 
-    $enabled = [regex]::Match($block.Groups['body'].Value, '"enabled"\s*:\s*(true|false)', 'IgnoreCase')
-    if (-not $enabled.Success) { return 'ABSENT' }
-    if ($enabled.Groups[1].Value -eq 'true') { return 'TRUE' }
+    $opencodeNode = $json.PSObject.Properties['[opencode]']
+    if ($null -eq $opencodeNode) { return 'ABSENT' }
+    $tmuxNode = $opencodeNode.Value.PSObject.Properties['tmux']
+    if ($null -eq $tmuxNode) { return 'ABSENT' }
+    $enabledNode = $tmuxNode.Value.PSObject.Properties['enabled']
+    if ($null -eq $enabledNode) { return 'ABSENT' }
+    if ($enabledNode.Value -is [bool]) {
+        if ($enabledNode.Value) { return 'TRUE' }
+        return 'FALSE'
+    }
     return 'FALSE'
 }
 
@@ -377,10 +508,26 @@ if ($null -ne $opencodeCmd) {
     Write-Line '[install] prereq_opencode_action=install opencode, then re-run. Note that after this install the bridge bin directory is first on PATH, so `where opencode` will name this script''s own opencode.cmd wrapper.'
 }
 
-$configPath = Get-OpencodeConfigPath
-$tmuxEnabled = Read-TmuxEnabled -Path $configPath
-Write-Line ('[install] opencode_config=' + $(if ($configPath -eq '') { '<none found>' } else { $configPath }))
-Write-Line ('[install] prereq_tmux_enabled=' + $tmuxEnabled)
+$opencodeConfigPath = Get-OpencodeConfigPath
+Write-Line ('[install] opencode_config=' + $(if ($opencodeConfigPath -eq '') { '<none found>' } else { $opencodeConfigPath }))
+
+# tmux.enabled is NOT in the opencode config. It is the `[opencode]` block of the
+# OMO config chain, so it is probed there -- see Read-OmoTmuxEnabled.
+$omoConfigPath = Get-OmoConfigPath
+$omoConfigExists = (-not [string]::IsNullOrEmpty($omoConfigPath)) -and (Test-Path -LiteralPath $omoConfigPath -PathType Leaf)
+$omoConfigRule = 'neither omo.jsonc nor omo.json exists; this is the path OmO expects (index.js:21426)'
+if ($omoConfigExists) {
+    $sibling = ''
+    if ((Split-Path $omoConfigPath -Leaf) -eq 'omo.jsonc') { $sibling = Join-Path (Split-Path $omoConfigPath -Parent) 'omo.json' }
+    else { $sibling = Join-Path (Split-Path $omoConfigPath -Parent) 'omo.jsonc' }
+    if (Test-Path -LiteralPath $sibling -PathType Leaf) { $omoConfigRule = 'both omo.jsonc and omo.json exist; OmO reads omo.jsonc (index.js:21423)' }
+    else { $omoConfigRule = 'omo.' + ((Split-Path $omoConfigPath -Leaf) -replace '^omo\.', '') + ' exists (index.js:21423,21426)' }
+}
+$tmuxEnabled = Read-OmoTmuxEnabled -Path $omoConfigPath
+Write-Line ('[install] omo_config=' + $(if ($omoConfigPath -eq '') { '<no home derivable>' } else { $omoConfigPath }))
+Write-Line ('[install] omo_config_exists=' + $omoConfigExists)
+Write-Line ('[install] omo_config_rule=' + $omoConfigRule)
+Write-Line ('[install] prereq_tmux_enabled=' + $tmuxEnabled + '  (read from omo config [opencode].tmux.enabled, index.js:141083-141084)')
 
 $machineBefore = Get-MachinePathFingerprint
 
@@ -570,11 +717,10 @@ if (($matching.Count -ne 1) -or -not (Get-SamePath $first $target) -or ($machine
 # the single most common way this project fails to appear to work.
 #
 # This script could set the key. It does not, for two reasons. The file belongs to
-# opencode and the key is one line inside a JSONC document that may carry comments
-# and trailing commas, so a programmatic edit is a rewrite with a real chance of
-# damaging a file the user also cares about. And a setting applied silently is a
+# OmO and is the one the user also edits and comments, so a programmatic edit is a
+# rewrite with a real chance of damaging it. And a setting applied silently is a
 # setting the user never learns exists, so the next time it matters -- after an
-# opencode update, or on a second machine -- they have nothing to fall back on.
+# OmO update, or on a second machine -- they have nothing to fall back on.
 # Printing the line and letting them paste it keeps the knowledge and the file.
 if ($tmuxEnabled -ne 'TRUE') {
     Write-Line ''
@@ -582,23 +728,27 @@ if ($tmuxEnabled -ne 'TRUE') {
     Write-Line '[install] ONE SETTING LEFT TO DO -- the install is complete without it,'
     Write-Line '[install] but subagent panes will NOT appear until it is set.'
     Write-Line '[install] =================================================================='
-    if ($configPath -eq '') {
-        Write-Line '[install] No opencode config file was found. In your opencode config'
-        Write-Line '[install] (opencode.json / opencode.jsonc) make sure the plugin is'
-        Write-Line '[install] declared and add:'
+if (-not $omoConfigExists) {
+        Write-Line ('[install] No OmO config file was found. OmO reads tmux.enabled from its own')
+        Write-Line ('[install] user config, which it looks for at:')
+        Write-Line ('[install]   ' + $omoConfigPath)
+        Write-Line ('[install] Create that file with this inside its top-level object:')
     } else {
-        Write-Line ('[install] file=' + $configPath)
-        Write-Line '[install] current_tmux_enabled=' + $tmuxEnabled
-        Write-Line '[install] Add this inside the top-level object:'
+        Write-Line ('[install] file=' + $omoConfigPath)
+        Write-Line ('[install] current_tmux_enabled=' + $tmuxEnabled)
+        Write-Line ('[install] Add this inside its top-level "[opencode]" object:')
     }
     Write-Line '[install]'
-    Write-Line '[install]     "tmux": { "enabled": true }'
+    Write-Line '[install]     "[opencode]": { "tmux": { "enabled": true } }'
     Write-Line '[install]'
-    Write-Line '[install] The OmO plugin defaults this to false and reports nothing when'
-    Write-Line '[install] it is off, so a missing pane is otherwise indistinguishable from'
-    Write-Line '[install] a broken install. If you set it and panes still do not appear,'
-    Write-Line '[install] run  bin\bridge-doctor.cmd  -- it is read-only and names which'
-    Write-Line '[install] of its four gates is responsible.'
+    Write-Line '[install] This key belongs to OmO, not to opencode, and it defaults to false, so'
+    Write-Line '[install] a missing pane is otherwise indistinguishable from a broken install.'
+    Write-Line '[install] The file is NOT necessarily the one named above: OmO reads'
+    Write-Line '[install] $HOME/.omo/omo.jsonc when it exists, else omo.json, and it also merges'
+    Write-Line '[install] project layers and a profile block (index.js:21410-21426, 26288-26302).'
+    Write-Line '[install] If you set it and panes still do not appear, run'
+    Write-Line '[install] bin\bridge-doctor.cmd  -- it is read-only and names which gate is'
+    Write-Line '[install] responsible, and it reports the same file-resolution rules as this.'
     Write-Line '[install] =================================================================='
     Write-Line ''
 }
