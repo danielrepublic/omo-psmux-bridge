@@ -450,7 +450,12 @@ function Start-RealOpencode {
     $launch = New-OpencodeProcess $Real $ArgumentList $PortEnv
     if (-not $launch.Ok) { return $launch.ExitCode }
     $launch.Proc.WaitForExit()
-    return $launch.ExitCode
+    # Read the exit code off the PROCESS, not off $launch: the success shape of
+    # New-OpencodeProcess is @{ Ok = $true; Proc = ... } and carries no
+    # ExitCode key. This script does not run under Set-StrictMode, so reading
+    # the absent key returned $null and every passthrough path exited 0,
+    # reporting success for an opencode that crashed or rejected its arguments.
+    return $launch.Proc.ExitCode
 }
 
 <#
