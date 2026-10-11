@@ -23,8 +23,7 @@
 //      no shell wrapper of any kind.
 
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, sep } from "node:path";
 import { spawn } from "node:child_process";
 import {
@@ -48,6 +47,7 @@ import type {
   ResolveOptions,
   Resolution,
 } from "../src/backend";
+import { fixtureLaunch, fixtureSandbox, fixtureSpawn } from "./fixture-backend";
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -108,31 +108,7 @@ function expectChainGuard(resolution: Resolution): ChainGuardResolution {
 // Temporary backend scripts, for the real-spawn tests
 // ---------------------------------------------------------------------------
 
-interface Sandbox {
-  readonly dir: string;
-  readonly pscript: (body: string) => string;
-  readonly cleanup: () => void;
-}
-
-/** A scratch directory holding executable stand-ins for `psmux.exe`. Shebang
- *  scripts, not shell one-liners, so nothing under test can smuggle a shell in
- *  through the backend itself. */
-function sandbox(): Sandbox {
-  const dir = mkdtempSync(join(tmpdir(), "omo-backend-"));
-  return {
-    dir,
-    pscript: (body: string): string => {
-      const path = join(dir, `fake-${Math.random().toString(36).slice(2)}.bin`);
-      // Absolute `process.execPath`, not `#!/usr/bin/env bun`: these stand-ins are
-      // spawned with a replaced environment and so have no PATH, and `/usr/bin/env`
-      // then falls back to `/bin:/usr/bin` — which finds a system bun and misses one
-      // installed under a user's home. See the same note in test/cli.test.ts.
-      writeFileSync(path, `#!${process.execPath}\n${body}\n`, { mode: 0o755 });
-      return path;
-    },
-    cleanup: () => rmSync(dir, { recursive: true, force: true }),
-  };
-}
+const sandbox = fixtureSandbox;
 
 // ---------------------------------------------------------------------------
 // 1. The ordered precedence chain
@@ -658,7 +634,7 @@ describe("forwarding to the backend", () => {
         backendName: "psmux.exe",
       } as const satisfies Resolution;
 
-      const outcome = await runBackend(resolution, ["-V"], { captureOutput: true });
+      const outcome = await runBackend(resolution, ["-V"], { captureOutput: true, spawn: fixtureSpawn });
       expect(outcome.exitCode).toBe(0);
       // Byte identity, trailing newline included. Not `.trim()`, not line one.
       expect(outcome.stdout).toBe(REAL_VERSION_STDOUT);
@@ -683,7 +659,7 @@ describe("forwarding to the backend", () => {
         backendName: "psmux.exe",
       } as const satisfies Resolution;
 
-      const outcome = await runBackend(resolution, ["list-sessions"], { captureOutput: true });
+      const outcome = await runBackend(resolution, ["list-sessions"], { captureOutput: true, spawn: fixtureSpawn });
       expect(outcome.exitCode).toBe(3);
       expect(outcome.stdout).toBe("out");
       expect(outcome.stderr).toBe("err");
@@ -710,7 +686,8 @@ describe("forwarding to the backend", () => {
         captureOutput: true,
         spawn: (executable, args, options) => {
           seen.push({ executable, argv: args, options });
-          return spawn(executable, [...args], { ...options, stdio: ["ignore", "pipe", "pipe"] });
+          const launch = fixtureLaunch(executable, args);
+          return spawn(launch.program, [...launch.argv], { ...options, stdio: ["ignore", "pipe", "pipe"] });
         },
       });
 
@@ -742,7 +719,7 @@ describe("forwarding to the backend", () => {
         backendName: "psmux.exe",
       } as const satisfies Resolution;
 
-      const outcome = await runBackend(resolution, [], { captureOutput: true });
+      const outcome = await runBackend(resolution, [], { captureOutput: true, spawn: fixtureSpawn });
       expect(outcome.stdout).toBe("0");
     } finally {
       box.cleanup();
@@ -777,7 +754,7 @@ describe("forwarding to the backend", () => {
       } as const satisfies Resolution;
 
       const started = Date.now();
-      const outcome = await runBackend(resolution, ["-V"], { captureOutput: true });
+      const outcome = await runBackend(resolution, ["-V"], { captureOutput: true, spawn: fixtureSpawn });
       expect(Date.now() - started).toBeLessThan(10_000);
       expect(outcome.exitCode).toBe(0);
     } finally {
@@ -796,9 +773,11 @@ describe("forwarding to the backend", () => {
     writeFileSync(
       entry,
       [
-        'import { resolveBackend, exitCodeFor, describeResolution } from "' +
-        join(import.meta.dir, "..", "src", "backend.ts") +
-        '";',
+        // JSON.stringify, not `"` + path + `"`: a Windows path spliced raw makes every
+        // `\` a TS escape, and the `\b` in `...\src\backend.ts` is a backspace.
+        'import { resolveBackend, exitCodeFor, describeResolution } from ' +
+        JSON.stringify(join(import.meta.dir, "..", "src", "backend.ts")) +
+        ";",
         "const resolution = resolveBackend();",
         "if (resolution.kind !== 'resolved') process.stderr.write(describeResolution(resolution) + '\\n');",
         'process.stderr.write(JSON.stringify({ kind: resolution.kind, exitCode: exitCodeFor(resolution) }) + "\\n");',
@@ -866,17 +845,36 @@ describe("no hardcoded machine path", () => {
     expect(RESOLUTION_CONTRACT.installDirEnv).toBe("OMO_PSMUX_INSTALL_DIR");
   });
 
-  test("resolution with no options reads the real environment and finds nothing on Linux", () => {
+  test("resolution with no options reads the real environment and invents no install dir", () => {
     // Not a Windows assertion: the point is that the defaults are safe to call
     // on any host and cannot invent a path out of thin air.
+    //
+    // The two seams that NAME a directory are pinned to a known-empty state,
+    // because a host that really has psmux installed — which is every Windows
+    // box this suite exists to run on — would otherwise resolve a real backend
+    // and leave the assertion below measuring the host instead of the defaults.
+    // Everything else stays real: the env var is read from the real
+    // `process.env`, `probePath` really stats, and the candidate names really
+    // are the production ones.
     const previous = process.env["OMO_PSMUX_INSTALL_DIR"];
     delete process.env["OMO_PSMUX_INSTALL_DIR"];
+    const box = sandbox();
     try {
-      const resolution = resolveBackend();
+      // The literal zero-option call is total on any host, whatever it finds.
+      const real = resolveBackend();
+      expect(["resolved", "chain-guard", "install-dir-unresolved", "backend-missing"]).toContain(real.kind);
+
+      const resolution = resolveBackend({
+        readRegistryInstallDir: () => undefined,
+        readLocalAppData: () => box.dir,
+      });
       expect(resolution.kind).not.toBe("resolved");
       if (resolution.kind === "resolved") return;
       expect(resolution.message).not.toMatch(/\/home\/[a-z]/i);
+      // Not silence: the operator is told what was consulted and what was tried.
+      expect(resolution.message.length).toBeGreaterThan(0);
     } finally {
+      box.cleanup();
       if (previous === undefined) delete process.env["OMO_PSMUX_INSTALL_DIR"];
       else process.env["OMO_PSMUX_INSTALL_DIR"] = previous;
     }

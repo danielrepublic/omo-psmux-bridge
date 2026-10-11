@@ -49,6 +49,7 @@ import {
   sanitisedArgv,
 } from "../src/cli";
 import type { MainDeps, ShimCallRecord } from "../src/cli";
+import { fixtureSpawn, writeBackendFixture } from "./fixture-backend";
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -103,20 +104,9 @@ beforeEach(() => {
 
   const callsPath = join(dir, "backend-calls.jsonl");
   const shimPath = join(staging, "tmux.exe");
-  writeFileSync(
+  writeBackendFixture(
     join(installDir, "psmux.exe"),
     [
-      // The ABSOLUTE path of the bun that is running these tests, not
-      // `#!/usr/bin/env bun`. The stand-ins below are spawned by `runBackend`
-      // with a REPLACED environment (`buildEnv` returns only the keys it is
-      // given, by design — see the `backendEnv` note in src/cli.ts), so the child
-      // has no PATH at all. `/usr/bin/env` then falls back to confstr(_CS_PATH),
-      // which is `/bin:/usr/bin` on most hosts: that finds a system-installed
-      // `bun` at /usr/bin/bun and silently works, and finds nothing when bun
-      // lives anywhere else. That is how this passed on the machine that wrote it
-      // and failed on a runner with bun under ~/.bun/bin with exit 127. Writing
-      // the absolute path removes the dependency on where bun happens to be.
-      `#!${process.execPath}`,
       'import { appendFileSync } from "node:fs";',
       `const callsPath = ${JSON.stringify(callsPath)};`,
       "const argv = process.argv.slice(2);",
@@ -130,9 +120,7 @@ beforeEach(() => {
       'appendFileSync(callsPath, JSON.stringify({ argv, stdout }) + "\\n");',
       'if (stdout.length > 0) process.stdout.write(stdout);',
       "process.exit(exitCode);",
-      "",
     ].join("\n"),
-    { mode: 0o755 },
   );
   // The shim image need not exist: the call log's directory is derived from the
   // shim's PATH, and nothing in this suite requires the file behind it.
@@ -185,6 +173,7 @@ function deps(extra: MainDeps = {}): MainDeps {
     registryInstallDir: "",
     localAppData: "",
     writeStderr: () => undefined,
+    run: (backend, argv, options) => runBackend(backend, argv, { ...options, spawn: fixtureSpawn }),
     ...extra,
   };
 }
@@ -203,7 +192,7 @@ describe("wiring: grammar -> translate -> backend -> exec", () => {
     // which is the point: a shim that re-wrapped the bytes would be visible here.
     let captured: BackendOutcome = { exitCode: -1, stdout: "", stderr: "", signal: null };
     const run: NonNullable<MainDeps["run"]> = (backend, argv, options) =>
-      runBackend(backend, argv, { ...options, captureOutput: true }).then((outcome) => {
+      runBackend(backend, argv, { ...options, captureOutput: true, spawn: fixtureSpawn }).then((outcome) => {
         captured = outcome;
         return outcome;
       });
@@ -212,6 +201,7 @@ describe("wiring: grammar -> translate -> backend -> exec", () => {
     const direct = await runBackend(resolvedFor(box.installDir), ["-V"], {
       captureOutput: true,
       env: { OMO_TEST_VERSION: REAL_VERSION_STDOUT },
+      spawn: fixtureSpawn,
     });
 
     expect(exitCode).toBe(0);
@@ -243,6 +233,7 @@ describe("wiring: grammar -> translate -> backend -> exec", () => {
     const direct = await runBackend(resolvedFor(box.installDir), argv, {
       captureOutput: true,
       env: { OMO_TEST_EXIT: "42" },
+      spawn: fixtureSpawn,
     });
 
     expect(forwarded).toBe(42);
@@ -364,7 +355,7 @@ describe("the layout rules reach the backend as a corrected command plus a follo
     const seen: { readonly argv: readonly string[]; readonly captureOutput: boolean | undefined }[] = [];
     const run: NonNullable<MainDeps["run"]> = (backend, argv, options) => {
       seen.push({ argv, captureOutput: options.captureOutput });
-      return runBackend(backend, argv, options);
+      return runBackend(backend, argv, { ...options, spawn: fixtureSpawn });
     };
 
     await main(["set-window-option", "main-pane-height", "50%"], deps({ run }));
