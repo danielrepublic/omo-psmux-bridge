@@ -15,7 +15,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, dirname, join } from "node:path";
+import { dirname, join } from "node:path";
 // A single parsed citation: `FILE:A[-B]` → expected text, found on contractLine
 // (1-based) of CONTRACT.md. `expected` is still markdown-escaped here; it is
 // unescaped with unescapeMarkdown just before comparison.
@@ -65,9 +65,10 @@ export function unescapeMarkdown(text: string): string {
   return text.split("\\`").join("`").split("\\\\").join("\\").split('\\"').join('"');
 }
 
-// Basename `index.js` is the OmO bundle; every other path lives in psmux.
+// Match the whole reference, not its basename: a psmux file named index.js
+// must not be read out of the OmO tree.
 export function routeTree(file: string): "omo" | "psmux" {
-  return basename(file) === "index.js" ? "omo" : "psmux";
+  return file === "index.js" ? "omo" : "psmux";
 }
 
 // Expand the two placeholders pins.json allows in the OmO bundle path.
@@ -290,6 +291,15 @@ export function verifyAll(
 ): { citations: Citation[]; problems: Problem[] } {
   const citations = parseCitations(markdown);
   const problems: Problem[] = [];
+  if (citations.length === 0) {
+    // Zero citations means zero was checked. Without this the run prints
+    // "checked 0 citations, found 0 problems" and exits 0 — a green build that
+    // asserts nothing, reachable by deleting every citation from the document.
+    problems.push({
+      code: "NO_CITATIONS",
+      detail: "no citations parsed, so no citation was verified",
+    });
+  }
   for (const citation of citations) {
     const problem = verifyCitation(citation, trees);
     if (problem !== null) {
@@ -331,15 +341,30 @@ export function checkOmoPin(bundleFile: string, verifiedAgainst: string): Proble
       },
     ];
   }
-  let actual: unknown = null;
+  let actual: unknown;
   try {
     const pkgPath = join(dirname(dirname(bundleFile)), "package.json");
     const pkg: unknown = JSON.parse(readFileSync(pkgPath, "utf8"));
     actual = isRecord(pkg) ? pkg["version"] : null;
   } catch {
-    return [];
+    // Deliberately not a pass. An unreadable manifest cannot confirm the pin,
+    // and reporting nothing is how a tree nobody verified reads as verified.
+    return [
+      {
+        code: "PIN_FILE_MISSING",
+        detail: `omo bundle ${oneLine(bundleFile)} is on disk but its package.json could not be read, so the pinned ${verifiedAgainst} cannot be confirmed`,
+      },
+    ];
   }
-  if (typeof actual === "string" && actual !== verifiedAgainst) {
+  if (typeof actual !== "string" || actual === "") {
+    return [
+      {
+        code: "PIN_FILE_MISSING",
+        detail: `omo bundle ${oneLine(bundleFile)} has no usable "version" in its package.json, so the pinned ${verifiedAgainst} cannot be confirmed`,
+      },
+    ];
+  }
+  if (actual !== verifiedAgainst) {
     return [
       {
         code: "PIN_DRIFT",

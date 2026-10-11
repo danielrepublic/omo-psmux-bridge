@@ -101,6 +101,23 @@ describe("the citation core", () => {
     expect(problems).toEqual([]);
   });
 
+  test("a range where the text is on a MIDDLE line of the range passes", () => {
+    // Covers the gap the first-line test above cannot: CONTRACT.md's
+    // `8927-8928` quotes the second line of its range.
+    const trees = makeTrees([], {
+      "src/apply_layout.rs": [
+        "if layout.startsWith(\"main-\") {",
+        "    spawnSizeProc(mpctMainPaneSize);",
+        "}",
+      ],
+    });
+    const { problems } = verifyAll(
+      "- `src/apply_layout.rs:1-3` → `spawnSizeProc(mpctMainPaneSize);`",
+      trees,
+    );
+    expect(problems).toEqual([]);
+  });
+
   test("a range where the text spans the joined lines passes", () => {
     // The markdown parser never yields an expected text with an embedded
     // newline (it comes from one contract line), so this reaches past the
@@ -234,5 +251,52 @@ describe("the citation core", () => {
   test("the summary line states citations checked and problems found", () => {
     expect(formatSummary(174, 0)).toBe("contract:verify: checked 174 citations, found 0 problems");
     expect(formatSummary(174, 91)).toBe("contract:verify: checked 174 citations, found 91 problems");
+  });
+
+  test("a document with no citations is a problem, not a clean run", () => {
+    // The reachable-by-deletion case: strip every citation out of CONTRACT.md
+    // and the checker used to iterate over an empty list, print "checked 0
+    // citations, found 0 problems" and exit 0. A green build that asserts
+    // nothing is worse than a red one, because it is believed.
+    const trees = makeTrees(["bundle line"], { "src/a.rs": ["placeholder"] });
+    expect(codesOf("# Contract\n\nNo citations remain.\n", trees)).toEqual(["NO_CITATIONS"]);
+    // Prose that merely looks like a citation must not be enough to pass.
+    expect(codesOf("bare `index.js:123` and `\"50%\"` → `\"50\"`\n", trees)).toEqual(["NO_CITATIONS"]);
+  });
+
+  test("an OmO bundle whose manifest cannot confirm the pin reports rather than passes", () => {
+    // Each of these used to return [] — an unreadable, unversioned or
+    // unparseable manifest read as a clean run, which is the one thing the
+    // pin exists to rule out.
+    const dir = mkdtempSync(join(tmpdir(), "contract-omo-manifest-"));
+    scratchDirs.push(dir);
+    const bundleFile = join(dir, "dist", "index.js");
+    mkdirSync(join(dir, "dist"), { recursive: true });
+    writeFileSync(bundleFile, "var x = 1;\n");
+
+    writeFileSync(join(dir, "package.json"), "{ not json");
+    expect(checkOmoPin(bundleFile, "5.1.30").map((problem) => problem.code)).toEqual([
+      "PIN_FILE_MISSING",
+    ]);
+
+    writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "oh-my-openagent" }));
+    const noVersion = checkOmoPin(bundleFile, "5.1.30");
+    expect(noVersion.map((problem) => problem.code)).toEqual(["PIN_FILE_MISSING"]);
+    expect(noVersion[0]?.detail).toContain("5.1.30");
+
+    rmSync(join(dir, "package.json"));
+    expect(checkOmoPin(bundleFile, "5.1.30").map((problem) => problem.code)).toEqual([
+      "PIN_FILE_MISSING",
+    ]);
+  });
+
+  test("a psmux file named index.js still resolves against the psmux tree", () => {
+    // Routing on the basename would send `src/index.js` to the OmO bundle and
+    // read a line number out of the wrong file — a confident wrong answer.
+    const trees = makeTrees(["OMO_SIDE"], { "src/index.js": ["PSMUX_SIDE"] });
+    expect(routeTree("src/index.js")).toBe("psmux");
+    expect(routeTree("index.js")).toBe("omo");
+    const { problems } = verifyAll("- `src/index.js:1` → `PSMUX_SIDE`", trees);
+    expect(problems).toEqual([]);
   });
 });
