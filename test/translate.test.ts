@@ -39,7 +39,7 @@ import {
 
 // Template B head/tail as they appear INSIDE the payload body, i.e. between the
 // outer double quotes of the payload argv element. Composed here from the
-// documented template (index.js:8329) rather than pasted as one opaque literal,
+// documented template (index.js:8336) rather than pasted as one opaque literal,
 // so that the expectation stays independent of the implementation.
 const BODY_HEAD = "printf '%s\\n%s\\n' \\\"OMO subagent pane ready: ";
 const BODY_TAIL = "\\\" \\\"Focus this pane to attach.\\\"; while :; do sleep 86400; done";
@@ -54,7 +54,7 @@ const HOSTILE_DESCRIPTION_RAW = "it's a $HOME `cmd` with \"quotes\" and \\backsl
 const PH_PLAIN_BODY = `${BODY_HEAD}${PLAIN_DESCRIPTION}${BODY_TAIL}`;
 const PH_HOSTILE_BODY = `${BODY_HEAD}${HOSTILE_DESCRIPTION}${BODY_TAIL}`;
 
-// Template A bodies (index.js:8325). Q() leaves the apostrophes in place and
+// Template A bodies (index.js:8332). Q() leaves the apostrophes in place and
 // encodes an embedded apostrophe as the five characters ' \ \ ' '.
 const AT_PLAIN_BODY =
   "opencode attach 'http://127.0.0.1:4096' --session 'ses_abc123' --dir '/home/dev/proj'";
@@ -137,7 +137,7 @@ interface PayloadCase {
 
 const PAYLOAD_CASES: readonly PayloadCase[] = [
   {
-    name: "placeholder-split (index.js:8402-8411) with authEnvArgs",
+    name: "placeholder-split (index.js:8409-8418) with authEnvArgs",
     argv: ["split-window", "-h", "-d", "-P", "-F", "#{pane_id}", "-t", "%3", ...AUTH_ARGS, PH_PLAIN],
     kind: "placeholder-split",
     dashDash: false,
@@ -164,7 +164,7 @@ const PAYLOAD_CASES: readonly PayloadCase[] = [
     envCount: 0,
   },
   {
-    name: "placeholder-newwindow (index.js:8617-8626)",
+    name: "placeholder-newwindow (index.js:8624-8633)",
     argv: ["new-window", "-d", "-n", "omo-agents", "-P", "-F", "#{pane_id}", ...AUTH_ARGS, PH_PLAIN],
     kind: "placeholder-newwindow",
     dashDash: false,
@@ -182,7 +182,7 @@ const PAYLOAD_CASES: readonly PayloadCase[] = [
     envCount: 0,
   },
   {
-    name: "placeholder-newsession with sizeArgs (:8736-8747)",
+    name: "placeholder-newsession with sizeArgs (:8743-8753)",
     argv: [
       "new-session",
       "-d",
@@ -205,7 +205,7 @@ const PAYLOAD_CASES: readonly PayloadCase[] = [
     envCount: 2,
   },
   {
-    name: "placeholder-newsession with NO sizeArgs (:8721)",
+    name: "placeholder-newsession with NO sizeArgs (:8728)",
     argv: ["new-session", "-d", "-s", "omo-iso-4711", "-P", "-F", "#{pane_id}", PH_PLAIN],
     kind: "placeholder-newsession",
     dashDash: false,
@@ -214,7 +214,7 @@ const PAYLOAD_CASES: readonly PayloadCase[] = [
     envCount: 0,
   },
   {
-    name: "placeholder-respawn (index.js:8501)",
+    name: "placeholder-respawn (index.js:8507-8508)",
     argv: ["respawn-pane", "-k", ...AUTH_ARGS, "-t", "%7", PH_HOSTILE],
     kind: "placeholder-respawn",
     dashDash: true,
@@ -223,7 +223,7 @@ const PAYLOAD_CASES: readonly PayloadCase[] = [
     envCount: 2,
   },
   {
-    name: "attach-respawn (index.js:8548-8555)",
+    name: "attach-respawn (index.js:8554-8561)",
     argv: ["respawn-pane", "-k", ...AUTH_ARGS, "-t", "%7", AT_PLAIN],
     kind: "attach-respawn",
     dashDash: true,
@@ -275,24 +275,33 @@ describe("fixture corpus integrity", () => {
     }
   });
 
-  test("every payload fixture's body is exactly what sits between the outer quotes", () => {
-    const payload = testCase_last(PH_PLAIN);
-    expect(payload).toBe(PH_PLAIN_BODY);
-    expect(testCase_last(PH_HOSTILE)).toBe(PH_HOSTILE_BODY);
-    expect(testCase_last(AT_PLAIN)).toBe(AT_PLAIN_BODY);
-    expect(testCase_last(AT_HOSTILE)).toBe(AT_HOSTILE_BODY);
-    // And the fixtures really do carry the hostile characters.
-    expect(HOSTILE_DESCRIPTION).toContain("it's");
-    expect(HOSTILE_DESCRIPTION).toContain("\\$");
-    expect(HOSTILE_DESCRIPTION).toContain("\\`");
-    expect(HOSTILE_DESCRIPTION).toContain('\\"');
-    expect(HOSTILE_DESCRIPTION).toContain("\\\\");
+  test("production classification recovers each fixture's exact payload body", () => {
+    // A fixture compared to a slice of itself cannot fail, so the body
+    // assertion has to go through classifyArgv's own extractor.
+    for (const testCase of PAYLOAD_CASES) {
+      const classified = classify(testCase.argv);
+      if (classified.kind === "pass-through") {
+        throw new Error(`${testCase.name} classified as pass-through`);
+      }
+      expect(classified.payload).toBe(testCase.payloadBody);
+    }
+  });
+
+  test("the hostile description survives the round trip production performs on it", () => {
+    // The hostile characters only carry weight if unescaping them recovers
+    // what a human typed, so this proves the production round trip.
+    const hostile = classify(["split-window", "-h", "-d", "-P", "-F", "#{pane_id}", PH_HOSTILE]);
+    expect(hostile.kind).toBe("placeholder-split");
+    if (hostile.kind !== "placeholder-split") throw new Error("unreachable");
+    expect(unescapeDoubleQuoted(hostile.description)).toBe(HOSTILE_DESCRIPTION_RAW);
+    // Each escaped form is genuinely in the argv, so the round trip above is
+    // not passing on a fixture that had nothing to unescape.
+    expect(PH_HOSTILE).toContain("\\$");
+    expect(PH_HOSTILE).toContain("\\`");
+    expect(PH_HOSTILE).toContain('\\"');
+    expect(PH_HOSTILE).toContain("\\\\backslash");
   });
 });
-
-function testCase_last(element: string): string {
-  return element.slice('/bin/sh -c "'.length, element.length - 1);
-}
 
 // ---------------------------------------------------------------------------
 // 1. pass-through — the guarantee that must never regress
@@ -956,9 +965,9 @@ describe("no shell wrapper, no cat special case", () => {
 // The fixtures here are the argv OmO 5.1.18 actually emits for the layout, in
 // order, after every subagent spawn and after every subagent close:
 //
-//   1. index.js:8914  ["select-layout", "main-vertical"]
-//   2. index.js:8921  ["set-window-option", dimension, `${mainPaneSize}%`]
-//   3. index.js:8937  ["resize-pane", "-t", mainPaneId, "-x", String(mainWidth)]
+//   1. index.js:8921  ["select-layout", "main-vertical"]
+//   2. index.js:8928  ["set-window-option", dimension, `${mainPaneSize}%`]
+//   3. index.js:8944  ["resize-pane", "-t", mainPaneId, "-x", String(mainWidth)]
 //
 // and every test here is pinned to a psmux defect: `options.rs:527` parses the
 // value as `u16` so `"50%"` never lands, `layout.rs:1094-1096` reads the option
@@ -1061,7 +1070,7 @@ describe("layout rule 1a: one trailing `%` is stripped from a main-pane sizing o
     // BEHAVIOUR CHANGE. This test used to assert that the follow-up existed and
     // merely did not leak `-t`/`%4` into it. It no longer exists at all. The
     // follow-up is now gated on `flagless`, i.e. on OmO's own three-element shape
-    // (`index.js:8921`), and this argv has two flags. Asserting the leak-absence
+    // (`index.js:8928`), and this argv has two flags. Asserting the leak-absence
     // on a command that gets no follow-up was asserting a weaker property than
     // the one that actually matters: that the bridge invents nothing here.
     expect(translation.followUps).toEqual([]);
@@ -1120,9 +1129,9 @@ describe("layout rule 1a: one trailing `%` is stripped from a main-pane sizing o
 
 describe("layout rule 1b: the follow-up fires ONLY for the exact shape OmO emits", () => {
   // The gate is `flagless` — verb, option name, value, nothing else — because
-  // that is byte-for-byte what `index.js:8921` spawns, and because a per-argv
+  // that is byte-for-byte what `index.js:8928` spawns, and because a per-argv
   // pure translator CANNOT know what layout the previous separate invocation left
-  // behind. `select-layout main-vertical` (index.js:8914) and this command are two
+  // behind. `select-layout main-vertical` (index.js:8921) and this command are two
   // different processes, so nothing in this argv names the current layout.
   //
   // The point of every test below is therefore not "did the `%` get stripped" but

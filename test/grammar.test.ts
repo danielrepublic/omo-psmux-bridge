@@ -1,19 +1,19 @@
 // argv grammar — classification and payload extraction.
 //
-// Every argv fixture below is a LITERAL capture of the argv OmO 5.1.18
+// Every argv fixture below is a LITERAL capture of the argv OmO 5.1.30
 // actually emits, taken from:
 //
-//   oh-my-openagent@5.1.18/dist/index.js
-//     :4715-4716  shellEscapeForDoubleQuotedCommand   (E)
-//     :8318-8319  shellQuoteForNestedCommand         (Q)
-//     :8321-8325  buildTmuxAttachCommand             (Template A)
-//     :8327-8329  buildTmuxPlaceholderCommand        (Template B)
-//     :8331-8341  buildPaneAuthEnvironmentArgs       (-e NAME=VALUE)
-//     :8402-8411  split-window     call site
-//     :8501       respawn-pane     + placeholder
-//     :8548-8555  respawn-pane     + attach
-//     :8617-8626  new-window
-//     :8727-8747  new-session / new-window-on-existing-session
+//   oh-my-openagent@5.1.30/dist/index.js
+//     :4717-4718  shellEscapeForDoubleQuotedCommand   (E)
+//     :8325-8326  shellQuoteForNestedCommand         (Q)
+//     :8328-8332  buildTmuxAttachCommand             (Template A)
+//     :8334-8336  buildTmuxPlaceholderCommand        (Template B)
+//     :8338-8348  buildPaneAuthEnvironmentArgs       (-e NAME=VALUE)
+//     :8409-8418  split-window     call site
+//     :8507-8508  respawn-pane     + placeholder
+//     :8554-8561  respawn-pane     + attach
+//     :8624-8633  new-window
+//     :8734-8753  new-session / new-window-on-existing-session
 //
 // STRUCTURAL FACT these fixtures encode: the payload is ONE argv element whose
 // text *contains* `/bin/sh -c "…"`. It is not three argv elements. The payload
@@ -51,7 +51,7 @@ const AT_PLAIN =
 const AT_HOSTILE =
   "/bin/sh -c \"opencode attach 'http://127.0.0.1:4096' --session 'ses_'\\\\''x'\\\\''--dir'\\\\''y' --dir '/home/dev/proj'\"";
 
-// buildPaneAuthEnvironmentArgs() with both vars set (:8336, :8339).
+// buildPaneAuthEnvironmentArgs() with both vars set (:8343, :8346).
 const AUTH_ARGS = [
   "-e",
   "OPENCODE_SERVER_PASSWORD=pw123",
@@ -65,16 +65,26 @@ const AUTH_ARGS = [
 
 describe("payload shape", () => {
   test("the payload is ONE argv element containing the shell text, not three", () => {
-    expect(PH_PLAIN.startsWith('/bin/sh -c "')).toBe(true);
-    expect(PH_PLAIN.endsWith('"')).toBe(true);
-    expect(PH_PLAIN.includes("/bin/sh -c \"")).toBe(true);
-    expect(["/bin/sh", "-c", "printf"]).toHaveLength(3);
-    expect(["/bin/sh", "-c", "printf"]).not.toEqual(PH_PLAIN.split(" "));
+    // Given: the same three words as three argv elements, as a naive
+    // space-split forwarder would produce
+    // When: classified
+    // Then: no placeholder is recognised — the one-element shape is
+    // load-bearing, and splitting it silently loses the pane
+    expect(
+      classifyArgv(["split-window", "-h", "-d", "-P", "-F", "#{pane_id}", "/bin/sh", "-c", "printf"])
+        .kind,
+    ).toBe("pass-through");
+    // And the intact single-element form classifies through production code.
+    const whole = ["split-window", "-h", "-d", "-P", "-F", "#{pane_id}", PH_PLAIN];
+    const result = classifyArgv(whole);
+    expect(result.kind).toBe("placeholder-split");
+    if (result.kind !== "placeholder-split") throw new Error("unreachable");
+    expect(result.payload.startsWith("printf '%s\\n%s\\n'")).toBe(true);
   });
 });
 
 // ---------------------------------------------------------------------------
-// 1. placeholder-split  (index.js:8402-8411)
+// 1. placeholder-split  (index.js:8409-8418)
 // ---------------------------------------------------------------------------
 
 describe("placeholder-split", () => {
@@ -96,7 +106,7 @@ describe("placeholder-split", () => {
     expect(result.flags).toEqual(["-h", "-d", "-P", "-F", "#{pane_id}", "-t", "%3"]);
   });
 
-  test("split-window with the EMPTY authEnvArgs case (:8334 returns [])", () => {
+  test("split-window with the EMPTY authEnvArgs case (:8341 returns [])", () => {
     const argv = ["split-window", "-v", "-d", "-P", "-F", "#{pane_id}", "-t", "%3", PH_PLAIN];
     const result = classifyArgv(argv);
 
@@ -107,7 +117,7 @@ describe("placeholder-split", () => {
     expect(result.description).toBe("explore the tmux grammar module");
   });
 
-  test("split-window with no -t target (targetPaneId unset, :8409)", () => {
+  test("split-window with no -t target (targetPaneId unset, :8416)", () => {
     const argv = ["split-window", "-h", "-d", "-P", "-F", "#{pane_id}", PH_PLAIN];
     const result = classifyArgv(argv);
 
@@ -118,7 +128,7 @@ describe("placeholder-split", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 2. placeholder-respawn  (index.js:8501)
+// 2. placeholder-respawn  (index.js:8507-8508)
 // ---------------------------------------------------------------------------
 
 describe("placeholder-respawn", () => {
@@ -147,7 +157,7 @@ describe("placeholder-respawn", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 3. attach-respawn  (index.js:8548-8555)
+// 3. attach-respawn  (index.js:8554-8561)
 // ---------------------------------------------------------------------------
 
 describe("attach-respawn", () => {
@@ -178,11 +188,11 @@ describe("attach-respawn", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 4. placeholder-newwindow  (index.js:8617-8626 and :8727-8735)
+// 4. placeholder-newwindow  (index.js:8624-8633 and :8734-8743)
 // ---------------------------------------------------------------------------
 
 describe("placeholder-newwindow", () => {
-  test("new-window with the literal window name omo-agents (:8647)", () => {
+  test("new-window with the literal window name omo-agents (:8654)", () => {
     const argv = ["new-window", "-d", "-n", "omo-agents", "-P", "-F", "#{pane_id}", PH_PLAIN];
     const result = classifyArgv(argv);
 
@@ -193,7 +203,7 @@ describe("placeholder-newwindow", () => {
     expect(result.envArgs).toEqual([]);
   });
 
-  test("new-window targeting an existing session (:8727-8735, no -d, no -n)", () => {
+  test("new-window targeting an existing session (:8734-8743, no -d, no -n)", () => {
     const argv = ["new-window", "-t", "omo-iso-4711", "-P", "-F", "#{pane_id}", ...AUTH_ARGS, PH_PLAIN];
     const result = classifyArgv(argv);
 
@@ -205,7 +215,7 @@ describe("placeholder-newwindow", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 5. placeholder-newsession  (index.js:8736-8747)
+// 5. placeholder-newsession  (index.js:8743-8753)
 // ---------------------------------------------------------------------------
 
 describe("placeholder-newsession", () => {
@@ -276,7 +286,7 @@ describe("pass-through — unrecognised verbs", () => {
   });
 
   test("split-window carrying the ATTACH payload is not one of the five forms", () => {
-    // index.js:8401 chooses the attach template under cmux-compat, which is
+    // index.js:8408 chooses the attach template under cmux-compat, which is
     // false under psmux. No classification name covers it, so pass-through.
     const argv = ["split-window", "-h", "-d", "-P", "-F", "#{pane_id}", AT_PLAIN];
     const result = classifyArgv(argv);
