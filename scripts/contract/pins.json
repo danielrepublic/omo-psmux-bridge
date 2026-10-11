@@ -1,6 +1,6 @@
 {
   "omo": {
-    "verifiedAgainst": "5.1.21",
+    "verifiedAgainst": "5.1.30",
     "bundleGlob": "$HOME/.cache/opencode/packages/oh-my-openagent@latest/node_modules/oh-my-openagent/dist/index.js"
   },
   "psmux": {
