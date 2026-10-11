@@ -487,6 +487,15 @@ if ([string]::IsNullOrEmpty($commandJson)) {
     Exit-Bridge -Code $script:ExitUsage -Message 'EX_USAGE: --command is not valid base64url'
 }
 $commandTokens = $null
+# The contract is an ARRAY of tokens. ConvertFrom-Json accepts ANY JSON value, so
+# the shape is checked on the text instead: a top-level string, number, object or
+# null is a translator bug, and without this the unwrap branch below would take a
+# bare string for a one-element array and exec it as a program name. The
+# legitimate one-element array (`["cmd"]`) starts with '[' too, so it still runs.
+$commandJsonTrimmed = $commandJson.TrimStart()
+if (-not $commandJsonTrimmed.StartsWith('[')) {
+    Exit-Bridge -Code $script:ExitUsage -Message 'EX_USAGE: --command is not a JSON array'
+}
 try {
     # ConvertFrom-Json unwraps a single-element array into a scalar, and a
     # one-token command is still a command. So parse without @(...), then
