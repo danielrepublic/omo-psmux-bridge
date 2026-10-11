@@ -81,6 +81,16 @@ rem Best effort, and deliberately so: -ErrorAction SilentlyContinue plus a host
 rem that may not even have the cmdlet. This step is a convenience for the files
 rem the user runs AFTER the install; step 4's -ExecutionPolicy Bypass is what
 rem actually guarantees this install runs at all.
+rem Windows PowerShell 5.1 resolves its own module cmdlets -- install.ps1 hashes
+rem with Get-FileHash -- through PSModulePath. PowerShell 7 rebuilds that
+rem variable for its runtime and drops 5.1's own module directory, so a 5.1
+rem started from a pwsh 7 shell inherits a PSModulePath in which those cmdlets
+rem do not exist. Put the directory back first; where it is already present this
+rem changes nothing, because PSModulePath is searched in order. Same repair as
+rem bridge-doctor.cmd.
+set "OMO_PSMOD=%SystemRoot%\System32\WindowsPowerShell\v1.0\Modules"
+if defined PSModulePath (set "PSModulePath=%OMO_PSMOD%;%PSModulePath%") else (set "PSModulePath=%OMO_PSMOD%")
+
 "%OMO_PS%" -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "Unblock-File -LiteralPath '%BRIDGE_BIN%' -Recurse -ErrorAction SilentlyContinue"
 
 rem ---- 4. run the installer, forwarding argv untouched -----------------------

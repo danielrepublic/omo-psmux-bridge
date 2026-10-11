@@ -27,6 +27,16 @@ if not defined OMO_PS (
     exit /b 127
 )
 
+rem Windows PowerShell 5.1 resolves its own module cmdlets -- the port probe
+rem uses Get-NetTCPConnection and Get-CimInstance -- through PSModulePath.
+rem PowerShell 7 rebuilds that variable for its runtime and drops 5.1's own
+rem module directory, so a 5.1 started from a pwsh 7 shell inherits a
+rem PSModulePath in which those cmdlets do not exist. Put the directory back
+rem first; where it is already present this changes nothing, because
+rem PSModulePath is searched in order. Same repair as bridge-doctor.cmd.
+set "OMO_PSMOD=%SystemRoot%\System32\WindowsPowerShell\v1.0\Modules"
+if defined PSModulePath (set "PSModulePath=%OMO_PSMOD%;%PSModulePath%") else (set "PSModulePath=%OMO_PSMOD%")
+
 "%OMO_PS%" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%OMO_HELPER%" %*
 set "OMO_RC=%ERRORLEVEL%"
 endlocal & exit /b %OMO_RC%
