@@ -509,7 +509,7 @@ $result = [ordered]@{
     namespace            = [ordered]@{
         flag              = '-L omo_t16'
         why               = 'throwaway namespace; PSMUX_DATA_DIR isolation is broken at psmux 3.3.8 (upstream #599) so -L is the only working lever'
-        isolation_state   = 'C:\Users\Daniel\.psmux (shared, pre-existing)'
+        isolation_state   = ($script:PsmuxHome + ' (shared, pre-existing)')
     }
     launcher             = [ordered]@{
         path               = $Launcher
