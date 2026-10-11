@@ -24,13 +24,32 @@ const fs = require('fs');
 const path = require('path');
 
 const HERE = __dirname;
-const corpusPath = process.argv[2] || path.join(HERE, 'corpus.json');
-const outPath = process.argv[3] || path.join(HERE, 'sweep-result.json');
-const negativeControl = process.argv.includes('--negative-control');
+const sweepArgs = require('./sweep-args.cjs');
+// Flags are parsed, never indexed: a flag in a positional slot used to BECOME
+// that path (argv[4] `--negative-control` wrote progress into a file by that
+// name). Unknown flags are refused rather than interpreted as paths.
+const parsed = sweepArgs.parseSweepArgs(process.argv.slice(2), HERE);
+if (!parsed.ok) {
+  console.error(parsed.error);
+  console.error(sweepArgs.USAGE);
+  process.exit(2);
+}
+if (parsed.help) {
+  console.log(sweepArgs.USAGE);
+  process.exit(0);
+}
+const corpusPath = parsed.corpusPath;
+const outPath = parsed.outPath;
+const negativeControl = parsed.negativeControl;
+// Opt-in ONLY: the historical pin refusal below stays the default. A current
+// build that legitimately differs from the corpus pin sweeps only when the
+// operator says so explicitly, and the artifact records the override.
+const allowShimMismatch = parsed.allowShimMismatch;
+const runId = sweepArgs.resolveRunId(parsed.runIdRaw, process.env, process.pid, Date.now());
 // stdout is block-buffered when it is redirected to a file, so a killed run loses
 // every line it never flushed. Progress is therefore appended to its own file with
 // appendFileSync, which is unbuffered, and the sweep can be watched and resumed.
-const progressPath = process.argv[4] || (outPath + '.progress');
+const progressPath = parsed.progressPath;
 fs.writeFileSync(progressPath, '');
 function progress(line) {
   fs.appendFileSync(progressPath, line + '\n', 'utf8');
@@ -101,7 +120,11 @@ function subst(argv) {
 }
 
 function nsNameFor(tag) {
-  return 'omo_t14_' + tag;
+  // Per-run prefix: the old fixed 'omo_t14_' + tag namespace was shared by
+  // every QA run on the host, so a case's preemptive kill-server could reap a
+  // concurrent run's seed mid-trial. The run id defaults to unique per process
+  // (--run-id or OMO_SWEEP_RUN_ID pins it when reproducibility is wanted).
+  return sweepArgs.nsNameFor(runId, tag);
 }
 
 function seed(ns) {
@@ -400,19 +423,41 @@ function main() {
   console.log('  sha256  = ' + shimSha);
   console.log('  pinned  = ' + pinOk);
   progress('shim bytes=' + shimBytes + ' sha256=' + shimSha + ' matches_pin=' + pinOk);
-  if (!pinOk && !negativeControl) {
-    const msg = 'REFUSING to run: the staged shim does not match the corpus pin. Sweeping an unverified binary proves nothing.';
+  if (!pinOk && !negativeControl && !allowShimMismatch) {
+    const msg = 'REFUSING to run: the staged shim does not match the corpus pin. Sweeping an unverified binary proves nothing. Re-run with --allow-shim-mismatch to sweep the current build explicitly; the override is recorded in the artifact.';
     console.log(msg);
     progress(msg);
     process.exit(3);
   }
+  if (!pinOk) {
+    const msg = 'proceeding with a pin mismatch (negative_control=' + negativeControl + ' allow_shim_mismatch=' + allowShimMismatch + '): artifact records matches_pin=false and the override';
+    console.log(msg);
+    progress(msg);
+  }
 
   // A negative control deliberately breaks one expectation, so the comparison is
   // observed to FAIL when it should. The rest of the corpus still runs.
-  let cases = corpus.cases;
-  if (negativeControl) {
-    cases = cases.map((c) => (c.id === 'a-version' ? Object.assign({}, c, { expect_stdout_bytes: (c.expect_stdout_bytes || 44) + 1 }) : c));
-    console.log('negative control: a-version expect_stdout_bytes incremented by 1');
+  const controlled = sweepArgs.applyNegativeControl(corpus.cases, negativeControl);
+  if (!controlled.ok) {
+    console.log('REFUSING to run: ' + controlled.error);
+    progress('REFUSING to run: ' + controlled.error);
+    process.exit(2);
+  }
+  const cases = controlled.cases;
+  if (controlled.targeted) {
+    console.log('negative control: ' + controlled.targeted + ' expect_stdout_bytes incremented by 1');
+  }
+
+  // Nothing to sweep is a refusal, not a clean run. Checked BEFORE the first
+  // spawn: an empty corpus otherwise prints `pass=0 fail=0` and exits 0, which is
+  // indistinguishable from a sweep that proved nothing wrong with anything.
+  const preflight = sweepArgs.preflightCases(cases);
+  if (!preflight.ok) {
+    const problems = preflight.problems;
+    console.log(JSON.stringify({ ok: false, problems, run_id: runId }, null, 2));
+    progress('REFUSING to run: ' + problems.join('; '));
+    fs.writeFileSync(outPath, JSON.stringify({ ok: false, problems, run_id: runId, vacuous: true }, null, 2), 'utf8');
+    process.exit(2);
   }
 
   const results = [];
@@ -433,30 +478,39 @@ function main() {
     }
   }
 
-  const failed = results.filter((r) => !r.ok);
   const expectedTranslated = corpus.cases.filter((c) => c.kind === 'translated').length;
-  const summary = {
-    started_utc: started,
-    finished_utc: new Date().toISOString(),
-    shim: { path: SHIM, bytes: shimBytes, sha256: shimSha, matches_pin: pinOk },
-    real_control: REAL,
-    psmux_control: PSMUXCTL,
-    call_log: CALL_LOG,
-    negative_control: negativeControl,
-    total_cases: results.length,
-    passed_cases: results.length - failed.length,
-    failed_cases: failed.length,
-    expected_translated_cases: expectedTranslated,
-    summary_line: 'pass=' + (results.length - failed.length) + ' fail=' + failed.length + ' expected-translated=' + expectedTranslated,
-    failed_ids: failed.map((f) => f.id),
+  // finalizeSweep WRITES THE ARTIFACT and only then decides the exit code. That
+  // order is the contract: a sweep that disagrees with its control must both
+  // leave its evidence on disk and fail the process.
+  const verdict = sweepArgs.finalizeSweep({
     results,
-  };
-  fs.writeFileSync(outPath, JSON.stringify(summary, null, 2), 'utf8');
+    meta: {
+      started_utc: started,
+      finished_utc: new Date().toISOString(),
+      run_id: runId,
+      shim: { path: SHIM, bytes: shimBytes, sha256: shimSha, matches_pin: pinOk, allow_shim_mismatch: allowShimMismatch, pin_override: (!pinOk && (allowShimMismatch || negativeControl)) },
+      real_control: REAL,
+      psmux_control: PSMUXCTL,
+      call_log: CALL_LOG,
+      negative_control: negativeControl,
+      expected_translated_cases: expectedTranslated,
+    },
+    writeArtifact: (summary) => fs.writeFileSync(outPath, JSON.stringify(summary, null, 2), 'utf8'),
+  });
+  const summary = verdict.summary;
+
   progress(summary.summary_line);
   console.log('');
   console.log(summary.summary_line);
   console.log('written ' + outPath);
   progress('# done ' + new Date().toISOString());
+  if (verdict.exitCode !== 0) {
+    // The JSON artifact above is the record; the exit code is the signal. A
+    // sweep that disagrees with its control must fail loudly: this script
+    // used to exit 0 with failed cases recorded only inside the JSON.
+    progress('failed_cases=' + summary.failed_cases + ' (' + summary.failed_ids.join(',') + '): exiting ' + verdict.exitCode + ', artifact retained at ' + outPath);
+    process.exitCode = verdict.exitCode;
+  }
 }
 
 main();
