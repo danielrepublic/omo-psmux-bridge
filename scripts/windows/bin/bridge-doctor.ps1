@@ -7,20 +7,20 @@
     When OmO spawns a subagent pane on Windows, exactly three mechanisms make
     it vanish with no error at all:
 
-      GATE 1  PATH   `findVerifiedTmuxPath` (omo dist/index.js:9071-9083) resolves
+      GATE 1  PATH   `findVerifiedTmuxPath` (omo dist/index.js:9078-9099) resolves
                       the literal name `tmux` and requires `-V` to exit 0. If the
                       real psmux `tmux.exe` wins PATH resolution the bridge is
                       never used; if the bridge bin directory is absent the gate
-                      logs "[spawnTmuxPane] SKIP: tmux not found" (index.js:8391).
-      GATE 3  PORT   `isServerRunning` (index.js:8267-8294) fetches
+                      logs "[spawnTmuxPane] SKIP: tmux not found" (index.js:8399).
+      GATE 3  PORT   `isServerRunning` (index.js:8274-8315) fetches
                       `GET /global/health` and treats anything that is not `ok` as
                       "not running", logging "[spawnTmuxPane] SKIP: server not
-                      running" (index.js:8387). `resolveServerUrl`
-                      (index.js:150702-150706) falls back to `http://localhost:4096`
+                      running" (index.js:8394). `resolveServerUrl`
+                      (index.js:156115-156138) falls back to `http://localhost:4096`
                       when OPENCODE_PORT is unset and the host server URL carries
                       port 0.
       GATE 0  CONFIG `[opencode].tmux.enabled` defaults to FALSE
-                      (index.js:26719), which is why a stock Windows OmO produces
+                      (index.js:27005), which is why a stock Windows OmO produces
                       zero panes and no error.
       GATE 2  STALE  a psmux server is long-lived and its panes inherit ITS
                       environment; the client-side attach never transmits one. A
@@ -63,6 +63,17 @@
     OmO config. Defaults to %USERPROFILE%\.omo\omo.jsonc. Exists so the config
     check can be pointed at a scratch copy without touching the live file.
 
+.PARAMETER PackageRoot
+    Directory holding the installed OmO packages, i.e. the parent of
+    `oh-my-openagent@latest`. Defaults to %USERPROFILE%\.cache\opencode\packages.
+    Same rationale as -ConfigPath: the version/anchor check is the one place the
+    doctor reads someone else's installed state, so it needs a way to be pointed at
+    a scratch tree. The check only ever READS this path -- it resolves a
+    package.json and streams a handful of numbered lines out of dist\index.js.
+    Overriding it changes which bundle the anchors are re-verified against; it
+    cannot make a drifted bundle pass, because the anchors are compared to the
+    bytes actually found at the cited line numbers.
+
 .PARAMETER ExpectedShimSha256
     sha256 the installed shim is expected to carry. A mismatch is reported as a
     NOTE, never as a failure: the shim is rebuilt during development, so its hash
@@ -70,7 +81,7 @@
 
 .PARAMETER FrozenOmoVersion
     The version CONTRACT.md is frozen against. Reported on every run. This is
-    5.1.18. CONTRACT.md section 0.1 states 5.1.17 "is not installed and must
+    5.1.30. CONTRACT.md section 0.1 states 5.1.17 "is not installed and must
     never be cited"; see check 5 for why the version-string comparison alone is
     insufficient and the line-anchor check is the load-bearing guard.
 
@@ -111,9 +122,10 @@ param(
     [string] $Namespace = 'default',
     [string] $DataDir,
     [string] $ConfigPath,
+    [string] $PackageRoot,
     [string] $ExpectedShimSha256 = '9EA5E733FD78F4EA966A85A5CF062D1113C644FEFF80AD3B3084574c2BA2A858',
-    [string] $FrozenOmoVersion = '5.1.18',
-    [string[]] $KnownEquivalentOmoVersions = @('5.1.17', '5.1.18'),
+    [string] $FrozenOmoVersion = '5.1.30',
+    [string[]] $KnownEquivalentOmoVersions = @(),
     [int]    $HealthTimeoutMs = 2000
 )
 
@@ -199,6 +211,52 @@ function Get-Sha256 {
     param([string] $Path)
     $h = Get-FileHash -LiteralPath $Path -Algorithm SHA256
     return [string]$h.Hash
+}
+
+# The OmO user config file, resolved the way the INSTALLED bundle resolves it.
+#
+# This used to be a hardcoded %USERPROFILE%\.omo\omo.jsonc, which is wrong in two
+# ways that both produce a confidently incorrect check 4:
+#
+#   * OmO reads `env.HOME ?? env.USERPROFILE ?? process.cwd()`. With HOME set --
+#     git-bash, WSL, a CI runner, any child process that exports it -- the doctor
+#     was reading a file OmO never opens.
+#   * OmO accepts omo.json when omo.jsonc is absent. A user who has only
+#     omo.json was told their config was missing, and the "it defaults to false"
+#     advice was attached to a path that does not exist.
+#
+# index.js:21410  function resolveHomeDir(env = process.env) {
+# index.js:21411    const homeDir = env.HOME ?? env.USERPROFILE ?? process.cwd();
+# index.js:21420  function detectUserOmoJsonPath(env, fileSystem) {
+# index.js:21422    const jsoncPath = join(configDir, "omo.jsonc");
+# index.js:21423    if (fileSystem.existsSync(jsoncPath)) return jsoncPath;
+# index.js:21425    const jsonPath = join(configDir, "omo.json");
+# index.js:21426    return fileSystem.existsSync(jsonPath) ? jsonPath : jsoncPath;
+#
+# `??` is NULL coalescing, not truthiness: an EMPTY HOME still wins over
+# USERPROFILE. A -not [string]::IsNullOrEmpty test would silently diverge here,
+# so this tests for $null exactly as the bundle does.
+function Resolve-OmoUserConfigPath {
+    $homeDir = ''
+    if ($null -ne $env:HOME) { $homeDir = $env:HOME }
+    elseif ($null -ne $env:USERPROFILE) { $homeDir = $env:USERPROFILE }
+    else { $homeDir = (Get-Location).Path }
+    $configDir = Join-Path $homeDir '.omo'
+    $jsoncPath = Join-Path $configDir 'omo.jsonc'
+    $jsonPath = Join-Path $configDir 'omo.json'
+    $jsoncExists = Test-Path -LiteralPath $jsoncPath -PathType Leaf
+    $jsonExists = Test-Path -LiteralPath $jsonPath -PathType Leaf
+    $rule = ''
+    $chosen = $jsoncPath
+    if ($jsoncExists) {
+        $rule = 'omo.jsonc exists (index.js:21423)'
+    } elseif ($jsonExists) {
+        $rule = 'omo.jsonc absent, omo.json exists (index.js:21426)'
+        $chosen = $jsonPath
+    } else {
+        $rule = 'neither file exists; reporting the path OmO expects (index.js:21426)'
+    }
+    return [pscustomobject]@{ Path = $chosen; Rule = $rule; Home = $homeDir; Dir = $configDir }
 }
 
 # Reduce a URL to scheme://host[:port]/path with every query, fragment and
@@ -391,7 +449,8 @@ if ([string]::IsNullOrEmpty($DataDir)) {
     if (-not [string]::IsNullOrEmpty($env:PSMUX_DATA_DIR)) { $DataDir = $env:PSMUX_DATA_DIR }
     else { $DataDir = Join-Path $env:USERPROFILE '.psmux' }
 }
-if ([string]::IsNullOrEmpty($ConfigPath)) { $ConfigPath = Join-Path $env:USERPROFILE '.omo\omo.jsonc' }
+$omoConfigDefault = Resolve-OmoUserConfigPath
+if ([string]::IsNullOrEmpty($ConfigPath)) { $ConfigPath = $omoConfigDefault.Path }
 
 if ([string]::IsNullOrEmpty($Session)) {
     $lastSessionFile = Join-Path $DataDir 'last_session'
@@ -436,6 +495,7 @@ $firstResolverIndex = -1
 $binIndexEffective = -1
 $binIndexUser = -1
 $shadowsTmux = @()
+$shadowsSeen = @()
 
 $processEntries = @(Get-PathEntries ([Environment]::GetEnvironmentVariable('Path', 'Process')))
 $userRaw = ''
@@ -450,8 +510,20 @@ $userEntries = @(Get-PathEntries $userRaw)
 
 for ($i = 0; $i -lt $processEntries.Count; $i++) {
     $e = $processEntries[$i]
-    if (Get-SamePath $e $BinDir) { if ($binIndexEffective -lt 0) { $binIndexEffective = $i } }
-    if (Test-BridgeBinEntry $e) { $shadowsTmux += $e }
+    $isOwnBinDir = Get-SamePath $e $BinDir
+    if ($isOwnBinDir) { if ($binIndexEffective -lt 0) { $binIndexEffective = $i } }
+    # SHADOW DETECTION SKIPS THE DOCTOR'S OWN BIN DIRECTORY. `Test-BridgeBinEntry`
+    # matches any `...\opencode-psmux-bridge\bin`, and the standard install IS such a
+    # path -- so on a correctly installed host the check warned
+    #   WARN another opencode-psmux-bridge\bin is on the PATH: C:\...\opencode-psmux-bridge\bin
+    # naming the very directory printed as bin_dir two lines earlier. A false WARN on a
+    # healthy machine trains the reader to ignore WARNs, which is worse than not
+    # warning at all. Only a genuinely DIFFERENT directory qualifies, and each one is
+    # reported once however many times it appears in PATH.
+    if ((-not $isOwnBinDir) -and (Test-BridgeBinEntry $e) -and ($shadowsSeen -notcontains (Get-NormalizedPath $e))) {
+        $shadowsSeen += (Get-NormalizedPath $e)
+        $shadowsTmux += $e
+    }
     foreach ($cand in @('tmux.exe', 'tmux.cmd', 'tmux.bat')) {
         $f = Join-Path $e $cand
         if ((Test-Path -LiteralPath $f -PathType Leaf) -and $firstResolverIndex -lt 0) {
@@ -638,11 +710,11 @@ if ($envPortRaw -match '^[0-9]{1,5}$') {
     $n = [int]$envPortRaw
     if ($n -ge 1 -and $n -le 65535) { $envPort = $n; $envPortValid = $true }
 }
-# omo dist/index.js:150704 -- `configuredPort ? Number(configuredPort) : 4096`.
+# omo dist/index.js:156117 -- `configuredPort ? Number(configuredPort) : 4096`.
 $FallbackPort = 4096
 Write-Line -Text ('OPENCODE_PORT=' + $(if ($envPortValid) { [string]$envPort } elseif ([string]::IsNullOrEmpty($envPortRaw)) { '<unset>' } else { '<' + (As-AsciiLine $envPortRaw -Max 40) + '> (not a usable port)' }))
 Write-Line -Text ('OPENCODE_SERVER=' + (Get-SafeUrlShape $env:OPENCODE_SERVER) + '  (query/fragment/userinfo withheld)')
-Write-Line -Text ('fallback_port_used_by_omo=' + $FallbackPort + ' (index.js:150704, when OPENCODE_PORT is unset)')
+Write-Line -Text ('fallback_port_used_by_omo=' + $FallbackPort + ' (index.js:156117, when OPENCODE_PORT is unset)')
 
 # Only ports the OS says are LISTENING are probed. This host DROPS a connect to a
 # closed loopback port instead of refusing it, so a blind probe of a dead port
@@ -683,9 +755,9 @@ if ($probePort -gt 0) {
     }
     if (-not $healthOk -and $healthStatus -gt 0) {
         Write-Warn  -Text ('the OpenCode server on ' + $probePort + ' answered HTTP ' + $healthStatus + ' to /global/health')
-        Write-Cause -Text 'omo isServerRunning (index.js:8267-8294) accepts only `response.ok`, so a'
+        Write-Cause -Text 'omo isServerRunning (index.js:8274-8315) accepts only `response.ok`, so a'
         Write-Cause -Text 'non-2xx reads as "not running" and every pane is skipped with'
-        Write-Cause -Text '"[spawnTmuxPane] SKIP: server not running" (index.js:8387).'
+        Write-Cause -Text '"[spawnTmuxPane] SKIP: server not running" (index.js:8394).'
         Write-Warn  -Text 'this is a property of the OpenCode server build, separate from port'
         Write-Warn  -Text 'resolution; it is reported, and it does not change this check verdict.'
     }
@@ -717,7 +789,7 @@ if ($check3Ok) {
     Write-Cause -Text 'and skip every pane with no user-visible error.'
     Write-Fix   -Text 'start the server with an explicit port and export it for the same shell:'
     Write-Fix   -Text '  set OPENCODE_PORT=<n>   then   opencode --port <n>'
-    Write-Fix   -Text 'opencode prints this remedy itself (index.js:150712, issue #3963).'
+    Write-Fix   -Text 'opencode prints this remedy itself (index.js:156125, issue #3963).'
     Write-Line -Text ''
     Add-Failure -CheckNumber 3 -Code 30
 }
@@ -727,6 +799,12 @@ if ($check3Ok) {
 
 Write-Verdict '....' 4 'OmO config [opencode].tmux.enabled'
 Write-Line -Text ('config=' + $ConfigPath + '  exists=' + (Test-Path -LiteralPath $ConfigPath -PathType Leaf))
+Write-Line -Text ('config_path_rule=' + $(if ($omoConfigDefault.Path -ceq $ConfigPath) { $omoConfigDefault.Rule } else { 'explicit -ConfigPath (caller override; resolution rule not applied)' }))
+Write-Line -Text ('config_home=' + $omoConfigDefault.Home + '  config_dir=' + $omoConfigDefault.Dir + '  (index.js:21410-21426)')
+Write-Note  -Text 'this is the ONE SELECTED user file. OmO also merges project layers and a'
+Write-Note  -Text 'profile block (index.js:26288-26302), so a project .omo\omo.jsonc can set'
+Write-Note  -Text 'tmux.enabled true while this file says false. PASS/FAIL here is about'
+Write-Note  -Text 'this file only.'
 $configKey = '[opencode].tmux.enabled'
 $configOk = $false
 $configState = 'missing'
@@ -791,7 +869,7 @@ if ($configOk) {
 } else {
     Write-Verdict 'FAIL ' 4 'OmO config [opencode].tmux.enabled'
     Write-Cause -Text ('key ' + $configKey + ' is not true (state: ' + $configState + ') in ' + $ConfigPath)
-    Write-Cause -Text 'omo reads [opencode].tmux.enabled with default(false) (index.js:26719), so a'
+    Write-Cause -Text 'omo reads [opencode].tmux.enabled with default(false) (index.js:27005), so a'
     Write-Cause -Text 'false value is not an error -- it silently produces zero panes.'
     Write-Fix   -Text ('set ' + $configKey + ' = true in ' + $ConfigPath)
     Write-Fix   -Text 'this doctor does not edit the config for you, on purpose.'
@@ -806,7 +884,7 @@ if ($configOk) {
 # line numbers must still resolve, in the INSTALLED bundle, to the same
 # constructs. That is the load-bearing half of this check.
 #
-# Stored as an ARRAY OF OBJECTS, not an [ordered] dictionary. `$od[8227]` on an
+# Stored as an ARRAY OF OBJECTS, not an [ordered] dictionary. `$od[8234]` on an
 # OrderedDictionary is the POSITIONAL indexer, so an out-of-range line number
 # yields $null rather than throwing; the next line then called
 # `$null.Replace('*','')`, raised InvokeMethodOnNull, and aborted the whole script
@@ -816,7 +894,8 @@ Write-Verdict '....' 5 'OmO package version drift'
 Write-Line -Text ('contract_frozen_version=' + $FrozenOmoVersion + '  (CONTRACT.md section 0.1)')
 Write-Line -Text ('known_equivalent_versions=' + ($KnownEquivalentOmoVersions -join ',') + '  (same line numbers verified)')
 
-$pkgRoot = Join-Path $env:USERPROFILE '.cache\opencode\packages'
+$pkgRoot = $PackageRoot
+if ([string]::IsNullOrEmpty($pkgRoot)) { $pkgRoot = Join-Path $env:USERPROFILE '.cache\opencode\packages' }
 $pkgPath = ''
 $installedVersion = ''
 $candidates = @()
@@ -845,17 +924,17 @@ foreach ($p in $candidates) {
 }
 
 $anchors = @(
-    [pscustomobject]@{ Line = 8227;  Text = 'function isInsideTmuxEnvironment(environment) {' }
-    [pscustomobject]@{ Line = 8267;  Text = 'async function isServerRunning(serverUrl, options = {}) {' }
-    [pscustomobject]@{ Line = 8279;  Text = 'const healthUrl = new URL("/global/health", serverUrl).toString();' }
-    [pscustomobject]@{ Line = 8385;  Text = 'const serverRunning = await deps.isServerRunning(serverUrl);' }
-    [pscustomobject]@{ Line = 8390;  Text = 'const tmux = await deps.getTmuxPath();' }
-    [pscustomobject]@{ Line = 9071;  Text = 'async function findVerifiedTmuxPath() {' }
-    [pscustomobject]@{ Line = 9077;  Text = 'const verifyProc = spawn([path, "-V"], {' }
-    [pscustomobject]@{ Line = 9083;  Text = 'if (verifyExitCode !== 0) {' }
-    [pscustomobject]@{ Line = 26719; Text = 'enabled: z48.boolean().default(false),' }
-    [pscustomobject]@{ Line = 150702; Text = 'function resolveServerUrl(rawServerUrl, env, log) {' }
-    [pscustomobject]@{ Line = 150712; Text = 'log("[tmux-session-manager] ctx.serverUrl has port 0; falling back. "' }
+    [pscustomobject]@{ Line = 8234;  Text = 'function isInsideTmuxEnvironment(environment) {' }
+    [pscustomobject]@{ Line = 8274;  Text = 'async function isServerRunning(serverUrl, options = {}) {' }
+    [pscustomobject]@{ Line = 8286;  Text = 'const healthUrl = new URL("/global/health", serverUrl).toString();' }
+    [pscustomobject]@{ Line = 8392;  Text = 'const serverRunning = await deps.isServerRunning(serverUrl);' }
+    [pscustomobject]@{ Line = 8397;  Text = 'const tmux = await deps.getTmuxPath();' }
+    [pscustomobject]@{ Line = 9078;  Text = 'async function findVerifiedTmuxPath() {' }
+    [pscustomobject]@{ Line = 9084;  Text = 'const verifyProc = spawn([path, "-V"], {' }
+    [pscustomobject]@{ Line = 9090;  Text = 'if (verifyExitCode !== 0) {' }
+    [pscustomobject]@{ Line = 27005; Text = 'enabled: z49.boolean().default(false),' }
+    [pscustomobject]@{ Line = 156115; Text = 'function resolveServerUrl(rawServerUrl, env, log) {' }
+    [pscustomobject]@{ Line = 156125; Text = 'log("[tmux-session-manager] ctx.serverUrl has port 0; falling back. "' }
 )
 $indexPath = ''
 if ($pkgPath -ne '') { $indexPath = Join-Path (Split-Path $pkgPath -Parent) 'dist\index.js' }
@@ -907,7 +986,7 @@ if ($installedVersion -ne '' -and $versionKnown -and $installedVersion -ne $Froz
     Write-Note  -Text ('installed ' + $installedVersion + ' is NOT the version CONTRACT.md freezes (' + $FrozenOmoVersion + ').')
     Write-Note  -Text ('It is accepted only because every one of the ' + $anchors.Count + ' cited line anchors resolves')
     Write-Note  -Text 'in the installed bundle (see frozen_line_anchors_resolved above). CONTRACT.md'
-    Write-Note  -Text 'section 0.1 forbids citing ' + $installedVersion + ' as the frozen version; it is cited'
+    Write-Note  -Text ('section 0.1 forbids citing ' + $installedVersion + ' as the frozen version; it is cited')
     Write-Note  -Text 'here only as an observed package.json value.'
 }
 
@@ -921,7 +1000,15 @@ if ($installedVersion -ne '' -and $versionKnown -and $driftLines.Count -eq 0) {
     } elseif (-not $versionKnown) {
         Write-Cause -Text ('installed version ' + $installedVersion + ' is neither the frozen ' + $FrozenOmoVersion)
         Write-Cause -Text ('nor a verified line-identical build (' + ($KnownEquivalentOmoVersions -join ',') + ')')
-        Write-Cause -Text 'the contract is frozen against ' + $FrozenOmoVersion + ', whose line numbers this check'
+        # PARENTHESES ARE LOAD-BEARING. Written as
+        #   Write-Cause -Text 'the contract is frozen against ' + $FrozenOmoVersion + ...
+        # PowerShell's command mode splits that into -Text 'the contract is frozen against '
+        # `+` $FrozenOmoVersion `+` '...', and because Write-Cause is a SIMPLE function with
+        # a single declared parameter, the 4 surplus positional arguments land in $args and
+        # are discarded with no error at all. Measured on Windows PowerShell 5.1: the line
+        # printed as "CAUSE the contract is frozen against " -- the frozen version, the
+        # number this whole message exists to name, silently gone.
+        Write-Cause -Text ('the contract is frozen against ' + $FrozenOmoVersion + ', whose line numbers this check')
         Write-Cause -Text 're-verifies against the bundle actually installed.'
     }
     foreach ($d in $driftLines) { Write-Cause -Text $d }
