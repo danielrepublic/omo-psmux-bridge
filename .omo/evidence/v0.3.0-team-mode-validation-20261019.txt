@@ -1,0 +1,131 @@
+v0.3.0 — Windows team-mode validation (2026-10-19)
+====================================================
+Host: WINDOWS-DANIEL (Windows 11 build 26300, PowerShell 5.1, node v24.19.0).
+Binary under test: the INSTALLED v0.3.0 release shim
+  %LOCALAPPDATA%\opencode-psmux-bridge\bin\tmux.exe
+  SHA-256 994875a97663ac4fe8a26a0bae11fa904b3ed16bed580929aebcbd92fcd8b513
+  (byte-identical to the v0.3.0 zip payload; installed via the documented
+  one-liner — see v0.3.0-windows-install-20261019.json).
+Backend: psmux 3.4.0 (20aa1d7). OmO bundle 5.1.35. opencode 1.19.3.
+Prior methodology: .omo/evidence/issue-1-windows-team-mode-validation.txt,
+issue-1-e2e-team-mode.txt, issue-1-e2e-team-mode-summary.json.
+
+1. Team-layout probe (grammar replay) — PASS
+--------------------------------------------
+Probe: scripts/windows/parity/team-layout-probe.cjs (D3, unmodified),
+staged to the Windows work dir and hash-verified identical.
+Namespaces: omo-v030-team031538 (direct arm) + omo-v030-team031538_shim
+(shim arm). Run: 2026-10-18T19:15:44Z–19:15:51Z.
+Result line: ok=true, direct.aborted=false, shim.aborted=false,
+cleanup.ok=true, sessionsLeft=[].
+
+SHIM arm, per command (installed v0.3.0 shim):
+  display x2  -> $44 / probe:0, exit 0; rewritten=true,
+                 rewriteReason=psmux-client-treats-display-F-as-message-text
+  list-panes  -> exit 0, %1 (valid target)
+  set-option -p x4 -> suppressed, exit 0, no backend call,
+                 suppressionReason=psmux-refuses-pane-scoped-options
+  select-layout -t probe:0 main-vertical -> exit 0 (passthrough)
+  resize-pane -t %1 -x 30% -> rewritten to
+                 argv=["set-option","main-pane-width","30"],
+                 followUps=[{reason=psmux-reads-main-pane-size-only-inside-apply-layout,
+                             argv=["select-layout","main-vertical"]}];
+                 geometry 119/80 -> 59/140 (caller 59/200 = 29.5%)
+  send-keys x2 -> capture-pane markers present (attempts=1 each)
+  kill-pane (dead) -> exit 1, expected (dead pane)
+DIRECT arm (control, real psmux.exe) still shows raw behaviour:
+  display -> `-F $42` / `-F probe:0` (unrewritten), list-panes exit 1,
+  select-layout exit 1, resize-pane exit 0 with geometry unchanged
+  (119/80). The treatment effect is attributable to the shim.
+Full artifact: .omo/evidence/v0.3.0-team-layout-probe-20261019.json.
+
+2. Real OmO team E2E (live opencode + OmO team_create) — PASS
+--------------------------------------------------------------
+Driver: .omo/evidence/v0.3.0-team-e2e-20261019.cjs (new; single ssh
+invocation owns the whole lifetime). Report: 14/14 checks PASS,
+exit 0. Session omo-v030-e2e-344466; team e2e-v030-344466;
+member probe-member-v030; marker E2E-MEMBER-OK-344466.
+
+Setup (mirrors the 10-06 PASS run):
+- Throwaway project %TEMP%\omo-v030-e2e with project-local
+  .omo/omo.jsonc: {"[opencode]":{"tmux":{"enabled":true},
+  "team_mode":{"enabled":true,"tmux_visualization":true}}}.
+  Bundle precheck passed: 5.1.35 carries team_mode +
+  tmux_visualization keys and team_create + team_send_message.
+- Fresh uniquely-named session in the DEFAULT namespace (see the
+  namespace note below). In-pane `where.exe tmux` resolves the
+  installed v0.3.0 shim first — no PATH override needed.
+- opencode TUI launched in the pane from the project dir; TUI chrome
+  detected; asked ONCE to team_create one single-member team.
+
+Result: PASS
+- Member pane created: %2, title `omo-team-probe-member-v030`.
+  Final geometry (list-panes -t <sess>:0 -F
+  '#{pane_id} #{pane_index} #{pane_title} #{pane_left} #{pane_width}'):
+    %1 0 WINDOWS-DANIEL            0  65
+    %2 1 omo-team-probe-member-v030 66 154
+  Window width 220: caller 65/220 (~30%), member column 154/220 (~70%)
+  — the rule-1e geometry (main-pane-width 30 + main-vertical) on a
+  real run, identical in shape to the 10-06 result.
+- Member pane is a live attached opencode subagent session
+  (Sisyphus-Junior footer, "Subagent (1 of 1)"); it echoed the unique
+  marker E2E-MEMBER-OK-344466, captured in-pane.
+- Installed-shim call log around the run shows the team sequence:
+  display rewritten, set-option -p suppressed x4, send-keys
+  passthrough, select-layout passthrough, resize-pane rewritten with
+  the main-vertical follow-up.
+- One bounded model call chain (main agent + one member); no other
+  LLM use in this validation.
+
+NAMESPACE NOTE (deviation, documented): the OmO-driven half of this
+run cannot carry -L — OmO's own tmux clients emit no -L flag and
+session targets (<session>:0) do not resolve inside a namespaced
+server, so the plugin aborts the layout (issue-1 harness note,
+reproduced 10-06 under -L te2f). Isolation here is by UNIQUE session
+name (omo-v030-e2e-344466) in the default namespace plus targeted
+`kill-session -t` only — kill-server was never issued in this scope.
+No pre-existing session was touched: baseline default-namespace
+sessions were [] at run time (the user's live servers run in their
+own namespaces) and sessionsAfter is [] again.
+
+Cleanup
+-------
+- kill-session -t omo-v030-e2e-344466 exit 0; target gone=true.
+- Baseline sessions intact=true; psmux.exe 1 before / 1 after
+  (matches the pre-flight baseline of 1).
+- Throwaway project dir deleted by the driver.
+- Probe namespaces (omo-v030-team031538{,_shim}) and the smoke
+  namespace (omo-v030-1396894347) verified gone; all staged files,
+  serve logs, read probes and the work dir deleted from the Windows
+  host and verified absent. Nothing of the user's was touched.
+
+Prior-harness check
+-------------------
+%TEMP%\omo-team-probe (the 10-06 E2E driver location) is ABSENT on
+the host — that harness was cleaned up long ago, so the E2E above is
+a fresh driver written for this release, not a replay of a saved one.
+Earlier same-day temp files from other validation runs
+(omo-smoke-31608713029.*, omo-smoke-40172910828.*, etc.) belong to
+other teammates' runs and were left alone.
+
+Artifacts in .omo/evidence/
+----------------------------
+- v0.3.0-team-mode-validation-20261019.txt   this file
+- v0.3.0-team-layout-probe-20261019.json     probe artifact (both arms)
+- v0.3.0-team-e2e-20261019.cjs               real-E2E driver
+- v0.3.0-windows-protocol-smoke-20261019.json protocol smoke (incl.
+  doctor exit 0 + 11/11 anchors under a live serve)
+- v0.3.0-windows-install-20261019.json       install + hash assertions
+- v0.3.0-windows-smoke-20261019.cjs          adapted smoke driver
+- v0.3.0-windows-preflight-20261019.json     BEFORE state (t3)
+
+Anything the user must know
+----------------------------
+- After this upgrade the doctor's STALE-SERVER gate is heuristic: the
+  new shim mtime moved forward while older servers still run, so a
+  long-lived psmux server can read as stale (false-positive path
+  documented in the doctor output). If the doctor ever reports
+  STALE FAIL on a server started before the upgrade, restart that
+  server from a fresh shell — same guidance as any bridge upgrade.
+- The installer's `Unblock-File -Recurse` error on PS 5.1 is cosmetic
+  (install still RESULT=OK); suggested follow-up issue for repo-ops.

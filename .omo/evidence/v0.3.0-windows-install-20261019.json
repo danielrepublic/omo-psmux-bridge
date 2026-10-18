@@ -1,0 +1,97 @@
+{
+  "artifact": "v0.3.0 Windows install E2E (windows-daniel, option A one-liner)",
+  "date": "2026-10-19",
+  "release": {
+    "tag": "v0.3.0",
+    "url": "https://github.com/danielrepublic/omo-psmux-bridge/releases/tag/v0.3.0",
+    "zip_asset": "opencode-psmux-bridge-v0.3.0-win-x64.zip",
+    "zip_bytes": 39752319,
+    "zip_sha256": "ee554c2433e6b236f0c8212261617d3a6ab06cb296adb49f74d47a8470ba0cbe",
+    "zip_sha256_match_repo_ops": true,
+    "bootstrap_asset_bytes": 10904,
+    "bootstrap_asset_sha256": "3c80de8c57d89a506d2b282db7587b43f26ec3a987f073b93d2e9481947e3a5c",
+    "bootstrap_sha256_match_repo_ops": true,
+    "zip_entries": 11,
+    "extracted_tmux_exe_bytes": 86135808,
+    "extracted_tmux_exe_sha256": "994875a97663ac4fe8a26a0bae11fa904b3ed16bed580929aebcbd92fcd8b513",
+    "extracted_sha256_match_repo_ops": true
+  },
+  "before": {
+    "installed_tmux_exe_sha256": "4E94E1DF2735DC70A559F807CE0BC2EB37B7414ACCA0470AAECE5505E9D28E39",
+    "installed_tmux_exe_bytes": 96429056,
+    "source": ".omo/evidence/v0.3.0-windows-preflight-20261019.json"
+  },
+  "install_run": {
+    "method": "INSTALL.md Option A one-liner, replicated verbatim in a staged wrapper .ps1 (two commands) plus exit-code propagation; invoked via ssh -File per G-3",
+    "wrapper": "run-oneliner-v030.ps1 (staged to work dir, deleted in cleanup)",
+    "bootstrap_exit": 0,
+    "bootstrap_tag": "v0.3.0",
+    "downloaded_bytes": 39752319,
+    "printed_sha256": "EE554C2433E6B236F0C8212261617D3A6AB06CB296ADB49F74D47A8470BA0CBE",
+    "printed_sha256_equals_asset": true,
+    "installer_exit": 0,
+    "installer_result": "OK",
+    "staged_shim_sha256": "994875A97663AC4FE8A26A0BAE11FA904B3ED16BED580929AEBCBD92FCD8B513",
+    "staged_shim_equals_zip_tmux": true,
+    "smoke_V": "tmux 3.4.0 / psmux 3.4.0 (20aa1d7 2026-10-13)",
+    "smoke_result": "PASS",
+    "user_path_result": "ALREADY_CORRECT (bridge bin already first, 14 entries unchanged)",
+    "full_bootstrap_console": "[bootstrap] repository=danielrepublic/omo-psmux-bridge\n[bootstrap] tag=v0.3.0\n[bootstrap] release_url=https://github.com/danielrepublic/omo-psmux-bridge/releases/tag/v0.3.0\n[bootstrap] asset=opencode-psmux-bridge-v0.3.0-win-x64.zip\n[bootstrap] asset_bytes=39752319\n[bootstrap] asset_url=https://github.com/danielrepublic/omo-psmux-bridge/releases/download/v0.3.0/opencode-psmux-bridge-v0.3.0-win-x64.zip\n[bootstrap] work_dir=C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-psmux-bridge-v0.3.0\n[bootstrap] step=download\n[bootstrap] note=this asset is roughly 38 MB and PowerShell shows no progress bar while it arrives\n[bootstrap] downloaded_bytes=39752319\n[bootstrap] step=verify\n[bootstrap] sha256=EE554C2433E6B236F0C8212261617D3A6AB06CB296ADB49F74D47A8470BA0CBE\n[bootstrap] sha256_note=compare this with the value on the release page before trusting the install\n[bootstrap] step=extract\n[bootstrap] entry_point=C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-psmux-bridge-v0.3.0\\extracted\\opencode-psmux-bridge\\bin\\install.cmd\n[bootstrap] step=install\n[bootstrap] ==== install.cmd output follows ====\nUnblock-File : \ufffd\u4923\ufffd\ufffd\u0166X\ufffd\u047c\u01a6W\ufffd\ufffd 'Recurse' \ufffd\ufffd\ufffd\u047c\u01a1C\n\ufffd\ufffd\ufffd \ufffdu\ufffd\ufffd:1 \ufffdr\ufffd\ufffd:124\n+ ... x-bridge-v0.3.0\\extracted\\opencode-psmux-bridge\\bin' -Recurse -ErrorA ...\n+                                                          ~~~~~~~~\n    + CategoryInfo          : InvalidArgument: (:) [Unblock-File]\ufffdAParameterBindingException\n    + FullyQualifiedErrorId : NamedParameterNotFound,Microsoft.PowerShell.Commands.UnblockFileCommand\n \n[install] source_root=C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-psmux-bridge-v0.3.0\\extracted\\opencode-psmux-bridge\n[install] install_root=C:\\Users\\Daniel\\AppData\\Local\\opencode-psmux-bridge\n[install] bin_dir=C:\\Users\\Daniel\\AppData\\Local\\opencode-psmux-bridge\\bin\n[install] payload_files_checked=6\n[install] payload_files_missing=0\n[install] prereq_psmux_registry=C:\\Users\\Daniel\\AppData\\Local\\psmux\n[install] prereq_psmux_found=True\n[install] prereq_psmux_binary=C:\\Users\\Daniel\\AppData\\Local\\psmux\\psmux.exe\n[install] prereq_opencode_found=True\n[install] prereq_opencode_path=C:\\Users\\Daniel\\AppData\\Local\\opencode-psmux-bridge\\bin\\opencode.cmd\n[install] opencode_config=C:\\Users\\Daniel\\.config\\opencode\\opencode.json\n[install] omo_config=C:\\Users\\Daniel\\.omo\\omo.jsonc\n[install] omo_config_exists=True\n[install] omo_config_rule=omo.jsonc exists (index.js:21427,21430)\n[install] prereq_tmux_enabled=TRUE  (read from omo config [opencode].tmux.enabled, index.js:141275-141276)\n[install] step=stage\n[install] stage_from=C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-psmux-bridge-v0.3.0\\extracted\\opencode-psmux-bridge\\bin\n[install] stage_to=C:\\Users\\Daniel\\AppData\\Local\\opencode-psmux-bridge\\bin\n[install] staged=bridge-doctor.cmd bytes=2232\n[install] staged=bridge-doctor.ps1 bytes=56644\n[install] staged=install.cmd bytes=6370\n[install] staged=install.ps1 bytes=35690\n[install] staged=omo-opencode-port.ps1 bytes=30607\n[install] staged=opencode.cmd bytes=2267\n[install] staged=psmux.cmd bytes=9880\n[install] staged=tmux.exe bytes=86135808\n[install] staged=uninstall.ps1 bytes=10781\n[install] staged=Start-PaneFromDescriptor.ps1 bytes=33025\n[install] backup_removed=yes\n[install] staged_shim_bytes=86135808\n[install] staged_shim_sha256=994875A97663AC4FE8A26A0BAE11FA904B3ED16BED580929AEBCBD92FCD8B513\n[install] smoke_-V_exit=0\n[install] smoke_-V=tmux 3.4.0 / psmux 3.4.0 (20aa1d7 2026-10-13)\n[install] smoke_result=PASS\n[install] user_path_kind=ExpandString\n[install] user_path_sha256_before=40BB31FCF9EDE1889E908A2B14DC1291F1952432837F17D504A25FE766B84DF2\n[install] user_path_bytes_before=825\n[install] user_path_entries_before=14\n[install] existing_matching_entries=1\n[install] user_path_entries_after=14\n[install] user_path_sha256_computed=40BB31FCF9EDE1889E908A2B14DC1291F1952432837F17D504A25FE766B84DF2\n[install] RESULT=ALREADY_CORRECT\n[install] changed=no\n[install] verify_kind=ExpandString\n[install] verify_kind_preserved=True\n[install] verify_entries=14\n[install] verify_matching_entries=1\n[install] verify_first_entry=C:\\Users\\Daniel\\AppData\\Local\\opencode-psmux-bridge\\bin\n[install] verify_first_is_bin_dir=True\n[install] user_path_sha256_after=40BB31FCF9EDE1889E908A2B14DC1291F1952432837F17D504A25FE766B84DF2\n[install] user_path_bytes_after=825\n[install] user_path_net_user_after=C:\\Users\\Daniel\\AppData\\Local\\opencode-psmux-bridge\\bin;C:\\Users\\Daniel\\AppData\\Local\\Programs\\Python\\Python312\\Scripts\\;C:\\Users\\Daniel\\AppData\\Local\\Programs\\Python\\Python312\\;C:\\Users\\Daniel\\AppData\\Local\\Programs\\Python\\Launcher\\;C:\\Users\\Daniel\\bin;C:\\Users\\Daniel\\AppData\\Local\\Microsoft\\WindowsApps;C:\\Users\\Daniel\\AppData\\Local\\Programs\\Microsoft VS Code\\bin;C:\\Users\\Daniel\\AppData\\Roaming\\npm;C:\\Users\\Daniel\\AppData\\Local\\Microsoft\\WinGet\\Links;C:\\Users\\Daniel\\AppData\\Local\\Microsoft\\WinGet\\Packages\\ast-grep.ast-grep_Microsoft.Winget.Source_8wekyb3d8bbwe;C:\\Users\\Daniel\\AppData\\Local\\Microsoft\\WinGet\\Packages\\yt-dlp.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-N-125875-g5d4d3bdc61-win64-gpl\\bin;C:\\Users\\Daniel\\.dotnet\\tools;C:\\Users\\Daniel\\tools\\jdk-21.0.12.1+1\\bin;C:\\Users\\Daniel\\AppData\\Local\\psmux\n[install] machine_path_fingerprint_before=1E56DEE7FB96E5D4690B7B1C199A070ED9A37D24FC7E8DCCCD0D818D05EE83D1 len=498\n[install] machine_path_fingerprint_after=1E56DEE7FB96E5D4690B7B1C199A070ED9A37D24FC7E8DCCCD0D818D05EE83D1 len=498\n[install] machine_path_unchanged=True\n[install] broadcast=SENDMSG_BROADCAST_OK\n[install] note=a_new_shell_is_required_for_the_change_to_be_visible\n[install] next=open a NEW terminal window (a running shell keeps its old PATH), then run: psmux\n[bootstrap] ==== install.cmd output ends ====\n[bootstrap] installer_exit=0\n[bootstrap] cleanup=removed_work_dir\n[bootstrap] RESULT=OK\n[bootstrap] next=open a NEW terminal, then run: psmux\n"
+  },
+  "after_assertions": {
+    "installed_tmux_sha256_equals_zip": {
+      "pass": true,
+      "value": "994875A97663AC4FE8A26A0BAE11FA904B3ED16BED580929AEBCBD92FCD8B513"
+    },
+    "installed_tmux_bytes": {
+      "pass": true,
+      "value": 86135808
+    },
+    "scripts_byte_match_release": {
+      "pass": true,
+      "files": {
+        "bin/install.ps1": "120A80580051352EC38A2D660D0D8D51D86F8023FB7D9549EEE856EA473D32FF",
+        "bin/psmux.cmd": "AD9D8E5B3C714474436D2EA71636BE6EAE7C2B02053F910324FEBFD39BCEDD36",
+        "bin/bridge-doctor.ps1": "16114BBF9C3CC013718670671D79C0B920C884C9F945A91269189F17C8E60BC3",
+        "bin/bridge-doctor.cmd": "C11EDEF92E207A15E4A95993864CC57DB2513DD4A3DBF752846E49EAD6E9CD4B",
+        "bin/install.cmd": "1BD67F755C52C90912A3B396BC8FAA16495EB0C0A2E93C4C5C8139F16B865F2D",
+        "bin/opencode.cmd": "FBB1E84509EBF2A9D26193CBA8F8F03E75CCAE41244AF0C3540221FB2C2CA958",
+        "bin/uninstall.ps1": "5A6201FADD01AF0E23FCED595A5C0A3F19D951E9861C11CF5F0494F3C8B07C86",
+        "bin/omo-opencode-port.ps1": "8AC696C87AD2F5A3FFD08A136ADB9E8DD8763864DA33783445EA70E99C6AE01A",
+        "runtime/Start-PaneFromDescriptor.ps1": "564E218B73350270C5DBE0FDB099913CE960EC48B4198C538E3FA74275B6E034"
+      }
+    },
+    "bridge_inventory_sane": {
+      "pass": true,
+      "detail": "payload files carry zip mtimes (11:10:14Z); state/ (pane jsonls, shim-calls.jsonl) preserved and growing; INSTALL.md root untouched (installer stages bin+runtime only)"
+    },
+    "verify_console": "===VERIFY-START===\nINSTALLED_TMUX_SHA256=994875A97663AC4FE8A26A0BAE11FA904B3ED16BED580929AEBCBD92FCD8B513\nINSTALLED_TMUX_BYTES=86135808\nFILE|install.ps1|35690|120A80580051352EC38A2D660D0D8D51D86F8023FB7D9549EEE856EA473D32FF\nFILE|psmux.cmd|9880|AD9D8E5B3C714474436D2EA71636BE6EAE7C2B02053F910324FEBFD39BCEDD36\nFILE|bridge-doctor.ps1|56644|16114BBF9C3CC013718670671D79C0B920C884C9F945A91269189F17C8E60BC3\nFILE|bridge-doctor.cmd|2232|C11EDEF92E207A15E4A95993864CC57DB2513DD4A3DBF752846E49EAD6E9CD4B\nFILE|install.cmd|6370|1BD67F755C52C90912A3B396BC8FAA16495EB0C0A2E93C4C5C8139F16B865F2D\nFILE|opencode.cmd|2267|FBB1E84509EBF2A9D26193CBA8F8F03E75CCAE41244AF0C3540221FB2C2CA958\nFILE|uninstall.ps1|10781|5A6201FADD01AF0E23FCED595A5C0A3F19D951E9861C11CF5F0494F3C8B07C86\nFILE|omo-opencode-port.ps1|30607|8AC696C87AD2F5A3FFD08A136ADB9E8DD8763864DA33783445EA70E99C6AE01A\nFILE|Start-PaneFromDescriptor.ps1|33025|564E218B73350270C5DBE0FDB099913CE960EC48B4198C538E3FA74275B6E034\n---BRIDGE-INVENTORY---\nINV|\\bin|1|2026-10-15T17:57:41.2429062Z\nINV|\\runtime|1|2026-10-18T18:31:36.7452135Z\nINV|\\state|1|2026-10-18T18:41:22.6944040Z\nINV|\\INSTALL.md|9327|2026-10-18T18:42:54.4486859Z\nINV|\\bin\\state|1|2026-10-15T17:57:41.2429062Z\nINV|\\bin\\bridge-doctor.cmd|2232|2026-10-18T11:10:14.0000000Z\nINV|\\bin\\bridge-doctor.ps1|56644|2026-10-18T11:10:14.0000000Z\nINV|\\bin\\install.cmd|6370|2026-10-18T11:10:14.0000000Z\nINV|\\bin\\install.ps1|35690|2026-10-18T11:10:14.0000000Z\nINV|\\bin\\omo-opencode-port.ps1|30607|2026-10-18T11:10:14.0000000Z\nINV|\\bin\\opencode.cmd|2267|2026-10-18T11:10:14.0000000Z\nINV|\\bin\\psmux.cmd|9880|2026-10-18T11:10:14.0000000Z\nINV|\\bin\\tmux.exe|86135808|2026-10-18T11:10:14.0000000Z\nINV|\\bin\\uninstall.ps1|10781|2026-10-18T11:10:14.0000000Z\nINV|\\bin\\state\\shim-calls.jsonl|2229309|2026-10-18T19:13:32.8112004Z\nINV|\\runtime\\Start-PaneFromDescriptor.ps1|33025|2026-10-18T11:10:14.0000000Z\nINV|\\state\\pane-pane-mve5oqav-57e17876.jsonl|345|2026-10-18T18:25:41.3580755Z\nINV|\\state\\pane-pane-mve5osdp-c25886b7.jsonl|345|2026-10-18T18:25:44.0702197Z\nINV|\\state\\pane-pane-mve5wfwa-f393bbc8.jsonl|345|2026-10-18T18:31:41.0996742Z\nINV|\\state\\pane-pane-mve5whz2-45677437.jsonl|345|2026-10-18T18:31:43.7588825Z\nINV|\\state\\pane-pane-mve63dsy-e8d8b01d.jsonl|345|2026-10-18T18:37:04.9859022Z\nINV|\\state\\pane-pane-mve63fv7-52950e72.jsonl|345|2026-10-18T18:37:07.6182378Z\nINV|\\state\\pane-pane-mve63hxl-a98fe376.jsonl|335|2026-10-18T18:37:10.3749383Z\nINV|\\state\\pane-pane-mve64zc4-9c52cfa3.jsonl|345|2026-10-18T18:38:19.5727750Z\nINV|\\state\\pane-pane-mve651ey-94c7408c.jsonl|345|2026-10-18T18:38:22.2720945Z\nINV|\\state\\pane-pane-mve653hr-6597e1e8.jsonl|335|2026-10-18T18:38:24.9145518Z\nINV|\\state\\pane-pane-mve66txl-4f057620.jsonl|345|2026-10-18T18:39:45.8720948Z\nINV|\\state\\pane-pane-mve66vzv-9d90ed21.jsonl|345|2026-10-18T18:39:48.4844760Z\nINV|\\state\\pane-pane-mve66znk-cb35a7de.jsonl|335|2026-10-18T18:39:53.2549597Z\nINV|\\state\\pane-pane-mve68rwv-8b25d76e.jsonl|345|2026-10-18T18:41:16.5216081Z\nINV|\\state\\pane-pane-mve68tzf-e9334e92.jsonl|345|2026-10-18T18:41:19.2320308Z\nINV|\\state\\pane-pane-mve68wnw-d5b06fe8.jsonl|335|2026-10-18T18:41:22.7004553Z\n===VERIFY-END===\n"
+  },
+  "doctor": {
+    "standalone_no_server": {
+      "exit": 30,
+      "detail": "4/5 PASS; gate 3 PORT fails with OPENCODE_PORT unset and nothing on 4096 \u2014 expected without a server, same as pre-flight, not an install fault"
+    },
+    "with_serve_in_protocol_smoke": {
+      "exit": 0,
+      "anchors": "11/11 frozen_line_anchors_resolved",
+      "detail": "see v0.3.0-windows-protocol-smoke-20261019.json assertions doctor-exit-0 + doctor-anchors-11/11"
+    }
+  },
+  "deviations_observations": [
+    "install.cmd prints a non-fatal Unblock-File -Recurse error on PS 5.1 (that cmdlet has no -Recurse on 5.1); install continues and reports RESULT=OK. Cosmetic PS5.1 compat nit, worth a follow-up issue, not a blocker.",
+    "Release shim (86,135,808 bytes) differs from the dev-rebuilt shim seen at pre-flight (96,429,056 bytes); expected \u2014 installed hash now equals the release zip hash exactly."
+  ],
+  "cleanup": {
+    "namespaces_created": [
+      "omo-v030-1396894347 (protocol smoke)",
+      "omo-v030-team031538 + _shim (layout probe)",
+      "omo-v030-e2e-344466 (default-ns unique session, real E2E)"
+    ],
+    "namespaces_left": "none \u2014 all verified gone (scoped kill-server exit 0 / kill-session exit 0)",
+    "psmux_exe_before": 1,
+    "psmux_exe_after": 1,
+    "staged_files_left": "none \u2014 work dir, wrapper/verify/doctor/probe/cleanup scripts, serve logs, read probes, bootstrap copy all deleted and verified absent",
+    "user_sessions_touched": "none"
+  }
+}
