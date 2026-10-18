@@ -1,0 +1,351 @@
+==============================================================================
+ENVIRONMENT
+  doctor under test      : C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\fixture-bin\bridge-doctor.ps1
+  stub shim              : bytes=66 sha256=FE90A3ACFA9A18F2FAD03825D6429E6F9818A847AE0EB953292F1F5192AA5BD7
+  hermetic PATH          : C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\fixture-bin;C:\WINDOWS\System32
+  health fixture         : up=True  ok_port=64793  unhealthy_port=64794  pid=44108
+  reserved dead port     : 64795
+  live pkg root present  : True  (C:\Users\Daniel\.cache\opencode\packages)
+  host opencode listener : False  fallback_4096_busy=False
+  contract version       : 5.1.35
+  anchors read from doctor: 11 rows, max line 156466
+  ASSERT PASS  the doctor still declares exactly 11 check-5 anchors  [found=11]
+  ASSERT PASS  the anchor this harness corrupts in case C exists at line 27072
+------------------------------------------------------------------------------
+CASE A-healthy
+  cmd            : powershell -NoProfile -ExecutionPolicy Bypass -File FIXTUREBIN\bridge-doctor.ps1 -Namespace fxlive -Session fresh -DataDir C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\registry-fixture-live -ConfigPath C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\omo-tmux-on.jsonc -PackageRoot C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\pkg-clean
+  env overrides  : {"OPENCODE_PORT":"64793","PATH":"C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-bridge-update-20261019\\doctor-final\\fixture-bin;C:\\WINDOWS\\System32"}
+  exit           : expected=0  actual=0
+  wall clock     : harness=2030ms   node=1609ms
+  doctor_stdout  : bytes=7028  lines=97
+  doctor_stderr  : bytes=0  (empty)
+  node_argv      : -NoProfile -ExecutionPolicy Bypass -File C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\fixture-bin\bridge-doctor.ps1 -Namespace fxlive -Session fresh -DataDir C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\registry-fixture-live -ConfigPath C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\omo-tmux-on.jsonc -PackageRoot C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\pkg-clean
+------------------------------------------------------------------------------
+CASE B-wrongversion
+  cmd            : powershell -NoProfile -ExecutionPolicy Bypass -File FIXTUREBIN\bridge-doctor.ps1 -Namespace fxlive -Session fresh -DataDir C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\registry-fixture-live -ConfigPath C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\omo-tmux-on.jsonc -PackageRoot C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\pkg-clean -FrozenOmoVersion 0.0.1
+  env overrides  : {"OPENCODE_PORT":"64793","PATH":"C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-bridge-update-20261019\\doctor-final\\fixture-bin;C:\\WINDOWS\\System32"}
+  exit           : expected=50  actual=50
+  wall clock     : harness=2027ms   node=1692ms
+  doctor_stdout  : bytes=7427  lines=104
+  doctor_stderr  : bytes=0  (empty)
+  node_argv      : -NoProfile -ExecutionPolicy Bypass -File C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\fixture-bin\bridge-doctor.ps1 -Namespace fxlive -Session fresh -DataDir C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\registry-fixture-live -ConfigPath C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\omo-tmux-on.jsonc -PackageRoot C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\pkg-clean -FrozenOmoVersion 0.0.1
+------------------------------------------------------------------------------
+CASE C-wronganchor
+  cmd            : powershell -NoProfile -ExecutionPolicy Bypass -File FIXTUREBIN\bridge-doctor.ps1 -Namespace fxlive -Session fresh -DataDir C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\registry-fixture-live -ConfigPath C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\omo-tmux-on.jsonc -PackageRoot C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\pkg-drift
+  env overrides  : {"OPENCODE_PORT":"64793","PATH":"C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-bridge-update-20261019\\doctor-final\\fixture-bin;C:\\WINDOWS\\System32"}
+  exit           : expected=50  actual=50
+  wall clock     : harness=2042ms   node=1708ms
+  doctor_stdout  : bytes=7254  lines=100
+  doctor_stderr  : bytes=0  (empty)
+  node_argv      : -NoProfile -ExecutionPolicy Bypass -File C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\fixture-bin\bridge-doctor.ps1 -Namespace fxlive -Session fresh -DataDir C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\registry-fixture-live -ConfigPath C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\omo-tmux-on.jsonc -PackageRoot C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\pkg-drift
+------------------------------------------------------------------------------
+CASE D-disabledconfig
+  cmd            : powershell -NoProfile -ExecutionPolicy Bypass -File FIXTUREBIN\bridge-doctor.ps1 -Namespace fxlive -Session fresh -DataDir C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\registry-fixture-live -ConfigPath C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\omo-tmux-off.jsonc -PackageRoot C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\pkg-clean
+  env overrides  : {"OPENCODE_PORT":"64793","PATH":"C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-bridge-update-20261019\\doctor-final\\fixture-bin;C:\\WINDOWS\\System32"}
+  exit           : expected=40  actual=40
+  wall clock     : harness=2024ms   node=1728ms
+  doctor_stdout  : bytes=7603  lines=103
+  doctor_stderr  : bytes=0  (empty)
+  node_argv      : -NoProfile -ExecutionPolicy Bypass -File C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\fixture-bin\bridge-doctor.ps1 -Namespace fxlive -Session fresh -DataDir C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\registry-fixture-live -ConfigPath C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\omo-tmux-off.jsonc -PackageRoot C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\pkg-clean
+------------------------------------------------------------------------------
+CASE E-nohealth
+  cmd            : powershell -NoProfile -ExecutionPolicy Bypass -File FIXTUREBIN\bridge-doctor.ps1 -Namespace fxlive -Session fresh -DataDir C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\registry-fixture-empty -ConfigPath C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\omo-tmux-on.jsonc -PackageRoot C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\pkg-clean
+  env overrides  : {"OPENCODE_PORT":null,"PATH":"C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-bridge-update-20261019\\doctor-final\\fixture-bin;C:\\WINDOWS\\System32"}
+  exit           : expected=30  actual=30
+  wall clock     : harness=2044ms   node=1684ms
+  doctor_stdout  : bytes=7233  lines=98
+  doctor_stderr  : bytes=0  (empty)
+  node_argv      : -NoProfile -ExecutionPolicy Bypass -File C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\fixture-bin\bridge-doctor.ps1 -Namespace fxlive -Session fresh -DataDir C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\registry-fixture-empty -ConfigPath C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\omo-tmux-on.jsonc -PackageRoot C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\pkg-clean
+------------------------------------------------------------------------------
+CASE F-unhealthy503
+  cmd            : powershell -NoProfile -ExecutionPolicy Bypass -File FIXTUREBIN\bridge-doctor.ps1 -Namespace fxlive -Session fresh -DataDir C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\registry-fixture-live -ConfigPath C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\omo-tmux-on.jsonc -PackageRoot C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\pkg-clean
+  env overrides  : {"OPENCODE_PORT":"64794","PATH":"C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-bridge-update-20261019\\doctor-final\\fixture-bin;C:\\WINDOWS\\System32"}
+  exit           : expected=0  actual=0
+  wall clock     : harness=2050ms   node=1719ms
+  doctor_stdout  : bytes=7704  lines=106
+  doctor_stderr  : bytes=0  (empty)
+  node_argv      : -NoProfile -ExecutionPolicy Bypass -File C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\fixture-bin\bridge-doctor.ps1 -Namespace fxlive -Session fresh -DataDir C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\registry-fixture-live -ConfigPath C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\omo-tmux-on.jsonc -PackageRoot C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\pkg-clean
+------------------------------------------------------------------------------
+CASE G-deadport
+  cmd            : powershell -NoProfile -ExecutionPolicy Bypass -File FIXTUREBIN\bridge-doctor.ps1 -Namespace fxlive -Session fresh -DataDir C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\registry-fixture-live -ConfigPath C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\omo-tmux-on.jsonc -PackageRoot C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\pkg-clean -HealthTimeoutMs 700
+  env overrides  : {"OPENCODE_PORT":"64795","PATH":"C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-bridge-update-20261019\\doctor-final\\fixture-bin;C:\\WINDOWS\\System32"}
+  exit           : expected=0  actual=0
+  wall clock     : harness=3055ms   node=2350ms
+  doctor_stdout  : bytes=7113  lines=98
+  doctor_stderr  : bytes=0  (empty)
+  node_argv      : -NoProfile -ExecutionPolicy Bypass -File C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\fixture-bin\bridge-doctor.ps1 -Namespace fxlive -Session fresh -DataDir C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\registry-fixture-live -ConfigPath C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\omo-tmux-on.jsonc -PackageRoot C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\pkg-clean -HealthTimeoutMs 700
+------------------------------------------------------------------------------
+CASE H-path
+  cmd            : powershell -NoProfile -ExecutionPolicy Bypass -File FIXTUREBIN\bridge-doctor.ps1 -Namespace fxlive -Session fresh -DataDir C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\registry-fixture-live -ConfigPath C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\omo-tmux-on.jsonc -PackageRoot C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\pkg-clean
+  env overrides  : {"OPENCODE_PORT":"64793","PATH":"C:\\WINDOWS\\System32"}
+  exit           : expected=10  actual=10
+  wall clock     : harness=2042ms   node=1676ms
+  doctor_stdout  : bytes=7293  lines=102
+  doctor_stderr  : bytes=0  (empty)
+  node_argv      : -NoProfile -ExecutionPolicy Bypass -File C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\fixture-bin\bridge-doctor.ps1 -Namespace fxlive -Session fresh -DataDir C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\registry-fixture-live -ConfigPath C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\omo-tmux-on.jsonc -PackageRoot C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\pkg-clean
+------------------------------------------------------------------------------
+CASE I-shadowbin
+  cmd            : powershell -NoProfile -ExecutionPolicy Bypass -File FIXTUREBIN\bridge-doctor.ps1 -Namespace fxlive -Session fresh -DataDir C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\registry-fixture-live -ConfigPath C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\omo-tmux-on.jsonc -PackageRoot C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\pkg-clean
+  env overrides  : {"OPENCODE_PORT":"64793","PATH":"C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-bridge-update-20261019\\doctor-final\\fixture-bin;C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-bridge-update-20261019\\doctor-final\\shadow\\opencode-psmux-bridge\\bin;C:\\WINDOWS\\System32"}
+  exit           : expected=0  actual=0
+  wall clock     : harness=2031ms   node=1625ms
+  doctor_stdout  : bytes=7276  lines=99
+  doctor_stderr  : bytes=0  (empty)
+  node_argv      : -NoProfile -ExecutionPolicy Bypass -File C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\fixture-bin\bridge-doctor.ps1 -Namespace fxlive -Session fresh -DataDir C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\registry-fixture-live -ConfigPath C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\omo-tmux-on.jsonc -PackageRoot C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\pkg-clean
+------------------------------------------------------------------------------
+CASE J-real-anchors
+  cmd            : powershell -NoProfile -ExecutionPolicy Bypass -File FIXTUREBIN\bridge-doctor.ps1 -Namespace fxlive -Session fresh -DataDir C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\registry-fixture-live -ConfigPath C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\omo-tmux-on.jsonc -HealthTimeoutMs 700
+  env overrides  : {"OPENCODE_PORT":"64793","PATH":"C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-bridge-update-20261019\\doctor-final\\fixture-bin;C:\\WINDOWS\\System32"}
+  exit           : expected=0  actual=0
+  wall clock     : harness=2031ms   node=1644ms
+  doctor_stdout  : bytes=6940  lines=97
+  doctor_stderr  : bytes=0  (empty)
+  node_argv      : -NoProfile -ExecutionPolicy Bypass -File C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\fixture-bin\bridge-doctor.ps1 -Namespace fxlive -Session fresh -DataDir C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\registry-fixture-live -ConfigPath C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\omo-tmux-on.jsonc -HealthTimeoutMs 700
+------------------------------------------------------------------------------
+CASE K-home-precedence
+  cmd            : powershell -NoProfile -ExecutionPolicy Bypass -File FIXTUREBIN\bridge-doctor.ps1 -Namespace fxlive -Session fresh -DataDir C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\registry-fixture-live -PackageRoot C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\pkg-clean
+  env overrides  : {"PATH":"C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-bridge-update-20261019\\doctor-final\\fixture-bin;C:\\WINDOWS\\System32","OPENCODE_PORT":"64793","HOME":"C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-bridge-update-20261019\\doctor-final\\cfg-home-json"}
+  exit           : expected=40  actual=40
+  wall clock     : harness=2019ms   node=1671ms
+  doctor_stdout  : bytes=7759  lines=103
+  doctor_stderr  : bytes=0  (empty)
+  node_argv      : -NoProfile -ExecutionPolicy Bypass -File C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\fixture-bin\bridge-doctor.ps1 -Namespace fxlive -Session fresh -DataDir C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\registry-fixture-live -PackageRoot C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\pkg-clean
+------------------------------------------------------------------------------
+CASE L-home-jsonc
+  cmd            : powershell -NoProfile -ExecutionPolicy Bypass -File FIXTUREBIN\bridge-doctor.ps1 -Namespace fxlive -Session fresh -DataDir C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\registry-fixture-live -PackageRoot C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\pkg-clean
+  env overrides  : {"PATH":"C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-bridge-update-20261019\\doctor-final\\fixture-bin;C:\\WINDOWS\\System32","OPENCODE_PORT":"64793","HOME":"C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-bridge-update-20261019\\doctor-final\\cfg-home-jsonc"}
+  exit           : expected=0  actual=0
+  wall clock     : harness=2035ms   node=1562ms
+  doctor_stdout  : bytes=7154  lines=97
+  doctor_stderr  : bytes=0  (empty)
+  node_argv      : -NoProfile -ExecutionPolicy Bypass -File C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\fixture-bin\bridge-doctor.ps1 -Namespace fxlive -Session fresh -DataDir C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\registry-fixture-live -PackageRoot C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\pkg-clean
+------------------------------------------------------------------------------
+CASE M-trailingcommas
+  cmd            : powershell -NoProfile -ExecutionPolicy Bypass -File FIXTUREBIN\bridge-doctor.ps1 -Namespace fxlive -Session fresh -DataDir C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\registry-fixture-live -ConfigPath C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\omo-trailing-commas.jsonc -PackageRoot C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\pkg-clean
+  env overrides  : {"OPENCODE_PORT":"64793","PATH":"C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-bridge-update-20261019\\doctor-final\\fixture-bin;C:\\WINDOWS\\System32"}
+  exit           : expected=0  actual=0
+  wall clock     : harness=2033ms   node=1536ms
+  doctor_stdout  : bytes=7179  lines=99
+  doctor_stderr  : bytes=0  (empty)
+  node_argv      : -NoProfile -ExecutionPolicy Bypass -File C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\fixture-bin\bridge-doctor.ps1 -Namespace fxlive -Session fresh -DataDir C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\registry-fixture-live -ConfigPath C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\omo-trailing-commas.jsonc -PackageRoot C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\pkg-clean
+------------------------------------------------------------------------------
+CASE N-malformedsecret
+  cmd            : powershell -NoProfile -ExecutionPolicy Bypass -File FIXTUREBIN\bridge-doctor.ps1 -Namespace fxlive -Session fresh -DataDir C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\registry-fixture-live -ConfigPath C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\omo-malformed.jsonc -PackageRoot C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\pkg-clean
+  env overrides  : {"OPENCODE_PORT":"64793","PATH":"C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-bridge-update-20261019\\doctor-final\\fixture-bin;C:\\WINDOWS\\System32"}
+  exit           : expected=40  actual=40
+  wall clock     : harness=2039ms   node=1779ms
+  doctor_stdout  : bytes=7443  lines=100
+  doctor_stderr  : bytes=0  (empty)
+  node_argv      : -NoProfile -ExecutionPolicy Bypass -File C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\fixture-bin\bridge-doctor.ps1 -Namespace fxlive -Session fresh -DataDir C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\registry-fixture-live -ConfigPath C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\omo-malformed.jsonc -PackageRoot C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\pkg-clean
+==============================================================================
+ASSERTIONS
+  ASSERT PASS  A-healthy: exit code is 0  [actual=0]
+  ASSERT PASS  A-healthy: stdout is real content, not an empty capture  [lines=97]
+  ASSERT PASS  A-healthy: stderr empty  [bytes=0]
+  ASSERT PASS  A-healthy: wall clock bounded  [harness=2030ms node=1609ms]
+  ASSERT PASS  A-healthy: no INTERNAL-ERROR
+  ASSERT PASS  A-healthy: the doctor printed its own elapsed_ms
+  ASSERT PASS  A-healthy: read-only banner present
+  ASSERT PASS  B-wrongversion: exit code is 50  [actual=50]
+  ASSERT PASS  B-wrongversion: stdout is real content, not an empty capture  [lines=104]
+  ASSERT PASS  B-wrongversion: stderr empty  [bytes=0]
+  ASSERT PASS  B-wrongversion: wall clock bounded  [harness=2027ms node=1692ms]
+  ASSERT PASS  B-wrongversion: no INTERNAL-ERROR
+  ASSERT PASS  B-wrongversion: the doctor printed its own elapsed_ms
+  ASSERT PASS  B-wrongversion: read-only banner present
+  ASSERT PASS  C-wronganchor: exit code is 50  [actual=50]
+  ASSERT PASS  C-wronganchor: stdout is real content, not an empty capture  [lines=100]
+  ASSERT PASS  C-wronganchor: stderr empty  [bytes=0]
+  ASSERT PASS  C-wronganchor: wall clock bounded  [harness=2042ms node=1708ms]
+  ASSERT PASS  C-wronganchor: no INTERNAL-ERROR
+  ASSERT PASS  C-wronganchor: the doctor printed its own elapsed_ms
+  ASSERT PASS  C-wronganchor: read-only banner present
+  ASSERT PASS  D-disabledconfig: exit code is 40  [actual=40]
+  ASSERT PASS  D-disabledconfig: stdout is real content, not an empty capture  [lines=103]
+  ASSERT PASS  D-disabledconfig: stderr empty  [bytes=0]
+  ASSERT PASS  D-disabledconfig: wall clock bounded  [harness=2024ms node=1728ms]
+  ASSERT PASS  D-disabledconfig: no INTERNAL-ERROR
+  ASSERT PASS  D-disabledconfig: the doctor printed its own elapsed_ms
+  ASSERT PASS  D-disabledconfig: read-only banner present
+  ASSERT PASS  E-nohealth: exit code is 30  [actual=30]
+  ASSERT PASS  E-nohealth: stdout is real content, not an empty capture  [lines=98]
+  ASSERT PASS  E-nohealth: stderr empty  [bytes=0]
+  ASSERT PASS  E-nohealth: wall clock bounded  [harness=2044ms node=1684ms]
+  ASSERT PASS  E-nohealth: no INTERNAL-ERROR
+  ASSERT PASS  E-nohealth: the doctor printed its own elapsed_ms
+  ASSERT PASS  E-nohealth: read-only banner present
+  ASSERT PASS  F-unhealthy503: exit code is 0  [actual=0]
+  ASSERT PASS  F-unhealthy503: stdout is real content, not an empty capture  [lines=106]
+  ASSERT PASS  F-unhealthy503: stderr empty  [bytes=0]
+  ASSERT PASS  F-unhealthy503: wall clock bounded  [harness=2050ms node=1719ms]
+  ASSERT PASS  F-unhealthy503: no INTERNAL-ERROR
+  ASSERT PASS  F-unhealthy503: the doctor printed its own elapsed_ms
+  ASSERT PASS  F-unhealthy503: read-only banner present
+  ASSERT PASS  G-deadport: exit code is 0  [actual=0]
+  ASSERT PASS  G-deadport: stdout is real content, not an empty capture  [lines=98]
+  ASSERT PASS  G-deadport: stderr empty  [bytes=0]
+  ASSERT PASS  G-deadport: wall clock bounded  [harness=3055ms node=2350ms]
+  ASSERT PASS  G-deadport: no INTERNAL-ERROR
+  ASSERT PASS  G-deadport: the doctor printed its own elapsed_ms
+  ASSERT PASS  G-deadport: read-only banner present
+  ASSERT PASS  H-path: exit code is 10  [actual=10]
+  ASSERT PASS  H-path: stdout is real content, not an empty capture  [lines=102]
+  ASSERT PASS  H-path: stderr empty  [bytes=0]
+  ASSERT PASS  H-path: wall clock bounded  [harness=2042ms node=1676ms]
+  ASSERT PASS  H-path: no INTERNAL-ERROR
+  ASSERT PASS  H-path: the doctor printed its own elapsed_ms
+  ASSERT PASS  H-path: read-only banner present
+  ASSERT PASS  I-shadowbin: exit code is 0  [actual=0]
+  ASSERT PASS  I-shadowbin: stdout is real content, not an empty capture  [lines=99]
+  ASSERT PASS  I-shadowbin: stderr empty  [bytes=0]
+  ASSERT PASS  I-shadowbin: wall clock bounded  [harness=2031ms node=1625ms]
+  ASSERT PASS  I-shadowbin: no INTERNAL-ERROR
+  ASSERT PASS  I-shadowbin: the doctor printed its own elapsed_ms
+  ASSERT PASS  I-shadowbin: read-only banner present
+  ASSERT PASS  J-real-anchors: exit code is 0  [actual=0]
+  ASSERT PASS  J-real-anchors: stdout is real content, not an empty capture  [lines=97]
+  ASSERT PASS  J-real-anchors: stderr empty  [bytes=0]
+  ASSERT PASS  J-real-anchors: wall clock bounded  [harness=2031ms node=1644ms]
+  ASSERT PASS  J-real-anchors: no INTERNAL-ERROR
+  ASSERT PASS  J-real-anchors: the doctor printed its own elapsed_ms
+  ASSERT PASS  J-real-anchors: read-only banner present
+  ASSERT PASS  K-home-precedence: exit code is 40  [actual=40]
+  ASSERT PASS  K-home-precedence: stdout is real content, not an empty capture  [lines=103]
+  ASSERT PASS  K-home-precedence: stderr empty  [bytes=0]
+  ASSERT PASS  K-home-precedence: wall clock bounded  [harness=2019ms node=1671ms]
+  ASSERT PASS  K-home-precedence: no INTERNAL-ERROR
+  ASSERT PASS  K-home-precedence: the doctor printed its own elapsed_ms
+  ASSERT PASS  K-home-precedence: read-only banner present
+  ASSERT PASS  L-home-jsonc: exit code is 0  [actual=0]
+  ASSERT PASS  L-home-jsonc: stdout is real content, not an empty capture  [lines=97]
+  ASSERT PASS  L-home-jsonc: stderr empty  [bytes=0]
+  ASSERT PASS  L-home-jsonc: wall clock bounded  [harness=2035ms node=1562ms]
+  ASSERT PASS  L-home-jsonc: no INTERNAL-ERROR
+  ASSERT PASS  L-home-jsonc: the doctor printed its own elapsed_ms
+  ASSERT PASS  L-home-jsonc: read-only banner present
+  ASSERT PASS  M-trailingcommas: exit code is 0  [actual=0]
+  ASSERT PASS  M-trailingcommas: stdout is real content, not an empty capture  [lines=99]
+  ASSERT PASS  M-trailingcommas: stderr empty  [bytes=0]
+  ASSERT PASS  M-trailingcommas: wall clock bounded  [harness=2033ms node=1536ms]
+  ASSERT PASS  M-trailingcommas: no INTERNAL-ERROR
+  ASSERT PASS  M-trailingcommas: the doctor printed its own elapsed_ms
+  ASSERT PASS  M-trailingcommas: read-only banner present
+  ASSERT PASS  N-malformedsecret: exit code is 40  [actual=40]
+  ASSERT PASS  N-malformedsecret: stdout is real content, not an empty capture  [lines=100]
+  ASSERT PASS  N-malformedsecret: stderr empty  [bytes=0]
+  ASSERT PASS  N-malformedsecret: wall clock bounded  [harness=2039ms node=1779ms]
+  ASSERT PASS  N-malformedsecret: no INTERNAL-ERROR
+  ASSERT PASS  N-malformedsecret: the doctor printed its own elapsed_ms
+  ASSERT PASS  N-malformedsecret: read-only banner present
+  ASSERT PASS  A: zero FAIL lines  [fail=0]
+  ASSERT PASS  A: exactly five PASS lines  [pass=5]
+  ASSERT PASS  A: the five PASS lines name five DIFFERENT checks  [numbers=1,2,3,4,5]
+  ASSERT PASS  A: the five PASS titles are five DIFFERENT strings
+  A PASS titles: 1=PATH ownership of the literal name `tmux` | 2=STALE-SERVER (heuristic) | 3=OpenCode port resolution | 4=OmO config [opencode].tmux.enabled | 5=OmO package version drift
+  ASSERT PASS  A: check 1 carries the REAL sha256 of the shim it hashed
+  ASSERT PASS  A: check 1 carries the REAL byte size
+  ASSERT PASS  A: check 1 compared that hash to the expected value
+  ASSERT PASS  A: check 1 names the exact file that won PATH resolution
+  ASSERT PASS  A: check 4 carries the REAL config path it read
+  ASSERT PASS  A: check 4 reports the value it actually parsed out of the document
+  ASSERT PASS  A: check 2 read the REAL port out of the fixture registry entry
+  ASSERT PASS  A: check 2 compared two REAL files with real mtimes
+  ASSERT PASS  A: check 3 measured its own listener-table cost
+  ASSERT PASS  A: check 3 names the endpoint it actually probed
+  ASSERT PASS  A: check 3 got a real 200 from the owned fixture
+  ASSERT PASS  A: check 3 printed the REAL body the fixture served
+  ASSERT PASS  A: check 5 verified all 11 line anchors in the synthetic bundle
+  ASSERT PASS  A: check 5 reports the frozen version
+  ASSERT PASS  A: check 5 read the installed version from the fixture package.json
+  ASSERT PASS  A: machine-readable verdict=PASS
+  ASSERT PASS  A: no FAIL marker anywhere in the output
+  ASSERT PASS  A: the doctor does NOT warn about a bridge bin dir when only its own bin dir is on PATH
+  ASSERT PASS  A: a healthy host produces ZERO WARN lines
+  ASSERT PASS  A: stale-server false-negative stated in ONE line, verbatim
+  ASSERT PASS  A: check 2 PASS verdict is labelled (heuristic)
+  ASSERT PASS  B: at least one FAIL line  [fail=1]
+  ASSERT PASS  B: the FIRST failing check is 5 (VERSION)  [first=5]
+  ASSERT PASS  B: the anchors still resolve, so this isolates the VERSION half of check 5
+  ASSERT PASS  B: the version FAIL names the frozen version it expected
+  ASSERT PASS  B: the message that must name the frozen version actually names it
+  ASSERT PASS  B: no message line ends with a dropped "frozen against " clause
+  ASSERT PASS  B: check 5 FAIL verdict present
+  ASSERT PASS  C: at least one FAIL line  [fail=1]
+  ASSERT PASS  C: the FIRST failing check is 5  [first=5]
+  ASSERT PASS  C: the version is CORRECT, so this isolates the ANCHOR half of check 5
+  ASSERT PASS  C: exactly one of eleven anchors failed to resolve
+  ASSERT PASS  C: the drift line names the line number and the expected text
+  ASSERT PASS  C: the version half PASSED and was reported as such
+  ASSERT PASS  C: no other check failed, so the drift really is isolated to check 5
+  ASSERT PASS  D: at least one FAIL line  [fail=1]
+  ASSERT PASS  D: the FIRST failing check is 4 (CONFIG)  [first=4]
+  ASSERT PASS  D: it reports the value it actually parsed (false)
+  ASSERT PASS  D: the FIX line carries both the key and the path
+  ASSERT PASS  D: output names the config FILE PATH
+  ASSERT PASS  D: it is a boolean false, not the string "false"
+  ASSERT PASS  D: check 5 passed, so the exit code isolates CONFIG
+  ASSERT PASS  E: at least one FAIL line  [fail=1]
+  ASSERT PASS  E: the FIRST failing check is 3 (PORT)  [first=3]
+  ASSERT PASS  E: the doctor says plainly that it probed nothing
+  ASSERT PASS  E: check 3 FAIL verdict present, so exit 30 is reachable
+  ASSERT PASS  F: at least one WARN line  [warn=5]
+  ASSERT PASS  F: check 3 reports the real 503 status it received
+  ASSERT PASS  F: it names the endpoint that answered non-ok
+  ASSERT PASS  F: it explains the OmO-side consequence (isServerRunning reads this as not-running)
+  ASSERT PASS  F: check 3 still PASSes -- it grades RESOLUTION, not health
+  ASSERT PASS  F: the run as a whole is PASS, with the health fault reported as a WARN
+  ASSERT PASS  G: at least one WARN line  [warn=1]
+  ASSERT PASS  G: it names the port that answered nothing
+  ASSERT PASS  G: resolution still PASSes because OPENCODE_PORT is set
+  ASSERT PASS  H: at least one FAIL line  [fail=1]
+  ASSERT PASS  H: the FIRST reported failure is check 1 (PATH)  [first=1]
+  ASSERT PASS  H: the winner is NOT the bridge shim  [winner=<none>]
+  ASSERT PASS  H: the shim IS present, so this is a PATH problem not a missing-file problem
+  ASSERT PASS  H: the bridge bin directory is absent from the child PATH (index -1)
+  ASSERT PASS  H: the remedy names the stale-shell trap
+  ASSERT PASS  I: a SECOND, DIFFERENT bridge bin dir still raises the shadow WARN
+  ASSERT PASS  I: the WARN names the offending directory
+  ASSERT PASS  I: the WARN does not name the doctor own bin dir
+  ASSERT PASS  I: a shadowed-but-correctly-ordered PATH still PASSes check 1
+  ASSERT PASS  I: the shadow is a WARN, never a fault
+  ASSERT PASS  J: all 11 anchors resolve in the INSTALLED bundle
+  ASSERT PASS  J: the bundle it read is the live installed one, not a synthetic fixture
+  ASSERT PASS  J: the installed package.json reports the contracted version
+  ASSERT PASS  J: the frozen default equals the installed version
+  ASSERT PASS  J: not one anchor drifted
+  ASSERT PASS  J: no cited line is past the end of the real bundle
+  ASSERT PASS  J: verdict basis is version EQUALITY, not a widened known-equivalent set
+  ASSERT PASS  J: the known-equivalent set is empty
+  ASSERT PASS  J: check 5 PASSes against the real target
+  ASSERT PASS  K: the doctor read HOME/.omo/omo.json without being told -ConfigPath  [got=C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\cfg-home-json\.omo\omo.json]
+  ASSERT PASS  K: the report names which rule chose the file
+  ASSERT PASS  K: it read the value out of THAT file
+  ASSERT PASS  K: exit 40 isolates the CONFIG gate
+  ASSERT PASS  K: it did NOT fall back to the real USERPROFILE config
+  ASSERT PASS  L: with omo.jsonc present the doctor prefers it  [got=C:\Users\Daniel\AppData\Local\Temp\omo-bridge-update-20261019\doctor-final\cfg-home-jsonc\.omo\omo.jsonc]
+  ASSERT PASS  L: the report names the rule
+  ASSERT PASS  L: tmux true in the HOME config PASSes
+  ASSERT PASS  L: the merged-layer caveat is printed
+  ASSERT PASS  M: a config with trailing commas parses
+  ASSERT PASS  M: the value is read out of the converted document
+  ASSERT PASS  M: gate 4 PASSes on legal trailing-comma JSONC
+  ASSERT PASS  M: the run as a whole is PASS
+  ASSERT PASS  M: nothing is reported unparseable
+  ASSERT PASS  N: at least one FAIL line  [fail=1]
+  ASSERT PASS  N: the FIRST failing check is 4 (CONFIG)  [first=4]
+  ASSERT PASS  N: the failure is reported as a parse failure
+  ASSERT PASS  N: the reason is a STABLE exception class, not message text
+  ASSERT PASS  N: the report says plainly that content is withheld
+  ASSERT PASS  N: the sentinel is ABSENT from stdout
+  ASSERT PASS  N: the sentinel is ABSENT from stderr
+==============================================================================
+READ-ONLY PROOF (the doctor changed nothing)
+  snapshot identical before/after every run: True
+  ASSERT PASS  user PATH, live omo.jsonc, live last_session, live bridge bin and the fixture bin are byte-identical before and after
+  ASSERT PASS  the snapshot really did cover the fixture bin directory
+  ASSERT PASS  no psmux/tmux process that existed before the harness is gone (nothing was killed)  [before=1 after=1 lost=]
+  ASSERT PASS  at most two cases skipped; the core cases own their fixtures and cannot skip  [skipped=0]
+  ASSERT PASS  at least thirteen cases ran  [ran=14]
+==============================================================================
+ASSERT TOTALS: pass=205  fail=0  skip=0
+total_harness_ms=33156
