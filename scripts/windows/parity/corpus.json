@@ -13,7 +13,7 @@
     "rebuilt_from": "bun build --compile --target=bun-windows-x64 src/cli.ts --outfile dist/tmux.exe"
   },
   "payloads": {
-    "placeholder": "/bin/sh -c \"printf '%s\\n%s\\n' \\\"OMO subagent pane ready: t14 probe\\\" \\\"Focus this pane to attach.\\\"; while :; do sleep 86400; done\"",
+    "placeholder": "/bin/sh -c \"printf '%s\\n%s\\n' 'OMO subagent pane ready: t14 probe' 'Focus this pane to attach.'; while :; do sleep 86400; done\"",
     "attach": "/bin/sh -c \"opencode attach 'http://127.0.0.1:4096/s/abc' --session 'ses_t14' --dir 'C:\\Users\\Daniel'\"",
     "missing_session": "omo_t14_no_such_session_zzz",
     "unicode_session": "セッション",
