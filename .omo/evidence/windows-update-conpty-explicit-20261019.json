@@ -1,0 +1,557 @@
+{
+  "task": 16,
+  "title": "Verify the interactive surface over a Windows-local ConPTY",
+  "captured_at_utc": "2026-10-18T18:34:27.6682641Z",
+  "host": {
+    "computer": "WINDOWS-DANIEL",
+    "os": "Microsoft Windows 11 專業工作站版",
+    "os_version": "10.0.26300",
+    "powershell": "7.6.7",
+    "console_encoding": "big5"
+  },
+  "transport": {
+    "kind": "Windows ConPTY owned by this harness, on the Windows host",
+    "why_not_ssh_tt": "psmux's own docs: do not add -t/-tt, allocating a remote PTY puts ConPTY back in the byte path. No ssh -t/-tt was used at any point.",
+    "implementation": "PowerShell 5.1 Add-Type + C# P/Invoke (CreatePseudoConsole / ResizePseudoConsole / ClosePseudoConsole / CreatePipe / InitializeProcThreadAttributeList / UpdateProcThreadAttribute[PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE] / CreateProcessW[EXTENDED_STARTUPINFO_PRESENT])",
+    "language_why": "Add-Type + kernel32.dll P/Invoke needs NO toolchain on this host. python is the Store stub and returns \"Python was not found\"; there is no gcc/cl, so no winpty; bun/dotnet would have been the fallback but were not needed.",
+    "resize_equivalent": "ResizePseudoConsole is the ConPTY equivalent of TIOCSWINSZ"
+  },
+  "namespace": {
+    "flag": "-L omo_t16",
+    "why": "throwaway namespace; PSMUX_DATA_DIR isolation is broken at psmux 3.3.8 (upstream #599) so -L is the only working lever",
+    "isolation_state": "C:\\Users\\Daniel\\.psmux (shared, pre-existing)"
+  },
+  "launcher": {
+    "path": "C:\\Users\\Daniel\\AppData\\Local\\opencode-psmux-bridge\\bin\\psmux.cmd",
+    "exists": true,
+    "note": "every client and every probe in this task went through this launcher, the real path the user types"
+  },
+  "checks": [
+    {
+      "check": "detach-leaves-session-alive",
+      "expected": "after detaching, the session still exists with its pane, session_attached is 0, list-clients is empty, and the client process has exited",
+      "observed": {
+        "session": "",
+        "detach_input": "CTRL-B (0x02) then \"d\" -- the psmux/tmux detach prefix",
+        "detach_elapsed_ms": 273,
+        "client_exited": true,
+        "client_exit_code": 1,
+        "sessions_after_detach": "",
+        "session_attached_after": "",
+        "panes_after_detach": [],
+        "pane_count_after_detach": 0,
+        "list_clients_after": "",
+        "pane_path_after_detach": null
+      },
+      "verdict": "FAIL",
+      "notes": [
+        "the detach key was sent through the owned ConPTY, not through an ssh-allocated pty"
+      ]
+    },
+    {
+      "check": "attach-shows-content",
+      "expected": "the re-attached client's ConPTY capture is non-empty AND contains the SERVER-produced marker 'T16SRV7C1E' that was written into the pane by send-keys BEFORE the attach",
+      "observed": {
+        "client_argv": [
+          "psmux.cmd",
+          "-L",
+          "omo_t16_probe",
+          "attach",
+          "-t",
+          ""
+        ],
+        "client_cwd": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\t16_E",
+        "conpty_size_at_attach": "80x24",
+        "client_pid": 15832,
+        "session_attached": "",
+        "capture_method": "raw bytes read off the ConPTY output pipe by the harness reader thread; CSI/OSC escapes stripped, then asserted on the text",
+        "captured_bytes": 16,
+        "captured_nonnull_bytes": 16,
+        "captured_text_length": 0,
+        "server_marker_seen": false,
+        "server_marker_origin": "psmux -L omo_t16_probe send-keys -t :0.0 \"echo T16SRV7C1E\" Enter  (run while NO client was attached)",
+        "marker_sample": "",
+        "alternate_screen_escape_count": 0,
+        "first_client_typed_marker_seen": false
+      },
+      "verdict": "FAIL",
+      "notes": [
+        "An absent alternate-screen escape sequence is NOT a failure: content is captured from the pty byte stream instead.",
+        "The marker was produced by the SERVER before the attach, so seeing it proves the client renders session content rather than echoing our own input."
+      ]
+    },
+    {
+      "check": "resize-propagates",
+      "expected": "width/height reported by psmux CHANGES across a ConPTY resize and the post-resize value equals 132x43",
+      "observed": {
+        "conpty_before": "80x24",
+        "conpty_after": "132x43",
+        "resize_api": "ResizePseudoConsole",
+        "resize_api_result": "ok",
+        "before_read": {
+          "source": "display-message -t <session> -p \"#{window_width}x#{window_height}\"",
+          "raw": "",
+          "cleaned": "",
+          "parsed": "",
+          "exit_code": 1,
+          "timed_out": false,
+          "stderr": "psmux: no server running on session 'omo_t16_probe__-p'"
+        },
+        "after_read": {
+          "source": "display-message -t <session> -p \"#{window_width}x#{window_height}\"",
+          "raw": "",
+          "cleaned": "",
+          "parsed": "",
+          "exit_code": 1,
+          "timed_out": false,
+          "stderr": "psmux: no server running on session 'omo_t16_probe__-p'"
+        },
+        "before_parsed": "",
+        "after_parsed": "",
+        "value_changed": false,
+        "equals_requested_size": false,
+        "settle_bounded_timeout_ms": 20000,
+        "settle_elapsed_ms": 20463,
+        "settle_poll_attempts": 43,
+        "settle_poll_trace": [
+          {
+            "attempt": 1,
+            "at_ms": 456,
+            "parsed": "",
+            "raw": ""
+          },
+          {
+            "attempt": 2,
+            "at_ms": 922,
+            "parsed": "",
+            "raw": ""
+          },
+          {
+            "attempt": 3,
+            "at_ms": 1380,
+            "parsed": "",
+            "raw": ""
+          },
+          {
+            "attempt": 4,
+            "at_ms": 1850,
+            "parsed": "",
+            "raw": ""
+          },
+          {
+            "attempt": 5,
+            "at_ms": 2363,
+            "parsed": "",
+            "raw": ""
+          },
+          {
+            "attempt": 6,
+            "at_ms": 2823,
+            "parsed": "",
+            "raw": ""
+          },
+          {
+            "attempt": 7,
+            "at_ms": 3307,
+            "parsed": "",
+            "raw": ""
+          },
+          {
+            "attempt": 8,
+            "at_ms": 3800,
+            "parsed": "",
+            "raw": ""
+          },
+          {
+            "attempt": 9,
+            "at_ms": 4278,
+            "parsed": "",
+            "raw": ""
+          },
+          {
+            "attempt": 10,
+            "at_ms": 4732,
+            "parsed": "",
+            "raw": ""
+          },
+          {
+            "attempt": 11,
+            "at_ms": 5205,
+            "parsed": "",
+            "raw": ""
+          },
+          {
+            "attempt": 12,
+            "at_ms": 5671,
+            "parsed": "",
+            "raw": ""
+          },
+          {
+            "attempt": 13,
+            "at_ms": 6158,
+            "parsed": "",
+            "raw": ""
+          },
+          {
+            "attempt": 14,
+            "at_ms": 6647,
+            "parsed": "",
+            "raw": ""
+          },
+          {
+            "attempt": 15,
+            "at_ms": 7102,
+            "parsed": "",
+            "raw": ""
+          },
+          {
+            "attempt": 16,
+            "at_ms": 7588,
+            "parsed": "",
+            "raw": ""
+          },
+          {
+            "attempt": 17,
+            "at_ms": 8076,
+            "parsed": "",
+            "raw": ""
+          },
+          {
+            "attempt": 18,
+            "at_ms": 8550,
+            "parsed": "",
+            "raw": ""
+          },
+          {
+            "attempt": 19,
+            "at_ms": 9010,
+            "parsed": "",
+            "raw": ""
+          },
+          {
+            "attempt": 20,
+            "at_ms": 9511,
+            "parsed": "",
+            "raw": ""
+          },
+          {
+            "attempt": 21,
+            "at_ms": 10032,
+            "parsed": "",
+            "raw": ""
+          },
+          {
+            "attempt": 22,
+            "at_ms": 10516,
+            "parsed": "",
+            "raw": ""
+          },
+          {
+            "attempt": 23,
+            "at_ms": 10998,
+            "parsed": "",
+            "raw": ""
+          },
+          {
+            "attempt": 24,
+            "at_ms": 11483,
+            "parsed": "",
+            "raw": ""
+          },
+          {
+            "attempt": 25,
+            "at_ms": 11962,
+            "parsed": "",
+            "raw": ""
+          },
+          {
+            "attempt": 26,
+            "at_ms": 12398,
+            "parsed": "",
+            "raw": ""
+          },
+          {
+            "attempt": 27,
+            "at_ms": 12845,
+            "parsed": "",
+            "raw": ""
+          },
+          {
+            "attempt": 28,
+            "at_ms": 13299,
+            "parsed": "",
+            "raw": ""
+          },
+          {
+            "attempt": 29,
+            "at_ms": 13748,
+            "parsed": "",
+            "raw": ""
+          },
+          {
+            "attempt": 30,
+            "at_ms": 14233,
+            "parsed": "",
+            "raw": ""
+          },
+          {
+            "attempt": 31,
+            "at_ms": 14750,
+            "parsed": "",
+            "raw": ""
+          },
+          {
+            "attempt": 32,
+            "at_ms": 15219,
+            "parsed": "",
+            "raw": ""
+          },
+          {
+            "attempt": 33,
+            "at_ms": 15695,
+            "parsed": "",
+            "raw": ""
+          },
+          {
+            "attempt": 34,
+            "at_ms": 16161,
+            "parsed": "",
+            "raw": ""
+          },
+          {
+            "attempt": 35,
+            "at_ms": 16636,
+            "parsed": "",
+            "raw": ""
+          },
+          {
+            "attempt": 36,
+            "at_ms": 17088,
+            "parsed": "",
+            "raw": ""
+          },
+          {
+            "attempt": 37,
+            "at_ms": 17570,
+            "parsed": "",
+            "raw": ""
+          },
+          {
+            "attempt": 38,
+            "at_ms": 18047,
+            "parsed": "",
+            "raw": ""
+          },
+          {
+            "attempt": 39,
+            "at_ms": 18567,
+            "parsed": "",
+            "raw": ""
+          },
+          {
+            "attempt": 40,
+            "at_ms": 19026,
+            "parsed": "",
+            "raw": ""
+          },
+          {
+            "attempt": 41,
+            "at_ms": 19494,
+            "parsed": "",
+            "raw": ""
+          },
+          {
+            "attempt": 42,
+            "at_ms": 19981,
+            "parsed": "",
+            "raw": ""
+          },
+          {
+            "attempt": 43,
+            "at_ms": 20463,
+            "parsed": "",
+            "raw": ""
+          }
+        ],
+        "read_source": "psmux -L omo_t16 display-message -t <session> -p \"#{window_width}x#{window_height}\"  (a real psmux read; the width is NEVER computed by the harness)"
+      },
+      "verdict": "FAIL",
+      "notes": [
+        "ConPTY resize is asynchronous, so the reported size is polled to a bounded timeout and the settle time is recorded."
+      ]
+    },
+    {
+      "check": "resize-propagates",
+      "expected": "conpty resized to 132x43 and psmux reported size changes to it",
+      "observed": {
+        "harness_error": "無法為 null 陣列編製索引。"
+      },
+      "verdict": "FAIL",
+      "notes": [
+        "harness exception"
+      ]
+    },
+    {
+      "check": "cwd-invariant",
+      "expected": "pane_current_path == D on both reads",
+      "observed": {
+        "harness_error": "無法為 null 陣列編製索引。"
+      },
+      "verdict": "FAIL",
+      "notes": [
+        "harness exception"
+      ]
+    },
+    {
+      "check": "split-window-inherits-cwd",
+      "expected": "split-window without -c inherits D",
+      "observed": {
+        "harness_error": "無法為 null 陣列編製索引。"
+      },
+      "verdict": "FAIL",
+      "notes": [
+        "harness exception"
+      ]
+    },
+    {
+      "check": "attach-shows-content",
+      "expected": "server-produced marker visible in the attach capture",
+      "observed": {
+        "harness_error": "無法為 null 陣列編製索引。"
+      },
+      "verdict": "FAIL",
+      "notes": [
+        "harness exception"
+      ]
+    }
+  ],
+  "negative_control": {
+    "purpose": "not run",
+    "expected": "131x43",
+    "observed": "",
+    "verdict": "NOT_RUN",
+    "note": "harness exception: 無法為 null 陣列編製索引。"
+  },
+  "cleanup": {
+    "conpty_handles_closed": true,
+    "clients_terminated": true,
+    "kill_server_call": {
+      "argv": [
+        "-L",
+        "omo_t16_probe",
+        "kill-server"
+      ],
+      "cwd": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\t16_E",
+      "timed_out": false,
+      "exit_code": 0,
+      "stdout_len": 0,
+      "stderr_len": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    "my_psmux_pids_before_kill": [
+      30696,
+      41180
+    ],
+    "my_psmux_server_gone": true,
+    "sessions_left_in_namespace": "",
+    "my_psmux_home_files_before": [],
+    "my_psmux_home_files_deleted": [],
+    "my_psmux_home_files_after": [],
+    "my_psmux_home_files_remaining": 0,
+    "scratch_still_present": [],
+    "psmux_processes_before": [
+      36736
+    ],
+    "psmux_processes_after": [
+      36736
+    ],
+    "foreign_pids_preserved": 1,
+    "foreign_pids_still_alive": [
+      36736
+    ],
+    "foreign_pids_lost": [],
+    "foreign_pids_untouched": true,
+    "bridge_tmux_exe_unchanged": false,
+    "bridge_tmux_exe_after": {
+      "path": "C:\\Users\\Daniel\\AppData\\Local\\opencode-psmux-bridge\\bin\\tmux.exe",
+      "size": 96429056,
+      "sha256": "4E94E1DF2735DC70A559F807CE0BC2EB37B7414ACCA0470AAECE5505E9D28E39"
+    },
+    "user_path_entry_count": 14,
+    "user_path_before": 14,
+    "user_path_unchanged": true,
+    "install_ps1_called": false,
+    "setx_called": false
+  },
+  "not_proved": [
+    "No check ran through `ssh -t` / `ssh -tt`: psmux documents that allocating a remote PTY puts ConPTY back into the byte path. The ConPTY was owned by this harness on the Windows host instead.",
+    "FAIL: detach-leaves-session-alive",
+    "FAIL: attach-shows-content",
+    "FAIL: resize-propagates",
+    "FAIL: resize-propagates",
+    "FAIL: cwd-invariant",
+    "FAIL: split-window-inherits-cwd",
+    "FAIL: attach-shows-content"
+  ],
+  "baseline": {
+    "taken_at_utc": "2026-10-18T18:34:28.3557121Z",
+    "psmux_processes": [
+      {
+        "pid": 36736,
+        "name": "psmux.exe",
+        "command_line": "<redacted: process command line>",
+        "created_by_this_task": false
+      }
+    ],
+    "psmux_process_count": 1,
+    "owned_by_this_task": [],
+    "user_path": {
+      "raw": "C:\\Users\\Daniel\\AppData\\Local\\opencode-psmux-bridge\\bin;C:\\Users\\Daniel\\AppData\\Local\\Programs\\Python\\Python312\\Scripts\\;C:\\Users\\Daniel\\AppData\\Local\\Programs\\Python\\Python312\\;C:\\Users\\Daniel\\AppData\\Local\\Programs\\Python\\Launcher\\;C:\\Users\\Daniel\\bin;C:\\Users\\Daniel\\AppData\\Local\\Microsoft\\WindowsApps;C:\\Users\\Daniel\\AppData\\Local\\Programs\\Microsoft VS Code\\bin;C:\\Users\\Daniel\\AppData\\Roaming\\npm;C:\\Users\\Daniel\\AppData\\Local\\Microsoft\\WinGet\\Links;C:\\Users\\Daniel\\AppData\\Local\\Microsoft\\WinGet\\Packages\\ast-grep.ast-grep_Microsoft.Winget.Source_8wekyb3d8bbwe;C:\\Users\\Daniel\\AppData\\Local\\Microsoft\\WinGet\\Packages\\yt-dlp.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-N-125875-g5d4d3bdc61-win64-gpl\\bin;C:\\Users\\Daniel\\.dotnet\\tools;C:\\Users\\Daniel\\tools\\jdk-21.0.12.1+1\\bin;C:\\Users\\Daniel\\AppData\\Local\\psmux",
+      "entry_count": 14,
+      "entries": [
+        "C:\\Users\\Daniel\\AppData\\Local\\opencode-psmux-bridge\\bin",
+        "C:\\Users\\Daniel\\AppData\\Local\\Programs\\Python\\Python312\\Scripts\\",
+        "C:\\Users\\Daniel\\AppData\\Local\\Programs\\Python\\Python312\\",
+        "C:\\Users\\Daniel\\AppData\\Local\\Programs\\Python\\Launcher\\",
+        "C:\\Users\\Daniel\\bin",
+        "C:\\Users\\Daniel\\AppData\\Local\\Microsoft\\WindowsApps",
+        "C:\\Users\\Daniel\\AppData\\Local\\Programs\\Microsoft VS Code\\bin",
+        "C:\\Users\\Daniel\\AppData\\Roaming\\npm",
+        "C:\\Users\\Daniel\\AppData\\Local\\Microsoft\\WinGet\\Links",
+        "C:\\Users\\Daniel\\AppData\\Local\\Microsoft\\WinGet\\Packages\\ast-grep.ast-grep_Microsoft.Winget.Source_8wekyb3d8bbwe",
+        "C:\\Users\\Daniel\\AppData\\Local\\Microsoft\\WinGet\\Packages\\yt-dlp.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-N-125875-g5d4d3bdc61-win64-gpl\\bin",
+        "C:\\Users\\Daniel\\.dotnet\\tools",
+        "C:\\Users\\Daniel\\tools\\jdk-21.0.12.1+1\\bin",
+        "C:\\Users\\Daniel\\AppData\\Local\\psmux"
+      ],
+      "has_bridge": true
+    },
+    "bridge_tmux_exe": {
+      "path": "C:\\Users\\Daniel\\AppData\\Local\\opencode-psmux-bridge\\bin\\tmux.exe",
+      "size": 96429056,
+      "sha256": "4E94E1DF2735DC70A559F807CE0BC2EB37B7414ACCA0470AAECE5505E9D28E39"
+    },
+    "psmux_home_before": [
+      "instances",
+      "killed",
+      "servers",
+      "__warm__.key",
+      "__warm__.pid",
+      "__warm__.port",
+      "__warm__.sid",
+      ".registry_sweep",
+      "host_colors",
+      "last_session",
+      "next_session_id",
+      "ssh_input.log"
+    ]
+  },
+  "directories": {
+    "created_from_D": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\t16_D",
+    "attach_from_E": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\t16_E",
+    "scratch": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\t16",
+    "both_exist": true
+  },
+  "redaction_note": "Live process command_line values were withheld for publication (may contain psmux --spawner internal tokens); raw artifacts remain staged in Windows TEMP."
+}
