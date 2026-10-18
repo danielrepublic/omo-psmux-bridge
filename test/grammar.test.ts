@@ -1,9 +1,9 @@
 // argv grammar — classification and payload extraction.
 //
-// Every argv fixture below is a LITERAL capture of the argv OmO 5.1.30
-// actually emits, taken from:
+// The legacy argv fixtures below capture OmO 5.1.33. Current 5.1.35 fixtures
+// follow in a separate section. Legacy source:
 //
-//   oh-my-openagent@5.1.30/dist/index.js
+//   oh-my-openagent@5.1.33/dist/index.js
 //     :4717-4718  shellEscapeForDoubleQuotedCommand   (E)
 //     :8325-8326  shellQuoteForNestedCommand         (Q)
 //     :8328-8332  buildTmuxAttachCommand             (Template A)
@@ -595,5 +595,149 @@ describe("a leading -L namespace does not defeat classification", () => {
     expect(translation.argv.slice(0, 2)).toEqual(["-L", "omo_ns"]);
     expect(translation.argv[2]).toBe("split-window");
     expect(translation.rewritten).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// placeholder, OmO 5.1.35 single-quoted banner.
+//
+// Upstream pane-command.ts buildTmuxPlaceholderCommand (5.1.35) builds the
+// payload as `printf '%s\n%s\n' ${Q(banner)} ${Q(hint)}; ...` where Q is
+// shellQuoteForNestedCommand: single quotes, `'` -> `'\''` (arriving doubled
+// as `'\\''` after the backslash pass), then `\` -> `\\`, `$` -> `\$`,
+// backtick -> `` \` ``, `"` -> `\"`. The old E(doublequote) shape below is
+// preserved as an explicit variant, not re-parsed.
+//
+// Fixtures are byte-exact outputs of that function, verified against the
+// installed bundle
+// oh-my-openagent@5.1.35/dist/index.js (pane-command.ts:
+// shellQuoteForNestedCommand, withoutNul, buildTmuxPlaceholderCommand).
+// ---------------------------------------------------------------------------
+
+// Template B (5.1.35), plain description.
+const PH535_PLAIN =
+  "/bin/sh -c \"printf '%s\\n%s\\n' 'OMO subagent pane ready: explore the tmux grammar module' 'Focus this pane to attach.'; while :; do sleep 86400; done\"";
+
+// Template B (5.1.35), hostile raw description:
+//   it's a $HOME `cmd` with "quotes" and \backslash\
+// Q-encoded by upstream, byte-exact.
+const PH535_HOSTILE =
+  "/bin/sh -c \"printf '%s\\n%s\\n' 'OMO subagent pane ready: it'\\\\''s a \\$HOME \\`cmd\\` with \\\"quotes\\\" and \\\\backslash\\\\' 'Focus this pane to attach.'; while :; do sleep 86400; done\"";
+
+// The Q-encoded banner inner text carried inside PH535_HOSTILE, as a literal:
+// the bytes between `'OMO subagent pane ready: ` and the token's closing `'`.
+const HOSTILE_Q_INNER =
+  "it'\\\\''s a \\$HOME \\`cmd\\` with \\\"quotes\\\" and \\\\backslash\\\\";
+
+// Template B (5.1.35), upstream-truncated description: 2005 chars in,
+// 2000 chars plus U+2026 out (PLACEHOLDER_DESCRIPTION_LIMIT).
+const TRUNCATED_Q_INNER = `${"A".repeat(2000)}…`;
+const PH535_TRUNCATED =
+  `/bin/sh -c "printf '%s\\n%s\\n' 'OMO subagent pane ready: ${"A".repeat(2000)}…' 'Focus this pane to attach.'; while :; do sleep 86400; done"`;
+
+// Template B (5.1.35), NUL-cleaned description: raw was `ab\0cd\0ef`,
+// upstream withoutNul strips the NULs before Q-encoding.
+const PH535_NUL_CLEANED =
+  "/bin/sh -c \"printf '%s\\n%s\\n' 'OMO subagent pane ready: abcdef' 'Focus this pane to attach.'; while :; do sleep 86400; done\"";
+
+describe("placeholder, 5.1.35 single-quoted banner", () => {
+  test("split-window carrying the 5.1.35 banner classifies, old E shape untouched", () => {
+    // Given: the new single-quoted payload on split-window
+    // When: classified
+    // Then: placeholder-split with the banner inner text and the Q encoding
+    const result = classifyArgv(["split-window", "-h", "-d", "-P", "-F", "#{pane_id}", "-t", "%3", PH535_PLAIN]);
+
+    expect(result.kind).toBe("placeholder-split");
+    if (result.kind !== "placeholder-split") throw new Error("unreachable");
+    expect(result.description).toBe("explore the tmux grammar module");
+    expect(result.descriptionEncoding).toBe("singlequote");
+    expect(result.payload).toBe(
+      "printf '%s\\n%s\\n' 'OMO subagent pane ready: explore the tmux grammar module' 'Focus this pane to attach.'; while :; do sleep 86400; done",
+    );
+    // And the shipped E(doublequote) shape still yields the E encoding.
+    const old = classifyArgv(["split-window", "-h", "-d", "-P", "-F", "#{pane_id}", "-t", "%3", PH_PLAIN]);
+    expect(old.kind).toBe("placeholder-split");
+    if (old.kind !== "placeholder-split") throw new Error("unreachable");
+    expect(old.descriptionEncoding).toBe("escaped-doublequote");
+  });
+
+  test("hostile Q banner (apostrophe, backslash, $, backtick, doublequote) extracts byte-identically", () => {
+    // Given: a banner whose description exercises every Q escape
+    // When: classified on respawn-pane
+    // Then: the Q-inner text survives byte-for-byte, nothing decoded here
+    const result = classifyArgv(["respawn-pane", "-k", "-t", "%7", PH535_HOSTILE]);
+
+    expect(result.kind).toBe("placeholder-respawn");
+    if (result.kind !== "placeholder-respawn") throw new Error("unreachable");
+    expect(result.description).toBe(HOSTILE_Q_INNER);
+    expect(result.description.length).toBe(HOSTILE_Q_INNER.length);
+    expect(result.description).toContain("it'\\\\''s a");
+    expect(result.description).toContain("\\$HOME");
+    expect(result.description).toContain("\\`cmd\\`");
+    expect(result.description).toContain('\\"quotes\\"');
+    expect(result.description).toContain("\\\\backslash\\\\");
+    expect(result.descriptionEncoding).toBe("singlequote");
+  });
+
+  test("5.1.35 banner on new-window and new-session", () => {
+    // Given: the new banner on the remaining placeholder verbs
+    // When: classified
+    // Then: each keeps its own kind with the Q encoding
+    const window = classifyArgv(["new-window", "-d", "-n", "omo-agents", "-P", "-F", "#{pane_id}", PH535_PLAIN]);
+    expect(window.kind).toBe("placeholder-newwindow");
+    if (window.kind !== "placeholder-newwindow") throw new Error("unreachable");
+    expect(window.description).toBe("explore the tmux grammar module");
+    expect(window.descriptionEncoding).toBe("singlequote");
+
+    const session = classifyArgv(["new-session", "-d", "-s", "omo-iso-4711", "-P", "-F", "#{pane_id}", PH535_PLAIN]);
+    expect(session.kind).toBe("placeholder-newsession");
+    if (session.kind !== "placeholder-newsession") throw new Error("unreachable");
+    expect(session.description).toBe("explore the tmux grammar module");
+    expect(session.descriptionEncoding).toBe("singlequote");
+  });
+
+  test("upstream-truncated description (2000 chars plus ellipsis) classifies", () => {
+    // Given: a description upstream cut at PLACEHOLDER_DESCRIPTION_LIMIT
+    // When: classified
+    // Then: the truncated inner text is carried, ellipsis included
+    const result = classifyArgv(["split-window", "-h", "-d", "-P", "-F", "#{pane_id}", PH535_TRUNCATED]);
+
+    expect(result.kind).toBe("placeholder-split");
+    if (result.kind !== "placeholder-split") throw new Error("unreachable");
+    expect(result.description).toBe(TRUNCATED_Q_INNER);
+    expect(result.description.length).toBe(2001);
+    expect(result.description.endsWith("…")).toBe(true);
+  });
+
+  test("NUL-cleaned description classifies as upstream emits it", () => {
+    // Given: upstream stripped the NULs before Q-encoding (`ab\\0cd\\0ef`)
+    // When: classified
+    // Then: the cleaned text is carried as-is
+    const result = classifyArgv(["respawn-pane", "-k", "-t", "%7", PH535_NUL_CLEANED]);
+
+    expect(result.kind).toBe("placeholder-respawn");
+    if (result.kind !== "placeholder-respawn") throw new Error("unreachable");
+    expect(result.description).toBe("abcdef");
+    expect(result.descriptionEncoding).toBe("singlequote");
+  });
+
+  test("a 5.1.35 banner with the wrong hint text is pass-through, not misparsed", () => {
+    // Given: the right banner but a foreign second token
+    // When: classified
+    // Then: no placeholder — the hint is part of the template, not decoration
+    const argv = [
+      "split-window",
+      "-h",
+      "/bin/sh -c \"printf '%s\\n%s\\n' 'OMO subagent pane ready: hi' 'Something else.'; while :; do sleep 86400; done\"",
+    ];
+    expect(classifyArgv(argv).kind).toBe("pass-through");
+  });
+
+  test("a truncated 5.1.35 banner (missing closing quote) is pass-through", () => {
+    // Given: a new-shape payload cut off mid-banner
+    // When: classified
+    // Then: pass-through, like the old-shape truncation case
+    const argv = ["split-window", "-h", "-d", "-P", "-F", "#{pane_id}", "/bin/sh -c \"printf '%s\\n%s\\n' 'OMO subagent pane ready: abc"];
+    expect(classifyArgv(argv).kind).toBe("pass-through");
   });
 });

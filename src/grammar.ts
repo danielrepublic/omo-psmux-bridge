@@ -21,9 +21,11 @@
 // The payload body is the substring between the outer double quotes of that
 // last element.
 //
-// Source of every template constant below is the OmO bundle
-// oh-my-openagent@5.1.18 dist/index.js; see test/grammar.test.ts for the
-// per-line citations and the byte-exact fixtures.
+// Template sources: the E(doublequote) constants below match the OmO bundle
+// from 5.1.18 through 5.1.33 (dist/index.js); the Q(singlequote) banner
+// constants match 5.1.35's pane-command.ts buildTmuxPlaceholderCommand.
+// test/grammar.test.ts keeps byte-exact fixtures for both eras; only the
+// 5.1.35 shape is current upstream.
 
 // ---------------------------------------------------------------------------
 // Result types
@@ -35,6 +37,15 @@ export type RecognisedKind =
   | "placeholder-newsession"
   | "placeholder-respawn"
   | "attach-respawn";
+
+/** How the placeholder description is encoded inside the payload body.
+ *
+ *  The shipped E(doublequote) template (5.1.33 and earlier) escapes the
+ *  description with shellEscapeForDoubleQuotedCommand; the 5.1.35 template
+ *  carries it inside a Q(singlequote) banner token instead. The translator
+ *  reverses the matching pass, so the grammar names the variant explicitly
+ *  rather than leaving the translator to guess. */
+export type PlaceholderEncoding = "escaped-doublequote" | "singlequote";
 
 /** One `-e NAME=VALUE` pair, as built by buildPaneAuthEnvironmentArgs
  *  (index.js:8331-8341). The value is kept byte-exact and is NEVER logged by
@@ -59,23 +70,29 @@ interface RecognisedBase {
 
 export interface PlaceholderSplit extends RecognisedBase {
   readonly kind: "placeholder-split";
-  /** The E(description) text (index.js:4715-4716), byte-exact. */
+  /** The description bytes, encoding named by `descriptionEncoding`. E text
+   *  for the shipped template, Q-banner inner text for the 5.1.35 template.
+   *  Byte-exact in both cases; decoding is the translator's business. */
   readonly description: string;
+  readonly descriptionEncoding: PlaceholderEncoding;
 }
 
 export interface PlaceholderNewWindow extends RecognisedBase {
   readonly kind: "placeholder-newwindow";
   readonly description: string;
+  readonly descriptionEncoding: PlaceholderEncoding;
 }
 
 export interface PlaceholderNewSession extends RecognisedBase {
   readonly kind: "placeholder-newsession";
   readonly description: string;
+  readonly descriptionEncoding: PlaceholderEncoding;
 }
 
 export interface PlaceholderRespawn extends RecognisedBase {
   readonly kind: "placeholder-respawn";
   readonly description: string;
+  readonly descriptionEncoding: PlaceholderEncoding;
 }
 
 export interface AttachRespawn extends RecognisedBase {
@@ -108,14 +125,27 @@ export type Classified = Classification | PassThrough;
 // ---------------------------------------------------------------------------
 
 /** `${TMUX_COMMAND_SHELL} -c "` — index.js:8343 + the leading half of the
- *  template in :8325 / :8329. */
+ *  template in :8325 / :8329. Unchanged in 5.1.35. */
 const SHELL_PREFIX = '/bin/sh -c "';
 
-/** index.js:8329, up to the interpolated description. */
+/** index.js:8329, up to the interpolated description. The shipped E template,
+ *  preserved verbatim (5.1.33 and earlier). */
 const PLACEHOLDER_HEAD = `printf '%s\\n%s\\n' \\"OMO subagent pane ready: `;
 
-/** index.js:8329, after the interpolated description. */
+/** index.js:8329, after the interpolated description. The shipped E template. */
 const PLACEHOLDER_TAIL = `\\" \\"Focus this pane to attach.\\"; while :; do sleep 86400; done`;
+
+/** 5.1.35 pane-command.ts buildTmuxPlaceholderCommand: the fixed prefix before
+ *  the Q(banner) token. */
+const PLACEHOLDER_PREFIX_535 = `printf '%s\\n%s\\n' `;
+
+/** 5.1.35: the banner token's fixed opening, including its leading quote. */
+const PLACEHOLDER_BANNER_OPEN_535 = `'OMO subagent pane ready: `;
+
+/** 5.1.35: the exact remainder after the banner token's closing quote — one
+ *  space, the Q(hint) token, then the sleep loop. The hint carries no escapes
+ *  (plain sentence), so it is matched literally. */
+const PLACEHOLDER_HINT_535 = `'Focus this pane to attach.'; while :; do sleep 86400; done`;
 
 /** index.js:8325. */
 const ATTACH_HEAD = "opencode attach ";
@@ -201,16 +231,23 @@ export function classifyArgv(argv: readonly string[]): Classified {
   const { flags, envArgs } = scanned;
 
   if (payload.kind === "placeholder") {
-    const base = { argv: [...argv], flags, payload: payload.body, envArgs };
+    const base = {
+      argv: [...argv],
+      flags,
+      payload: payload.body,
+      envArgs,
+      description: payload.description,
+      descriptionEncoding: payload.descriptionEncoding,
+    };
     switch (verb) {
       case "split-window":
-        return { ...base, kind: "placeholder-split", description: payload.description };
+        return { ...base, kind: "placeholder-split" };
       case "new-window":
-        return { ...base, kind: "placeholder-newwindow", description: payload.description };
+        return { ...base, kind: "placeholder-newwindow" };
       case "new-session":
-        return { ...base, kind: "placeholder-newsession", description: payload.description };
+        return { ...base, kind: "placeholder-newsession" };
       case "respawn-pane":
-        return { ...base, kind: "placeholder-respawn", description: payload.description };
+        return { ...base, kind: "placeholder-respawn" };
       default:
         // e.g. split-window carrying the attach template (index.js:8401 under
         // cmux-compat). No classification name covers that, and cmux-compat is
@@ -298,7 +335,12 @@ function scanAuthEnvArgs(head: readonly string[]): ScannedHead | undefined {
 // ---------------------------------------------------------------------------
 
 type ParsedPayload =
-  | { readonly kind: "placeholder"; readonly body: string; readonly description: string }
+  | {
+      readonly kind: "placeholder";
+      readonly body: string;
+      readonly description: string;
+      readonly descriptionEncoding: PlaceholderEncoding;
+    }
   | {
       readonly kind: "attach";
       readonly body: string;
@@ -327,12 +369,41 @@ function parsePayloadElement(element: string): ParsedPayload | undefined {
       PLACEHOLDER_HEAD.length,
       body.length - PLACEHOLDER_TAIL.length,
     );
-    return { kind: "placeholder", body, description };
+    return { kind: "placeholder", body, description, descriptionEncoding: "escaped-doublequote" };
+  }
+
+  if (body.startsWith(PLACEHOLDER_PREFIX_535)) {
+    return parsePlaceholder535Body(body);
   }
 
   if (body.startsWith(ATTACH_HEAD)) return parseAttachBody(body);
 
   return undefined;
+}
+
+/**
+ * 5.1.35 placeholder body: `printf '…' <Q(banner)> <Q(hint)>; while …`.
+ *
+ * The banner is read as one single-quoted token — the same scanner the attach
+ * template uses, so an embedded apostrophe (`'\\''`) does not end it early —
+ * and must open with the fixed banner prefix. The remainder after its closing
+ * quote must be exactly one space plus the hint tail. Anything else is not
+ * this template. The description is the banner's inner text after the prefix,
+ * still Q-escaped; decoding is the translator's business.
+ */
+function parsePlaceholder535Body(
+  body: string,
+): Extract<ParsedPayload, { readonly kind: "placeholder" }> | undefined {
+  const banner = readSingleQuotedToken(body, PLACEHOLDER_PREFIX_535.length);
+  if (banner === undefined) return undefined;
+  if (!banner.token.startsWith(PLACEHOLDER_BANNER_OPEN_535)) return undefined;
+
+  const rest = body.slice(banner.next);
+  if (rest !== ` ${PLACEHOLDER_HINT_535}`) return undefined;
+
+  const inner = banner.token.slice(1, -1);
+  const description = inner.slice(PLACEHOLDER_BANNER_OPEN_535.length - 1);
+  return { kind: "placeholder", body, description, descriptionEncoding: "singlequote" };
 }
 
 /**

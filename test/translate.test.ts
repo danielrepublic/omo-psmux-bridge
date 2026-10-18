@@ -30,6 +30,7 @@ import {
   translate,
   translateArgv,
   unescapeDoubleQuoted,
+  unescapeQContent,
   unescapeSingleQuotedToken,
 } from "../src/translate";
 
@@ -568,6 +569,31 @@ describe("round-trip byte identity", () => {
     // A naive split on ` --dir ` would have produced `ses_'x'` here.
     expect(invocation.command[4]).toBe("ses_'x'--dir'y");
   });
+
+  test("attach values carrying $, backtick and quotes decode to the raw values", () => {
+    // Given: 5.1.35 Q attach tokens exercising the full Q pass — session id
+    // ses_$x`tick`"q"'ap, directory C:\work\$cash (literal backslash before $)
+    // When: classified and translated on respawn-pane
+    // Then: the command vector holds the raw values, with no extra backslash
+    const payload =
+      "/bin/sh -c \"opencode attach 'http://127.0.0.1:4096' --session 'ses_\\$x\\`tick\\`\\\"q\\\"'\\\\''ap' --dir 'C:\\\\work\\\\\\$cash'\"";
+    const translation = translateArgv(classify(["respawn-pane", "-k", "-t", "%7", payload]), OPTS);
+    const invocation = parseHelperCommandLine(translation.helperCommandLine ?? "");
+
+    expect(translation.kind).toBe("helper");
+    expect(invocation.payload).toBe(
+      "opencode attach 'http://127.0.0.1:4096' --session 'ses_\\$x\\`tick\\`\\\"q\\\"'\\\\''ap' --dir 'C:\\\\work\\\\\\$cash'",
+    );
+    expect(invocation.command).toEqual([
+      "opencode",
+      "attach",
+      "http://127.0.0.1:4096",
+      "--session",
+      "ses_$x`tick`\"q\"'ap",
+      "--dir",
+      "C:\\work\\$cash",
+    ]);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -591,6 +617,11 @@ describe("escaping reversal", () => {
     // Backslashes survive the blanket doubling pass.
     expect(unescapeSingleQuotedToken("'C:\\\\Users\\\\dev'")).toBe("C:\\Users\\dev");
     expect(unescapeSingleQuotedToken("''")).toBe("");
+    // 5.1.35 Q escapes $, backtick and `"` as well — attach values carry them.
+    expect(unescapeSingleQuotedToken("'ses_\\$x\\`tick\\`\\\"q\\\"'\\\\''ap'")).toBe(
+      "ses_$x`tick`\"q\"'ap",
+    );
+    expect(unescapeSingleQuotedToken("'C:\\\\work\\\\\\$cash'")).toBe("C:\\work\\$cash");
   });
 });
 
@@ -1753,5 +1784,88 @@ describe("rule D0: the `-F` element is dropped from `display` / `display-message
       "-t",
       "%1",
     ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 5.1.35 single-quoted placeholder banner: decode traced through the translator
+// ---------------------------------------------------------------------------
+
+describe("5.1.35 placeholder banner decodes through the translator", () => {
+  // Template B (5.1.35) bodies, byte-exact outputs of upstream
+  // buildTmuxPlaceholderCommand. Composed from the documented template (Q
+  // banner + Q hint) rather than pasted as opaque literals, mirroring how
+  // BODY_HEAD/BODY_TAIL are composed above.
+  const BANNER_OPEN = "printf '%s\\n%s\\n' 'OMO subagent pane ready: ";
+  const BANNER_HINT_TAIL = "' 'Focus this pane to attach.'; while :; do sleep 86400; done";
+  const Q535_PLAIN_BODY = `${BANNER_OPEN}explore the tmux grammar module${BANNER_HINT_TAIL}`;
+  const Q535_HOSTILE_INNER =
+    "it'\\\\''s a \\$HOME \\`cmd\\` with \\\"quotes\\\" and \\\\backslash\\\\";
+  const Q535_HOSTILE_BODY = `${BANNER_OPEN}${Q535_HOSTILE_INNER}${BANNER_HINT_TAIL}`;
+  const Q535_TRUNCATED_BODY = `${BANNER_OPEN}${"A".repeat(2000)}…${BANNER_HINT_TAIL}`;
+  const Q535_NUL_BODY = `${BANNER_OPEN}abcdef${BANNER_HINT_TAIL}`;
+
+  const Q535_PLAIN = `/bin/sh -c "${Q535_PLAIN_BODY}"`;
+  const Q535_HOSTILE = `/bin/sh -c "${Q535_HOSTILE_BODY}"`;
+  const Q535_TRUNCATED = `/bin/sh -c "${Q535_TRUNCATED_BODY}"`;
+  const Q535_NUL = `/bin/sh -c "${Q535_NUL_BODY}"`;
+
+  test("the 5.1.35 plain banner translates to the same Windows command as the old E shape", () => {
+    // Given: the new single-quoted payload carrying a plain description
+    // When: translated
+    // Then: the Windows-native token vector equals the old shape's vector,
+    // proving the Q banner decodes to the same raw description E decoded to
+    const translation = translate(["split-window", "-h", "-d", "-P", "-F", "#{pane_id}", Q535_PLAIN], OPTS);
+    const invocation = parseHelperCommandLine(translation.helperCommandLine ?? "");
+
+    expect(translation.kind).toBe("helper");
+    expect(invocation.payload).toBe(Q535_PLAIN_BODY);
+    expect(invocation.command).toEqual(PLACEHOLDER_COMMAND);
+  });
+
+  test("the hostile Q banner decodes to the raw description in the helper script", () => {
+    // Given: a banner exercising every Q escape
+    // When: translated
+    // Then: the helper script holds the human-typed text, PowerShell-quoted
+    const translation = translate(["respawn-pane", "-k", "-t", "%7", Q535_HOSTILE], OPTS);
+    const invocation = parseHelperCommandLine(translation.helperCommandLine ?? "");
+
+    expect(invocation.payload).toBe(Q535_HOSTILE_BODY);
+    expect(invocation.command).toEqual(PLACEHOLDER_HOSTILE_COMMAND);
+    expect(invocation.command[4]).toBe(HOSTILE_SCRIPT);
+  });
+
+  test("truncated and NUL-cleaned banners translate with no re-escaping layer", () => {
+    // Given: upstream-truncated (2000 chars + ellipsis) and NUL-cleaned bodies
+    // When: translated
+    // Then: the script carries them verbatim inside PowerShell single quotes
+    const truncated = parseHelperCommandLine(
+      translate(["split-window", "-h", Q535_TRUNCATED], OPTS).helperCommandLine ?? "",
+    );
+    expect(truncated.command[4]).toBe(
+      `Write-Output 'OMO subagent pane ready: ${"A".repeat(2000)}…'; ` +
+        "Write-Output 'Focus this pane to attach.'; " +
+        "while ($true) { Start-Sleep -Seconds 86400 }",
+    );
+
+    const cleaned = parseHelperCommandLine(
+      translate(["respawn-pane", "-k", "-t", "%7", Q535_NUL], OPTS).helperCommandLine ?? "",
+    );
+    expect(cleaned.command[4]).toContain("OMO subagent pane ready: abcdef");
+    expect(cleaned.command[4]).not.toContain("\x00");
+  });
+
+  test("unescapeQContent reverses the Q banner escapes", () => {
+    expect(unescapeQContent(Q535_HOSTILE_INNER)).toBe(HOSTILE_DESCRIPTION_RAW);
+    expect(unescapeQContent("explore the tmux grammar module")).toBe("explore the tmux grammar module");
+    expect(unescapeQContent("")).toBe("");
+    // A lone trailing backslash is not an escape and survives as itself.
+    expect(unescapeQContent("a\\")).toBe("a\\");
+    // Every Q escape, in isolation.
+    expect(unescapeQContent("'\\\\''")).toBe("'");
+    expect(unescapeQContent("\\\\")).toBe("\\");
+    expect(unescapeQContent("\\$")).toBe("$");
+    expect(unescapeQContent("\\`")).toBe("`");
+    expect(unescapeQContent("\\\"")).toBe("\"");
   });
 });

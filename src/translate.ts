@@ -336,7 +336,7 @@
 // follow-up in rule 1b, and it is un-targeted for the same reason.
 
 import { classifyArgv } from "./grammar";
-import type { AuthEnvArg, Classification, Classified } from "./grammar";
+import type { AuthEnvArg, Classification, Classified, PlaceholderEncoding } from "./grammar";
 
 // ---------------------------------------------------------------------------
 // The contract, as data
@@ -1291,8 +1291,32 @@ function buildCommandVector(classified: Classification, shellPath: string): stri
   }
 
   return [shellPath, "-NoProfile", "-NonInteractive", "-Command", placeholderScript(
-    unescapeDoubleQuoted(classified.description),
+    decodePlaceholderDescription(classified.descriptionEncoding, classified.description),
   )];
+}
+
+/**
+ * Decode a placeholder description according to the encoding the grammar named.
+ *
+ * Exhaustive over PlaceholderEncoding: the default arm binds the value to
+ * `never`, so adding a third encoding without a case above fails compilation.
+ * The arm returns rather than throws because translate is total — but the
+ * grammar is the only producer of this union, so it is unreachable.
+ */
+function decodePlaceholderDescription(
+  encoding: PlaceholderEncoding,
+  description: string,
+): string {
+  switch (encoding) {
+    case "escaped-doublequote":
+      return unescapeDoubleQuoted(description);
+    case "singlequote":
+      return unescapeQContent(description);
+    default: {
+      const unreachable: never = encoding;
+      return unreachable;
+    }
+  }
 }
 
 function placeholderScript(description: string): string {
@@ -1321,7 +1345,8 @@ function powerShellSingleQuoted(value: string): string {
 // ---------------------------------------------------------------------------
 
 /**
- * Reverse `shellEscapeForDoubleQuotedCommand` (E), used inside Template B.
+ * Reverse `shellEscapeForDoubleQuotedCommand` (E), used inside the legacy E
+ * Template B (5.1.33 and earlier).
  *
  * E's order (index.js:8319's neighbourhood, and the byte-exact fixture in
  * test/grammar.test.ts) is: double every backslash, then `$`, then a backtick,
@@ -1350,39 +1375,58 @@ export function unescapeDoubleQuoted(text: string): string {
 }
 
 /**
- * Reverse `shellQuoteForNestedCommand` (Q), used inside Template A.
+ * The single Q decoder: reverse `shellQuoteForNestedCommand` over token CONTENT
+ * (surrounding quotes already stripped).
  *
- * Q wraps the value in apostrophes, replaces every apostrophe with the four
- * characters `'\''`, and then doubles every backslash — so the inserted backslash
- * arrives doubled and an embedded apostrophe arrives as the five characters
- * `'` `\` `\` `'` `'`. Reversed: that five-character run yields one apostrophe,
- * and a `\\` pair yields one backslash.
+ * Q wraps the value in apostrophes, rewrites every apostrophe to `'\''`, then
+ * doubles every backslash — so an embedded apostrophe arrives as the five
+ * characters `'\\''` — and finally escapes `$`, backtick and `"` with a
+ * backslash (5.1.35 pane-command.ts; the same pass covers attach values and
+ * the placeholder banner). Reversed: the five-character run yields one
+ * apostrophe, and a backslash followed by `\`, `$`, backtick or `"` yields
+ * that character; a backslash before anything else is literal, because Q
+ * would have doubled it.
  *
- * The token is passed WITH its surrounding apostrophes, exactly as grammar.ts
- * hands it over; this module owns the reversal, as grammar.ts documents.
+ * One decoder, two entry points: the placeholder branch calls this directly
+ * (the grammar hands over the banner's inner text), while attach tokens keep
+ * their quotes and go through `unescapeSingleQuotedToken`, which strips them
+ * and delegates here.
  */
-export function unescapeSingleQuotedToken(token: string): string {
-  if (token.length < 2 || !token.startsWith("'") || !token.endsWith("'")) return token;
-  const inner = token.slice(1, -1);
-
+export function unescapeQContent(text: string): string {
   let out = "";
   let index = 0;
 
-  while (index < inner.length) {
-    if (inner.startsWith("'\\\\''", index)) {
+  while (index < text.length) {
+    if (text.startsWith("'\\\\''", index)) {
       out += "'";
       index += 5;
       continue;
     }
-    if (inner.startsWith("\\\\", index)) {
-      out += "\\";
-      index += 2;
-      continue;
+    if (text[index] === "\\") {
+      const next = text[index + 1];
+      if (next === "\\" || next === "$" || next === "`" || next === '"') {
+        out += next;
+        index += 2;
+        continue;
+      }
     }
-    out += inner[index];
+    out += text[index];
     index += 1;
   }
   return out;
+}
+
+/**
+ * Reverse `shellQuoteForNestedCommand` (Q) over a token WITH its surrounding
+ * apostrophes, exactly as grammar.ts hands attach values over.
+ *
+ * Strips the quotes and delegates to `unescapeQContent`, which owns the one
+ * reversal. A token without both quotes is returned as-is: it is not a Q
+ * token, and guessing would corrupt it.
+ */
+export function unescapeSingleQuotedToken(token: string): string {
+  if (token.length < 2 || !token.startsWith("'") || !token.endsWith("'")) return token;
+  return unescapeQContent(token.slice(1, -1));
 }
 
 // ---------------------------------------------------------------------------
