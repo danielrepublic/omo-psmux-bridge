@@ -1,0 +1,19 @@
+// bridge-doctor harness fixture: LEGAL JSONC that Windows PowerShell 5.1
+// ConvertFrom-Json rejects without a trailing-comma pass. Four trailing
+// commas, nested arrays, strings containing ,} and ,] plus //, a block
+// comment, and a $schema URL whose // must not start a comment.
+{
+  // line comment before $schema; the // in the URL below is string content
+  "$schema": "https://example.com/omo-schema.json",
+  "[opencode]": {
+    /* block comment: ,} and ,] in here are not punctuation */
+    "tmux": {
+      "enabled": true,
+      "notes": "a string with ,} and ,] inside, plus // slashes",
+      "layouts": [
+        "main-vertical",
+        "tiled",
+      ],
+    },
+  },
+}

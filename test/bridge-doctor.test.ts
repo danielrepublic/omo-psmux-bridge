@@ -1,4 +1,5 @@
-// Regression coverage for the 5.1.30 bridge-doctor repair.
+// Regression coverage for the contracted 5.1.35 bridge-doctor anchors.
+// Both the version and the line/text pairs must match the installed bundle.
 //
 // WHAT THE PREVIOUS VERSION OF THIS FILE GOT WRONG, because it is the whole
 // reason this file was rewritten:
@@ -8,11 +9,12 @@
 //       expect(doctor).toContain(`Text = '${text}'`)
 //   Those two searches are satisfiable by a table where the Line column and the
 //   Text column have been PERMUTED against each other. Swapping the rows for
-//   lines 27005 and 156115 -- telling the doctor that line 27005 holds
-//   `function resolveServerUrl(...)` and line 156115 holds
+//   lines 27072 and 156456 -- telling the doctor that line 27072 holds
+//   `function resolveServerUrl(...)` and line 156456 holds
+//   `enabled: z49.boolean().default(false),` -- passes every assertion in that
 //   `enabled: z49.boolean().default(false),` -- passes every assertion in that
 //   file, and makes the doctor's drift detector report 0/11 on a perfectly
-//   healthy 5.1.30 host. That is not a hypothetical: it is the exact failure
+//   healthy contracted host. That is not a hypothetical: it is the exact failure
 //   recorded in the native baseline, where `frozen_line_anchors_resolved=0/11`
 //   and check 5 exited 50 on a machine with the right package installed.
 //
@@ -41,7 +43,7 @@
 //
 // NATIVE EXECUTION: reading bytes proves the SHAPE of the fix, not that PowerShell
 // accepts it. Actual Windows PowerShell 5.1 runs (all harness cases, argv through
-// .cmd, and the real 5.1.30 anchors read out of the INSTALLED bundle) are owned by
+// .cmd, and the real contracted anchors read out of the INSTALLED bundle) are owned by
 // the windows-runner lane and by scripts/windows/harness/doctor-harness.ps1.
 
 import { describe, expect, test } from "bun:test";
@@ -88,20 +90,20 @@ function parseAnchors(source: string): Anchor[] {
 
 const shippedAnchors = parseAnchors(doctor);
 
-/** The 11 check-5 anchors, verified against the real 5.1.30 dist/index.js. */
+/** The 11 check-5 anchors, verified against the installed 5.1.35 dist/index.js. */
 const EXPECTED_ANCHORS: ReadonlyArray<Anchor> = [
-  { line: 8234, text: "function isInsideTmuxEnvironment(environment) {" },
-  { line: 8274, text: "async function isServerRunning(serverUrl, options = {}) {" },
-  { line: 8286, text: 'const healthUrl = new URL("/global/health", serverUrl).toString();' },
-  { line: 8392, text: "const serverRunning = await deps.isServerRunning(serverUrl);" },
-  { line: 8397, text: "const tmux = await deps.getTmuxPath();" },
-  { line: 9078, text: "async function findVerifiedTmuxPath() {" },
-  { line: 9084, text: 'const verifyProc = spawn([path, "-V"], {' },
-  { line: 9090, text: "if (verifyExitCode !== 0) {" },
-  { line: 27005, text: "enabled: z49.boolean().default(false)," },
-  { line: 156115, text: "function resolveServerUrl(rawServerUrl, env, log) {" },
+  { line: 8231, text: "function isInsideTmuxEnvironment(environment) {" },
+  { line: 8271, text: "async function isServerRunning(serverUrl, options = {}) {" },
+  { line: 8283, text: 'const healthUrl = new URL("/global/health", serverUrl).toString();' },
+  { line: 8399, text: "const serverRunning = await deps.isServerRunning(serverUrl);" },
+  { line: 8404, text: "const tmux = await deps.getTmuxPath();" },
+  { line: 9079, text: "async function findVerifiedTmuxPath() {" },
+  { line: 9085, text: 'const verifyProc = spawn([path, "-V"], {' },
+  { line: 9091, text: "if (verifyExitCode !== 0) {" },
+  { line: 27072, text: "enabled: z49.boolean().default(false)," },
+  { line: 156456, text: "function resolveServerUrl(rawServerUrl, env, log) {" },
   {
-    line: 156125,
+    line: 156466,
     text: 'log("[tmux-session-manager] ctx.serverUrl has port 0; falling back. "',
   },
 ];
@@ -203,16 +205,56 @@ describe("bridge-doctor check-5 anchors match the contract as PAIRS", () => {
     }
   });
 
+  test("no superseded 5.1.30/5.1.33-era anchor or citation survives", () => {
+    // The 5.1.30 anchors were 27005 / 156115 / 156125 and the 5.1.33 anchors
+    // were 8234 / 8274 / 8286 / 8392 / 8397 / 9078 / 9084 / 9090 / 27010 /
+    // 156364 / 156374. Every one moved in the installed 5.1.35 bundle, so any
+    // of these reappearing as an ANCHOR LINE means the refresh is incomplete.
+    const staleLines = [
+      8234, 8274, 8286, 8392, 8397, 9078, 9084, 9090, 27005, 27010, 156115,
+      156125, 156364, 156374,
+    ];
+    const found = shippedAnchors
+      .map((a) => a.line)
+      .filter((n) => staleLines.includes(n));
+    expect({ staleAnchorLinesStillPresent: found }).toEqual({
+      staleAnchorLinesStillPresent: [],
+    });
+
+    for (const stale of [
+      "index.js:27005",
+      "index.js:27010",
+      "index.js:156115",
+      "index.js:156117",
+      "index.js:156125",
+      "index.js:156364",
+      "index.js:156366",
+      "index.js:156374",
+      "index.js:9078-9099",
+      "index.js:8274-8315",
+      "index.js:156364-156387",
+      "index.js:21410-21426",
+      "index.js:21412-21428",
+      "index.js:26288-26302",
+      "index.js:26293-26307",
+    ]) {
+      expect({ stale, found: doctor.includes(stale) }).toEqual({
+        stale,
+        found: false,
+      });
+    }
+  });
+
   test("each GATE range starts on a line the anchors actually check", () => {
     // Only the three silent-failure gate ranges are covered by the check-5
-    // anchor table. The config-resolution ranges (21410-21426, 26288-26302) are
+    // anchor table. The config-resolution ranges (21414-21430, 26355-26369) are
     // deliberately NOT anchors -- they describe which file is read, not what is
     // at a line -- and they are verified by the isolated-home cases in
     // scripts/windows/harness/install-config-probe.ps1 instead.
     const GATE_RANGES: ReadonlyArray<readonly [string, number]> = [
-      ["9078-9099", 9078],
-      ["8274-8315", 8274],
-      ["156115-156138", 156115],
+      ["9079-9100", 9079],
+      ["8271-8312", 8271],
+      ["156456-156479", 156456],
     ];
     for (const [span, start] of GATE_RANGES) {
       expect({
@@ -223,7 +265,7 @@ describe("bridge-doctor check-5 anchors match the contract as PAIRS", () => {
     }
 
     // And the config ranges are cited without being passed off as anchors.
-    for (const span of ["21410-21426", "26288-26302"]) {
+    for (const span of ["21414-21430", "26355-26369"]) {
       expect({
         span,
         cited: doctor.includes(`index.js:${span}`),
@@ -244,7 +286,7 @@ describe("bridge-doctor frozen version", () => {
   test("the pin this file reads is the one the contract checker reads", () => {
     // If pins.json ever stops carrying omo.verifiedAgainst, this file would
     // silently start comparing against `undefined`.
-    expect(pins.omo.verifiedAgainst).toBe("5.1.30");
+    expect(pins.omo.verifiedAgainst).toBe("5.1.35");
     expect(pins.omo.bundleGlob).toContain("oh-my-openagent");
   });
 
@@ -352,6 +394,77 @@ describe("bridge-doctor launcher", () => {
   test("still propagates the doctor exit code unchanged", () => {
     expect(launcher).toContain("BRIDGE_DOCTOR_EXIT=%ERRORLEVEL%");
     expect(launcher).toContain("exit /b %BRIDGE_DOCTOR_EXIT%");
+  });
+});
+
+describe("bridge-doctor gate-4 JSONC converter", () => {
+  // Parent reproduced gate 4 UNPARSEABLE on a live .omo/omo.jsonc holding four
+  // trailing commas, which are legal JSONC that PS5.1 ConvertFrom-Json rejects
+  // raw. Check 4 must convert through a trailing-comma-aware pass first.
+  test("check 4 converts through a named trailing-comma-aware converter", () => {
+    expect(doctor).toContain("function ConvertTo-PlainJsonText {");
+    expect(doctor).toContain("$stripped = ConvertTo-PlainJsonText $raw");
+    expect(doctor).toContain(
+      "if ($next -eq '}' -or $next -eq ']') { continue }",
+    );
+  });
+
+  test("the old comment-only stripper is gone", () => {
+    expect(doctor).not.toContain("function Remove-JsoncComments {");
+    expect(doctor).not.toContain("Remove-JsoncComments $raw");
+  });
+
+  test("parse failures withhold content: stable class, never the message", () => {
+    // PS5.1 ConvertFrom-Json embeds the offending raw JSON in
+    // Exception.Message, so the old `$parseError = ... Exception.Message`
+    // echoed file contents -- possibly secrets -- to the screen.
+    expect(doctor).toContain("parse-failed type=");
+    expect(doctor).toContain("content withheld");
+    expect(doctor).not.toContain(
+      "$parseError = As-AsciiLine -Text $_.Exception.Message -Max 160",
+    );
+  });
+});
+
+describe("trailing-comma fixture is not vacuous", () => {
+  const FIXTURE = `${ROOT}scripts/windows/harness/fixtures/omo-tmux-on-trailing-commas.jsonc`;
+  const fixture = readFileSync(FIXTURE, "latin1");
+
+  test("it enables tmux and carries the four trailing commas", () => {
+    expect(fixture).toContain('"enabled": true');
+    expect(fixture).toContain('"tiled",\n      ],');
+    expect(fixture).toContain("      ],\n    },");
+    expect(fixture).toContain("    },\n  },\n}");
+  });
+
+  test("its hostile strings would punish a naive stripper", () => {
+    expect(fixture).toContain('"notes": "a string with ,} and ,] inside, plus // slashes"');
+    expect(fixture).toContain("https://example.com/omo-schema.json");
+    expect(fixture).toContain("/* block comment");
+  });
+
+  test("it is genuinely not plain JSON, so case M exercises the converter", () => {
+    expect(() => JSON.parse(fixture)).toThrow();
+  });
+});
+
+describe("doctor harness JSONC regression cases", () => {
+  test("cases M and N exist with the right gates", () => {
+    expect(harness).toContain("M-trailingcommas");
+    expect(harness).toContain("N-malformedsecret");
+    expect(harness).toContain("fixtures\\omo-tmux-on-trailing-commas.jsonc");
+    expect(harness).toContain("HARNESS-SENTINEL-");
+  });
+
+  test("case N asserts the sentinel is absent from both streams", () => {
+    expect(harness).toContain("the sentinel is ABSENT from stdout");
+    expect(harness).toContain("the sentinel is ABSENT from stderr");
+  });
+
+  test("case J requires the real contracted bundle to pass without adapting its expected exit", () => {
+    const realCase = /-Name 'J-real-anchors'[^\n]*-ExpectExit ([^\r\n]+)/.exec(harness);
+    expect(realCase?.[1]).toBe("0");
+    expect(harness).toContain("verdict_basis=version-equality");
   });
 });
 

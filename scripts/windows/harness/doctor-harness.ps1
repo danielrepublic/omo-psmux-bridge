@@ -341,6 +341,21 @@ $deadPort = Get-FreeLoopbackPort
 $onCfg  = Write-File (Join-Path $work 'omo-tmux-on.jsonc')  '{ "[opencode]": { "tmux": { "enabled": true } } }'
 $offCfg = Write-File (Join-Path $work 'omo-tmux-off.jsonc') '{ "[opencode]": { "tmux": { "enabled": false } } }'
 
+# Legal JSONC with trailing commas: the checked-in fixture under
+# fixtures\ holds the exact bytes (comments, a block comment, a $schema URL,
+# strings containing ,} and ,] plus //, nested arrays, four trailing commas).
+# Copied, never generated, so the bytes the doctor parses are the bytes under
+# version control.
+$trailingSrc = Join-Path $src 'fixtures\omo-tmux-on-trailing-commas.jsonc'
+$trailingCfg = Join-Path $work 'omo-trailing-commas.jsonc'
+Copy-Item -LiteralPath $trailingSrc -Destination $trailingCfg -Force
+
+# Malformed config carrying a sentinel inside a string value. Truncated before
+# any closing brace, so no converter can save it: check 4 must stay FAIL while
+# the sentinel stays out of stdout AND stderr. Generated, never checked in.
+$sentinel = 'HARNESS-SENTINEL-9F8E7D6C5B4A'
+$malformedCfg = Write-File (Join-Path $work 'omo-malformed.jsonc') ('{ "[opencode]": { "tmux": { "enabled": true, "token": "' + $sentinel + '",')
+
 # --- registry fixtures for check 2 ------------------------------------------
 #
 # check 2 fires only when a `<ns>__<session>.port` exists AND is older than the
@@ -359,7 +374,7 @@ $emptyFixtureDir = New-Dir (Join-Path $work 'registry-fixture-empty')
 # --- package fixtures for check 5 -------------------------------------------
 #
 # A synthetic bundle proves the drift DETECTOR works. It does not prove anything
-# about the real 5.1.30 bundle, and case G below is the one that does that, by
+# about the real 5.1.35 bundle, and case J below is the one that does that, by
 # reading the INSTALLED package tree read-only.
 function New-SyntheticBundle {
     param([string] $Root, [int] $DriftLine)
@@ -370,7 +385,7 @@ function New-SyntheticBundle {
     $maxLine = 1
     foreach ($a in $anchorTable) { if ($a.Line -gt $maxLine) { $maxLine = $a.Line } }
     # 1-BASED source line N lives at $lines[N-1], and the array is written with
-    # WriteAllLines rather than `+=` in a loop: the highest anchor is line 156125,
+    # WriteAllLines rather than `+=` in a loop: the highest anchor is line 156466,
     # and PowerShell's string `+=` is O(n^2), which hangs on a 5 MB document.
     $lines = New-Object 'string[]' $maxLine
     for ($i = 1; $i -le $maxLine; $i++) { $lines[$i - 1] = 'var filler_line_' + $i + ' = ' + $i + ';' }
@@ -386,7 +401,7 @@ function New-SyntheticBundle {
     return $Root
 }
 $pkgGood = New-SyntheticBundle -Root (Join-Path $work 'pkg-clean') -DriftLine 0
-$pkgDrift = New-SyntheticBundle -Root (Join-Path $work 'pkg-drift') -DriftLine 27005
+$pkgDrift = New-SyntheticBundle -Root (Join-Path $work 'pkg-drift') -DriftLine 27072
 
 $livePkgRoot = Join-Path $env:USERPROFILE '.cache\opencode\packages'
 $livePkgOk = (Test-Path -LiteralPath (Join-Path $livePkgRoot 'oh-my-openagent@latest\node_modules\oh-my-openagent\dist\index.js')) -or
@@ -449,7 +464,7 @@ Say ('  host opencode listener : ' + $opencodeListener + '  fallback_4096_busy='
 Say ('  contract version       : ' + $contractVersion)
 Say ('  anchors read from doctor: ' + $anchorTable.Count + ' rows, max line ' + $(if ($anchorTable.Count -gt 0) { [string](($anchorTable | Measure-Object -Property Line -Maximum).Maximum) } else { 'n/a' }))
 Assert -Ok ($anchorTable.Count -eq 11) -Name 'the doctor still declares exactly 11 check-5 anchors' -Detail ('found=' + $anchorTable.Count)
-Assert -Ok (@($anchorTable | Where-Object { $_.Line -eq 27005 }).Count -eq 1) -Name 'the anchor this harness corrupts in case C exists at line 27005'
+Assert -Ok (@($anchorTable | Where-Object { $_.Line -eq 27072 }).Count -eq 1) -Name 'the anchor this harness corrupts in case C exists at line 27072'
 
 $snapBefore = Get-ReadOnlySnapshot -ExtraDirs @($fixtureBin)
 $procBefore = Get-ProcSnapshot
@@ -467,7 +482,7 @@ $healthyArgs = @('-Namespace', 'fxlive', '-Session', 'fresh', '-DataDir', $liveF
 # --- config-resolution fixtures ------------------------------------------------
 # The doctor's default -ConfigPath used to be a hardcoded
 # %USERPROFILE%\.omo\omo.jsonc. OmO resolves it as HOME ?? USERPROFILE ?? cwd and
-# then omo.jsonc, else omo.json (index.js:21410-21426), so the old default could
+# then omo.jsonc, else omo.json (index.js:21414-21430), so the old default could
 # point at a file OmO never opens. These two sandboxes drive the DEFAULT end to
 # end, through the real doctor, with no -ConfigPath at all.
 $cfgHomeJsonRoot = New-Dir (Join-Path $work 'cfg-home-json')
@@ -499,6 +514,13 @@ if ($livePkgOk) {
 # while USERPROFILE stays the real one, so this proves HOME takes precedence.
 $results += Invoke-Case -Name 'K-home-precedence' -EnvOverrides @{ PATH = $ownedPath; OPENCODE_PORT = [string]$healthPort; HOME = $cfgHomeJsonRoot } -DoctorArgs $healthyFixtureArgs -ExpectExit 40
 $results += Invoke-Case -Name 'L-home-jsonc' -EnvOverrides @{ PATH = $ownedPath; OPENCODE_PORT = [string]$healthPort; HOME = $cfgHomeJsoncRoot } -DoctorArgs $healthyFixtureArgs -ExpectExit 0
+
+# Gate-4 JSONC cases. M is the parent's real host file in miniature: legal
+# JSONC with trailing commas that PS5.1 ConvertFrom-Json rejects raw. N is
+# unparseable even after conversion and carries a sentinel that must never
+# reach the screen.
+$results += Invoke-Case -Name 'M-trailingcommas' -EnvOverrides $envHappy -DoctorArgs @('-Namespace', 'fxlive', '-Session', 'fresh', '-DataDir', $liveFixtureDir, '-ConfigPath', $trailingCfg, '-PackageRoot', $pkgGood) -ExpectExit 0
+$results += Invoke-Case -Name 'N-malformedsecret' -EnvOverrides $envHappy -DoctorArgs @('-Namespace', 'fxlive', '-Session', 'fresh', '-DataDir', $liveFixtureDir, '-ConfigPath', $malformedCfg, '-PackageRoot', $pkgGood) -ExpectExit 40
 
 $snapAfter = Get-ReadOnlySnapshot -ExtraDirs @($fixtureBin)
 $procAfter = Get-ProcSnapshot
@@ -587,7 +609,7 @@ Assert -Ok ($cFail.Count -ge 1) -Name 'C: at least one FAIL line' -Detail ('fail
 Assert -Ok ($cFail[0].N -eq 5) -Name 'C: the FIRST failing check is 5' -Detail ('first=' + $cFail[0].N)
 Assert -Ok ($cc.Text -match 'installed_version=' + $contractVersion) -Name 'C: the version is CORRECT, so this isolates the ANCHOR half of check 5'
 Assert -Ok ($cc.Text -match 'frozen_line_anchors_resolved=10/11') -Name 'C: exactly one of eleven anchors failed to resolve'
-Assert -Ok ($cc.Text -match 'line 27005 drifted: expected `enabled: z49\.boolean\(\)\.default\(false\),`') -Name 'C: the drift line names the line number and the expected text'
+Assert -Ok ($cc.Text -match 'line 27072 drifted: expected `enabled: z49\.boolean\(\)\.default\(false\),`') -Name 'C: the drift line names the line number and the expected text'
 Assert -Ok ($cc.Text -match 'verdict_basis=version-equality') -Name 'C: the version half PASSED and was reported as such'
 Assert -Ok (-not ($cc.Text -match '\[FAIL \] [1-4] ')) -Name 'C: no other check failed, so the drift really is isolated to check 5'
 } else { Skip-Case -Name 'C-asserts' -Reason 'case C did not run' }
@@ -662,18 +684,16 @@ Assert -Ok ($ci.Text -match 'verdict=PASS') -Name 'I: the shadow is a WARN, neve
 # ------------------------------------------- J: the REAL installed bundle
 if ($byName.ContainsKey('J-real-anchors')) {
 $cj = $byName['J-real-anchors']
-# This is the only case that proves anything about the actual 5.1.30 target. The
-# synthetic bundles above prove the detector works; only reading the INSTALLED
-# dist/index.js proves the 11 cited line numbers still resolve there.
-Assert -Ok ($cj.Text -match 'frozen_line_anchors_resolved=11/11') -Name 'J: all 11 anchors resolve in the INSTALLED 5.1.30 bundle'
+# Only the installed bundle proves that the contracted version's anchors resolve.
+Assert -Ok ($cj.Text -match 'frozen_line_anchors_resolved=11/11') -Name 'J: all 11 anchors resolve in the INSTALLED bundle'
 Assert -Ok ($cj.Text -match 'bundle=C:\\Users') -Name 'J: the bundle it read is the live installed one, not a synthetic fixture'
 Assert -Ok ($cj.Text -match ('installed_version=' + $contractVersion)) -Name 'J: the installed package.json reports the contracted version'
-Assert -Ok ($cj.Text -match ('contract_frozen_version=' + $contractVersion)) -Name 'J: the frozen default equals it, so version equality holds without widening'
+Assert -Ok ($cj.Text -match ('contract_frozen_version=' + $contractVersion)) -Name 'J: the frozen default equals the installed version'
+Assert -Ok ($cj.Text -notmatch 'line \d+ drifted:') -Name 'J: not one anchor drifted'
+Assert -Ok (-not ($cj.Text -match 'line \d+ is past the end of the bundle')) -Name 'J: no cited line is past the end of the real bundle'
 Assert -Ok ($cj.Text -match 'verdict_basis=version-equality') -Name 'J: verdict basis is version EQUALITY, not a widened known-equivalent set'
 Assert -Ok ($cj.Text -match 'known_equivalent_versions=\s*\(same line numbers verified\)') -Name 'J: the known-equivalent set is empty'
 Assert -Ok ($cj.Text -match '\[PASS \] 5 OmO package version drift') -Name 'J: check 5 PASSes against the real target'
-Assert -Ok ($cj.Text -notmatch 'line \d+ drifted:') -Name 'J: not one anchor drifted'
-Assert -Ok (-not ($cj.Text -match 'line \d+ is past the end of the bundle')) -Name 'J: no cited line is past the end of the real bundle'
 } else { Skip-Case -Name 'J-asserts' -Reason 'case J did not run' }
 
 # ------------------------------------------------- K/L: default config resolution
@@ -698,6 +718,32 @@ Assert -Ok ($cl.Text -match 'config_path_rule=omo\.jsonc exists') -Name 'L: the 
 Assert -Ok ($cl.Text -match '\[PASS \] 4 OmO config') -Name 'L: tmux true in the HOME config PASSes'
 Assert -Ok ($cl.Text -match 'this is the ONE SELECTED user file') -Name 'L: the merged-layer caveat is printed'
 } else { Skip-Case -Name 'L-asserts' -Reason 'case L did not run' }
+
+# ------------------------------------------------- M: legal trailing commas
+if ($byName.ContainsKey('M-trailingcommas')) {
+$cm = $byName['M-trailingcommas']
+# The regression this case exists for: the parent's live .omo/omo.jsonc holds
+# four trailing commas, which are legal JSONC, and the doctor called it
+# unparseable (gate-4 FAIL) because PS5.1 ConvertFrom-Json rejects them raw.
+Assert -Ok ($cm.Text -match 'jsonc_parse=OK') -Name 'M: a config with trailing commas parses'
+Assert -Ok ($cm.Text -match '\[opencode\]\.tmux\.enabled = true   \(observed literally') -Name 'M: the value is read out of the converted document'
+Assert -Ok ($cm.Text -match '\[PASS \] 4 OmO config') -Name 'M: gate 4 PASSes on legal trailing-comma JSONC'
+Assert -Ok ($cm.Text -match 'verdict=PASS') -Name 'M: the run as a whole is PASS'
+Assert -Ok (-not ($cm.Text -match 'unparseable')) -Name 'M: nothing is reported unparseable'
+} else { Skip-Case -Name 'M-asserts' -Reason 'case M did not run' }
+
+# --------------------------------------- N: malformed config keeps its secret
+if ($byName.ContainsKey('N-malformedsecret')) {
+$cn = $byName['N-malformedsecret']
+$nFail = @(Get-VerdictLines -Text $cn.Text -State 'FAIL')
+Assert -Ok ($nFail.Count -ge 1) -Name 'N: at least one FAIL line' -Detail ('fail=' + $nFail.Count)
+Assert -Ok ($nFail[0].N -eq 4) -Name 'N: the FIRST failing check is 4 (CONFIG)' -Detail ('first=' + $nFail[0].N)
+Assert -Ok ($cn.Text -match 'jsonc_parse=FAILED') -Name 'N: the failure is reported as a parse failure'
+Assert -Ok ($cn.Text -match 'parse-failed type=') -Name 'N: the reason is a STABLE exception class, not message text'
+Assert -Ok ($cn.Text -match 'content withheld') -Name 'N: the report says plainly that content is withheld'
+Assert -Ok (-not ($cn.Text.Contains($sentinel))) -Name 'N: the sentinel is ABSENT from stdout'
+Assert -Ok (-not ($cn.Err.Contains($sentinel))) -Name 'N: the sentinel is ABSENT from stderr'
+} else { Skip-Case -Name 'N-asserts' -Reason 'case N did not run' }
 
 # --------------------------------------------------------------------------- global
 Sep '='
@@ -724,7 +770,7 @@ $lostPids = @($pidsBefore | Where-Object { $pidsAfter -notcontains $_ })
 Assert -Ok ($lostPids.Count -eq 0) -Name 'no psmux/tmux process that existed before the harness is gone (nothing was killed)' -Detail ('before=' + $pidsBefore.Count + ' after=' + $pidsAfter.Count + ' lost=' + ($lostPids -join ','))
 
 Assert -Ok ($script:Skipped -le 2) -Name 'at most two cases skipped; the core cases own their fixtures and cannot skip' -Detail ('skipped=' + $script:Skipped)
-Assert -Ok ($results.Count -ge 11) -Name 'at least eleven cases ran' -Detail ('ran=' + $results.Count)
+Assert -Ok ($results.Count -ge 13) -Name 'at least thirteen cases ran' -Detail ('ran=' + $results.Count)
 
 Sep '='
 Say ('ASSERT TOTALS: pass=' + $script:Pass + '  fail=' + $script:Fail + '  skip=' + $script:Skipped)
