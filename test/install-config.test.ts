@@ -10,8 +10,8 @@
 //
 //   * Wrong FILE. `tmux.enabled` is read by
 //       isTmuxIntegrationEnabled(pluginConfig) -> pluginConfig.tmux?.enabled ?? false
-//     (index.js:141083-141084), and pluginConfig is the `[opencode]` block of the
-//     OMO config chain (index.js:26288-26302). It is never a top-level `tmux` key
+//     (index.js:141275-141276), and pluginConfig is the `[opencode]` block of the
+//     OMO config chain (index.js:26355-26369). It is never a top-level `tmux` key
 //     in opencode.jsonc.
 //   * Wrong METHOD. A raw regex answers TRUE for a config whose only match is a
 //     comment:
@@ -21,12 +21,12 @@
 //     this file guards is demonstrably real rather than hypothetical.
 //
 // The resolution rules the installer must mirror, verified against the real
-// 5.1.30 bundle before the code was written:
-//   21410  resolveHomeDir: env.HOME ?? env.USERPROFILE ?? process.cwd()
-//   21420  detectUserOmoJsonPath: <home>/.omo/omo.jsonc if it exists,
+// 5.1.35 bundle:
+//   21414  resolveHomeDir: env.HOME ?? env.USERPROFILE ?? process.cwd()
+//   21424  detectUserOmoJsonPath: <home>/.omo/omo.jsonc if it exists,
 //          else <home>/.omo/omo.json if it exists, else <home>/.omo/omo.jsonc
-//   21481  resolveOmoConfigPaths is the LOADER and calls detectUserOmoJsonPath.
-//          resolveUserOmoConfigPath (21414) is only the WRITE path (22138), so it
+//   21485  resolveOmoConfigPaths is the LOADER and calls detectUserOmoJsonPath.
+//          resolveUserOmoConfigPath (21418) is only the WRITE path, so it
 //          must not be used to model loading.
 //
 // These are static assertions and they need no Windows. The BEHAVIOURAL half --
@@ -172,7 +172,7 @@ describe("install.ps1 advice names the file OmO actually reads", () => {
 
   test("it states the real resolution rules instead of asserting omo.jsonc", () => {
     expect(install).toContain("omo.jsonc when it exists, else omo.json");
-    expect(install).toContain("index.js:21410-21426");
+    expect(install).toContain("index.js:21414-21430");
     // The merged-layer caveat: a project config can enable tmux while the user
     // file says false, so a FAIL here is not proof about the effective config.
     expect(install).toContain("merges");

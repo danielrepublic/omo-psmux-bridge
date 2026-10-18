@@ -223,8 +223,8 @@ function Get-PsmuxBackend {
 #
 # Confusing the two is not a style problem. `tmux.enabled` is read by
 #   isTmuxIntegrationEnabled(pluginConfig)  -> pluginConfig.tmux?.enabled ?? false
-# (index.js:141083-141084), and pluginConfig is the `[opencode]` block of the OMO
-# config chain (index.js:26288-26302, appendViews(..., block, "[opencode].")).
+# (index.js:141275-141276), and pluginConfig is the `[opencode]` block of the OMO
+# config chain (index.js:26366-26369, appendViews(..., block, "[opencode].")).
 # Probing the opencode config for a top-level "tmux" block therefore reports on a
 # key that is never read, in a file that never carries it, so the installer could
 # print TRUE while panes still did not appear, or FALSE on a fully working setup.
@@ -253,13 +253,13 @@ function Get-OpencodeConfigPath {
 # Resolved exactly the way the installed bundle resolves it, so this installer
 # cannot advise about a file OmO never opens:
 #
-#   index.js:21410  function resolveHomeDir(env = process.env) {
-#   index.js:21411    const homeDir = env.HOME ?? env.USERPROFILE ?? process.cwd();
-#   index.js:21420  function detectUserOmoJsonPath(env, fileSystem) {
-#   index.js:21422    const jsoncPath = join(configDir, "omo.jsonc");
-#   index.js:21423    if (fileSystem.existsSync(jsoncPath)) return jsoncPath;
-#   index.js:21425    const jsonPath = join(configDir, "omo.json");
-#   index.js:21426    return fileSystem.existsSync(jsonPath) ? jsonPath : jsoncPath;
+#   index.js:21414  function resolveHomeDir(env = process.env) {
+#   index.js:21415    const homeDir = env.HOME ?? env.USERPROFILE ?? process.cwd();
+#   index.js:21424  function detectUserOmoJsonPath(env, fileSystem) {
+#   index.js:21426    const jsoncPath = join(configDir, "omo.jsonc");
+#   index.js:21427    if (fileSystem.existsSync(jsoncPath)) return jsoncPath;
+#   index.js:21429    const jsonPath = join(configDir, "omo.json");
+#   index.js:21430    return fileSystem.existsSync(jsonPath) ? jsonPath : jsoncPath;
 #
 # `??` is NULL coalescing, not truthiness: an EMPTY HOME still wins over
 # USERPROFILE. -not [string]::IsNullOrEmpty would diverge here, so this tests
@@ -515,19 +515,19 @@ Write-Line ('[install] opencode_config=' + $(if ($opencodeConfigPath -eq '') { '
 # OMO config chain, so it is probed there -- see Read-OmoTmuxEnabled.
 $omoConfigPath = Get-OmoConfigPath
 $omoConfigExists = (-not [string]::IsNullOrEmpty($omoConfigPath)) -and (Test-Path -LiteralPath $omoConfigPath -PathType Leaf)
-$omoConfigRule = 'neither omo.jsonc nor omo.json exists; this is the path OmO expects (index.js:21426)'
+$omoConfigRule = 'neither omo.jsonc nor omo.json exists; this is the path OmO expects (index.js:21430)'
 if ($omoConfigExists) {
     $sibling = ''
     if ((Split-Path $omoConfigPath -Leaf) -eq 'omo.jsonc') { $sibling = Join-Path (Split-Path $omoConfigPath -Parent) 'omo.json' }
     else { $sibling = Join-Path (Split-Path $omoConfigPath -Parent) 'omo.jsonc' }
-    if (Test-Path -LiteralPath $sibling -PathType Leaf) { $omoConfigRule = 'both omo.jsonc and omo.json exist; OmO reads omo.jsonc (index.js:21423)' }
-    else { $omoConfigRule = 'omo.' + ((Split-Path $omoConfigPath -Leaf) -replace '^omo\.', '') + ' exists (index.js:21423,21426)' }
+    if (Test-Path -LiteralPath $sibling -PathType Leaf) { $omoConfigRule = 'both omo.jsonc and omo.json exist; OmO reads omo.jsonc (index.js:21427)' }
+    else { $omoConfigRule = 'omo.' + ((Split-Path $omoConfigPath -Leaf) -replace '^omo\.', '') + ' exists (index.js:21427,21430)' }
 }
 $tmuxEnabled = Read-OmoTmuxEnabled -Path $omoConfigPath
 Write-Line ('[install] omo_config=' + $(if ($omoConfigPath -eq '') { '<no home derivable>' } else { $omoConfigPath }))
 Write-Line ('[install] omo_config_exists=' + $omoConfigExists)
 Write-Line ('[install] omo_config_rule=' + $omoConfigRule)
-Write-Line ('[install] prereq_tmux_enabled=' + $tmuxEnabled + '  (read from omo config [opencode].tmux.enabled, index.js:141083-141084)')
+Write-Line ('[install] prereq_tmux_enabled=' + $tmuxEnabled + '  (read from omo config [opencode].tmux.enabled, index.js:141275-141276)')
 
 $machineBefore = Get-MachinePathFingerprint
 
@@ -745,7 +745,7 @@ if (-not $omoConfigExists) {
     Write-Line '[install] a missing pane is otherwise indistinguishable from a broken install.'
     Write-Line '[install] The file is NOT necessarily the one named above: OmO reads'
     Write-Line '[install] $HOME/.omo/omo.jsonc when it exists, else omo.json, and it also merges'
-    Write-Line '[install] project layers and a profile block (index.js:21410-21426, 26288-26302).'
+    Write-Line '[install] project layers and a profile block (index.js:21414-21430, 26366-26369).'
     Write-Line '[install] If you set it and panes still do not appear, run'
     Write-Line '[install] bin\bridge-doctor.cmd  -- it is read-only and names which gate is'
     Write-Line '[install] responsible, and it reports the same file-resolution rules as this.'
