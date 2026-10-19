@@ -154,3 +154,30 @@ describe("the release manifest exists in this tree", () => {
     expect(existsSync(`${RELEASE}/install-bootstrap.ps1`)).toBe(true);
   });
 });
+
+describe("install.cmd clears Mark-of-the-Web through Get-ChildItem, not Unblock-File -Recurse", () => {
+  // Unblock-File has no -Recurse parameter in 5.1 or 7.x: recursion belongs
+  // to Get-ChildItem. A bare `Unblock-File ... -Recurse` fails parameter
+  // binding before -ErrorAction applies (noise on every install) and unblocks
+  // nothing (the step is dead). Issue #3.
+  test("the MotW step pipes Get-ChildItem -Recurse into Unblock-File", () => {
+    const text = readFileSync(`${BIN}/install.cmd`, "utf8");
+    expect(text).toContain("Get-ChildItem");
+    expect(text).toContain("| Unblock-File");
+  });
+
+  test("no Unblock-File invocation passes -Recurse", () => {
+    const text = readFileSync(`${BIN}/install.cmd`, "utf8");
+    const unblockLines = text
+      .split(/\r?\n/)
+      .filter((line) => line.includes("Unblock-File"));
+    // Guard against vacuous pass: the step must exist to be asserted on.
+    expect(unblockLines.length).toBeGreaterThan(0);
+    for (const line of unblockLines) {
+      // Only the Unblock-File argv is asserted: -Recurse legitimately belongs
+      // to Get-ChildItem earlier in the same pipeline.
+      const argv = line.slice(line.indexOf("Unblock-File"));
+      expect(argv).not.toContain("-Recurse");
+    }
+  });
+});

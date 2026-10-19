@@ -91,7 +91,7 @@ rem bridge-doctor.cmd.
 set "OMO_PSMOD=%SystemRoot%\System32\WindowsPowerShell\v1.0\Modules"
 if defined PSModulePath (set "PSModulePath=%OMO_PSMOD%;%PSModulePath%") else (set "PSModulePath=%OMO_PSMOD%")
 
-"%OMO_PS%" -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "Unblock-File -LiteralPath '%BRIDGE_BIN%' -Recurse -ErrorAction SilentlyContinue"
+"%OMO_PS%" -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "Get-ChildItem -LiteralPath '%BRIDGE_BIN%' -Recurse -File -ErrorAction SilentlyContinue | Unblock-File -ErrorAction SilentlyContinue"
 
 rem ---- 4. run the installer, forwarding argv untouched -----------------------
 "%OMO_PS%" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%OMO_INSTALL_PS1%" %*
