@@ -1,0 +1,317 @@
+{
+  "tool": "omo5140-cache-rebuild.cjs",
+  "ok": true,
+  "started_utc": "2026-10-21T04:20:11.515Z",
+  "cacheHome": "C:\\Users\\Daniel\\.cache\\opencode",
+  "expectVersion": "5.1.40",
+  "expectBundleSha": "d3d603598b6f0a9ce5da8681d6f0aa680220fd8216b314cfcf20a7bb127b36fd",
+  "expectBundleBytes": 6080006,
+  "backup": {
+    "workRoot": "C:/Users/Daniel/AppData/Local/Temp/omo5140-backup",
+    "manifest": "C:/Users/Daniel/AppData/Local/Temp/omo5140-backup/backup-manifest.json",
+    "checks": {
+      "manifestOk": true,
+      "errors": 0,
+      "cacheSourceFiles": 8875,
+      "cacheCopiedFiles": 8875,
+      "cacheSourceBytes": 132472373,
+      "cacheCopiedBytes": 132472373,
+      "cacheTreeOk": true,
+      "oldBundleSha": "886b7a3cb275609649ab5083670d87fe66c4c1248dfa801d83963f187f824930",
+      "oldBundleBackupSha": "886b7a3cb275609649ab5083670d87fe66c4c1248dfa801d83963f187f824930",
+      "oldBundleMatch": true,
+      "skillFiles": [
+        {
+          "rel": "skills\\security-research\\SKILL.md",
+          "bytes": 7784,
+          "sha256": "d14aebffc36be7139174bfda330b9342a81773a2d51703f98863d5d9261d6864",
+          "backup_sha256": "d14aebffc36be7139174bfda330b9342a81773a2d51703f98863d5d9261d6864",
+          "match": true
+        },
+        {
+          "rel": "skills\\security-review\\SKILL.md",
+          "bytes": 7832,
+          "sha256": "1c5b5bb806a2c58886d7936b733b2c15a4b8744ae8368c421376abf579fe440a",
+          "backup_sha256": "1c5b5bb806a2c58886d7936b733b2c15a4b8744ae8368c421376abf579fe440a",
+          "match": true
+        }
+      ]
+    },
+    "ok": false,
+    "skillFiles": [
+      {
+        "rel": "skills/security-research/SKILL.md",
+        "sha256": "d14aebffc36be7139174bfda330b9342a81773a2d51703f98863d5d9261d6864"
+      },
+      {
+        "rel": "skills/security-review/SKILL.md",
+        "sha256": "1c5b5bb806a2c58886d7936b733b2c15a4b8744ae8368c421376abf579fe440a"
+      }
+    ]
+  },
+  "gates": {
+    "cacheRootExists": true,
+    "rootReparse": "False",
+    "reparseCount": 0,
+    "reparsePaths": []
+  },
+  "assertions": [
+    {
+      "name": "G1-cache-root-exists",
+      "pass": true,
+      "detail": "C:\\Users\\Daniel\\.cache\\opencode"
+    },
+    {
+      "name": "G2-cache-root-is-not-a-reparse-point",
+      "pass": true,
+      "detail": "root_reparse=False"
+    },
+    {
+      "name": "G2-cache-has-zero-reparse-points",
+      "pass": true,
+      "detail": "reparse_count=0 "
+    },
+    {
+      "name": "G3-no-live-opencode-process",
+      "pass": true,
+      "detail": "opencode pids=[] psmux pids=[11624,18816,22332,43640] leases=1 pending=\"\""
+    },
+    {
+      "name": "G4-backup-manifest-exists",
+      "pass": true,
+      "detail": "C:/Users/Daniel/AppData/Local/Temp/omo5140-backup/backup-manifest.json"
+    },
+    {
+      "name": "G4-backup-manifest-readable",
+      "pass": true,
+      "detail": "C:/Users/Daniel/AppData/Local/Temp/omo5140-backup/backup-manifest.json"
+    },
+    {
+      "name": "G4-backup-manifest-ok",
+      "pass": true,
+      "detail": "ok=true errors=0"
+    },
+    {
+      "name": "G4-backup-copied-every-cache-file",
+      "pass": true,
+      "detail": "copied=8875/8875"
+    },
+    {
+      "name": "G4-backup-cache-tree-ok",
+      "pass": true,
+      "detail": "tree_ok=true"
+    },
+    {
+      "name": "G4-backup-old-plugin-bundle-matches",
+      "pass": true,
+      "detail": "src=886b7a3cb275609649ab5083670d87fe66c4c1248dfa801d83963f187f824930 backup=886b7a3cb275609649ab5083670d87fe66c4c1248dfa801d83963f187f824930"
+    },
+    {
+      "name": "G5-backup-has-skill-files",
+      "pass": true,
+      "detail": "2 file(s)"
+    },
+    {
+      "name": "G5-skill-backup-matches:skills/security-research/SKILL.md",
+      "pass": true,
+      "detail": "source=d14aebffc36be7139174bfda330b9342a81773a2d51703f98863d5d9261d6864 backup=d14aebffc36be7139174bfda330b9342a81773a2d51703f98863d5d9261d6864"
+    },
+    {
+      "name": "G5-skill-backup-matches:skills/security-review/SKILL.md",
+      "pass": true,
+      "detail": "source=1c5b5bb806a2c58886d7936b733b2c15a4b8744ae8368c421376abf579fe440a backup=1c5b5bb806a2c58886d7936b733b2c15a4b8744ae8368c421376abf579fe440a"
+    },
+    {
+      "name": "cache-root-removed",
+      "pass": true,
+      "detail": "exists=false"
+    },
+    {
+      "name": "skill-restored:skills/security-research/SKILL.md",
+      "pass": true,
+      "detail": "sha256=d14aebffc36be7139174bfda330b9342a81773a2d51703f98863d5d9261d6864"
+    },
+    {
+      "name": "skill-restored:skills/security-review/SKILL.md",
+      "pass": true,
+      "detail": "sha256=1c5b5bb806a2c58886d7936b733b2c15a4b8744ae8368c421376abf579fe440a"
+    },
+    {
+      "name": "opencode-exe-present",
+      "pass": true,
+      "detail": "C:\\Users\\Daniel\\AppData\\Roaming\\npm\\node_modules\\opencode-ai\\bin\\opencode.exe"
+    },
+    {
+      "name": "opencode-version-1.19.3",
+      "pass": true,
+      "detail": "1.19.3"
+    },
+    {
+      "name": "serve-health-ok",
+      "pass": true,
+      "detail": "healthy=true version=1.19.3"
+    },
+    {
+      "name": "plugin-initialisation-triggered",
+      "pass": true,
+      "detail": "GET /agent -> HTTP 200"
+    },
+    {
+      "name": "plugin-installed-by-opencode-loader",
+      "pass": true,
+      "detail": "version=5.1.40"
+    },
+    {
+      "name": "plugin-version-is-5.1.40",
+      "pass": true,
+      "detail": "version=5.1.40"
+    },
+    {
+      "name": "plugin-bundle-sha256",
+      "pass": true,
+      "detail": "sha256=d3d603598b6f0a9ce5da8681d6f0aa680220fd8216b314cfcf20a7bb127b36fd"
+    },
+    {
+      "name": "plugin-bundle-bytes",
+      "pass": true,
+      "detail": "bytes=6080006"
+    },
+    {
+      "name": "plugin-meta-record-readable",
+      "pass": true,
+      "detail": "version=5.1.35"
+    },
+    {
+      "name": "agent-plugin-loaded",
+      "pass": true,
+      "detail": "24 agent(s), /^Sisyphus/ required"
+    },
+    {
+      "name": "only-the-owned-child-opencode-is-running",
+      "pass": true,
+      "detail": "opencode pids after the rebuild: opencode=39556 (the owned child only)"
+    },
+    {
+      "name": "owned-child-stopped",
+      "pass": true,
+      "detail": "exit=null signal=SIGTERM"
+    }
+  ],
+  "observations": [
+    {
+      "name": "cache-before",
+      "detail": "8922 files"
+    },
+    {
+      "name": "agent-trigger",
+      "detail": "GET /agent failed: Error: timeout-after-10000ms"
+    },
+    {
+      "name": "agent-trigger",
+      "detail": "GET /agent failed: Error: timeout-after-10000ms"
+    },
+    {
+      "name": "agent-trigger",
+      "detail": "GET /agent failed: Error: timeout-after-10000ms"
+    },
+    {
+      "name": "agent-trigger",
+      "detail": "GET /agent failed: Error: timeout-after-10000ms"
+    },
+    {
+      "name": "agent-trigger",
+      "detail": "GET /agent failed: Error: timeout-after-10000ms"
+    },
+    {
+      "name": "agent-trigger",
+      "detail": "GET /agent -> HTTP 200 (attempt 6)"
+    },
+    {
+      "name": "plugin-meta-record-state",
+      "detail": "plugin-meta.json still names 5.1.35 (was 5.1.35); this is the interactive-TUI bookkeeping record, which `opencode serve` does not rewrite. The installed package.json and bundle are the authority."
+    }
+  ],
+  "errors": [],
+  "live": {
+    "processes": [
+      "psmux=11624",
+      "psmux=18816",
+      "psmux=22332",
+      "psmux=43640"
+    ],
+    "opencodePids": [],
+    "psmuxPids": [
+      "11624",
+      "18816",
+      "22332",
+      "43640"
+    ],
+    "omoLeaseCount": 1,
+    "omoRefreshPending": ""
+  },
+  "before": {
+    "inventory": [
+      "FILES=8922",
+      "BYTES=128111091",
+      "CHILD=bin|True",
+      "CHILD=packages|True",
+      "CHILD=skills|True",
+      "CHILD=models.json|False"
+    ],
+    "files": 8922,
+    "pluginMetaVersion": "5.1.35"
+  },
+  "after": {
+    "skillsRestored": 2,
+    "agentTriggerStatus": 200,
+    "bundleSha256": "d3d603598b6f0a9ce5da8681d6f0aa680220fd8216b314cfcf20a7bb127b36fd",
+    "bundleBytes": 6080006,
+    "pluginMetaVersion": "5.1.35",
+    "processes": [
+      "opencode=39556",
+      "psmux=11624",
+      "psmux=18816",
+      "psmux=22332",
+      "psmux=43640"
+    ]
+  },
+  "cleanup": {
+    "ownedChild": "exit=null signal=SIGTERM",
+    "killedUserProcesses": 0,
+    "note": "only the owned child was stopped; no pre-existing process was signalled"
+  },
+  "notes": "Cache rebuild: the cache root was removed and OpenCode's own loader reinstalled oh-my-openagent@latest. No pre-existing OpenCode or psmux process was stopped or signalled.",
+  "opencodeVersion": "1.19.3",
+  "port": 64460,
+  "health": {
+    "healthy": true,
+    "version": "1.19.3"
+  },
+  "agents": [
+    "Sisyphus - ultraworker",
+    "Sisyphus - ultraworker",
+    "Hephaestus - Deep Agent",
+    "Hephaestus - Deep Agent",
+    "Prometheus - Plan Builder",
+    "Prometheus - Plan Builder",
+    "Atlas - Plan Executor",
+    "Atlas - Plan Executor",
+    "Metis - Plan Consultant",
+    "Metis - Plan Consultant",
+    "Momus - Plan Critic",
+    "Momus - Plan Critic",
+    "Sisyphus-Junior",
+    "Sisyphus-Junior",
+    "build",
+    "compaction",
+    "explore",
+    "general",
+    "librarian",
+    "multimodal-looker",
+    "oracle",
+    "plan",
+    "summary",
+    "title"
+  ],
+  "finished_utc": "2026-10-21T04:21:13.769Z"
+}
