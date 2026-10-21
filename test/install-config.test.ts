@@ -29,6 +29,20 @@
 //          resolveUserOmoConfigPath (21418) is only the WRITE path, so it
 //          must not be used to model loading.
 //
+// The SHIPPED citations are the CURRENT ones, verified against the installed
+// oh-my-openagent@5.1.40 bundle (dist/index.js):
+//   86041-86057   resolveHomeDir / detectUserOmoJsonPath -- the user file rules
+//   86112         resolveOmoConfigPaths, the LOADER (86115 calls
+//                 detectUserOmoJsonPath); resolveUserOmoConfigPath (86045) is
+//                 still only the WRITE path
+//   88313-88327   loadOmoOpenCodeConfigChain -- the config chain
+//   88324-88327   its appendViews block: baseView, the "[opencode]." prefix,
+//                 the profile block, and the profile+[opencode] combination
+//   141307-141308 isTmuxIntegrationEnabled: pluginConfig.tmux?.enabled ?? false
+//
+// The 5.1.35 spelling of that appendViews block was 26366-26369. In 5.1.40 that
+// range is a model catalogue entry, so a live citation of it names nothing.
+//
 // These are static assertions and they need no Windows. The BEHAVIOURAL half --
 // HOME precedence, the omo.json fallback, and the comment decoy actually being
 // rejected -- runs natively in scripts/windows/harness/install-config-probe.ps1,
@@ -172,11 +186,22 @@ describe("install.ps1 advice names the file OmO actually reads", () => {
 
   test("it states the real resolution rules instead of asserting omo.jsonc", () => {
     expect(install).toContain("omo.jsonc when it exists, else omo.json");
-    expect(install).toContain("index.js:21414-21430");
+    expect(install).toContain("index.js:86041-86057");
     // The merged-layer caveat: a project config can enable tmux while the user
     // file says false, so a FAIL here is not proof about the effective config.
     expect(install).toContain("merges");
     expect(install).toContain("project layers and a profile block");
+    // The config-chain citation must name the CURRENT bundle's lines. 26366-26369
+    // was the 5.1.35 spelling of the appendViews block; in 5.1.40 that range is
+    // a model catalogue entry, so a citation of it points at nothing at all.
+    // Scoped to the advice line, because the same correct range also appears in
+    // a source comment -- that one must not make this assertion pass.
+    const advice = install
+      .split(/\r?\n/)
+      .find((line) => line.includes("project layers and a profile block")) ?? "";
+    expect(advice).toContain("88324-88327");
+    expect(install).not.toContain("26366-26369");
+    expect(install).not.toContain("index.js:86054,21430");
   });
 
   test("it still reports rather than writes", () => {
