@@ -1,4 +1,4 @@
-// Regression coverage for the contracted 5.1.35 bridge-doctor anchors.
+// Regression coverage for the contracted 5.1.40 bridge-doctor anchors.
 // Both the version and the line/text pairs must match the installed bundle.
 //
 // WHAT THE PREVIOUS VERSION OF THIS FILE GOT WRONG, because it is the whole
@@ -8,15 +8,15 @@
 //       expect(doctor).toContain(`[pscustomobject]@{ Line = ${line};`)
 //       expect(doctor).toContain(`Text = '${text}'`)
 //   Those two searches are satisfiable by a table where the Line column and the
-//   Text column have been PERMUTED against each other. Swapping the rows for
-//   lines 27072 and 156456 -- telling the doctor that line 27072 holds
-//   `function resolveServerUrl(...)` and line 156456 holds
-//   `enabled: z49.boolean().default(false),` -- passes every assertion in that
-//   `enabled: z49.boolean().default(false),` -- passes every assertion in that
-//   file, and makes the doctor's drift detector report 0/11 on a perfectly
-//   healthy contracted host. That is not a hypothetical: it is the exact failure
-//   recorded in the native baseline, where `frozen_line_anchors_resolved=0/11`
-//   and check 5 exited 50 on a machine with the right package installed.
+//   Text column have been PERMUTED against each other. Swapping the row that
+//   holds `enabled: z49.boolean().default(false),` with the row that holds
+//   `function resolveServerUrl(...)` -- telling the doctor that the former's
+//   line holds the resolveServerUrl signature and the latter's line holds the
+//   z49 default -- passes every assertion in that file, and makes the doctor's
+//   drift detector report 0/11 on a perfectly healthy contracted host. That is
+//   not a hypothetical: it is the exact failure recorded in the native
+//   baseline, where `frozen_line_anchors_resolved=0/11` and check 5 exited 50
+//   on a machine with the right package installed.
 //
 //   So the anchors below are read OUT of the script as (Line, Text) PAIRS by a
 //   single parser, and compared as pairs. A swapped row fails. There is also a
@@ -90,20 +90,20 @@ function parseAnchors(source: string): Anchor[] {
 
 const shippedAnchors = parseAnchors(doctor);
 
-/** The 11 check-5 anchors, verified against the installed 5.1.35 dist/index.js. */
+/** The 11 check-5 anchors, verified against the installed 5.1.40 dist/index.js. */
 const EXPECTED_ANCHORS: ReadonlyArray<Anchor> = [
-  { line: 8231, text: "function isInsideTmuxEnvironment(environment) {" },
-  { line: 8271, text: "async function isServerRunning(serverUrl, options = {}) {" },
-  { line: 8283, text: 'const healthUrl = new URL("/global/health", serverUrl).toString();' },
-  { line: 8399, text: "const serverRunning = await deps.isServerRunning(serverUrl);" },
-  { line: 8404, text: "const tmux = await deps.getTmuxPath();" },
+  { line: 8235, text: "function isInsideTmuxEnvironment(environment) {" },
+  { line: 8275, text: "async function isServerRunning(serverUrl, options = {}) {" },
+  { line: 8287, text: 'const healthUrl = new URL("/global/health", serverUrl).toString();' },
+  { line: 8403, text: "const serverRunning = await deps.isServerRunning(serverUrl);" },
+  { line: 8408, text: "const tmux = await deps.getTmuxPath();" },
   { line: 9079, text: "async function findVerifiedTmuxPath() {" },
   { line: 9085, text: 'const verifyProc = spawn([path, "-V"], {' },
   { line: 9091, text: "if (verifyExitCode !== 0) {" },
-  { line: 27072, text: "enabled: z49.boolean().default(false)," },
-  { line: 156456, text: "function resolveServerUrl(rawServerUrl, env, log) {" },
+  { line: 89030, text: "enabled: z49.boolean().default(false)," },
+  { line: 156488, text: "function resolveServerUrl(rawServerUrl, env, log) {" },
   {
-    line: 156466,
+    line: 156498,
     text: 'log("[tmux-session-manager] ctx.serverUrl has port 0; falling back. "',
   },
 ];
@@ -245,16 +245,54 @@ describe("bridge-doctor check-5 anchors match the contract as PAIRS", () => {
     }
   });
 
+  test("no superseded 5.1.35-era anchor or citation survives", () => {
+    // The 5.1.35 anchors were 8231 / 8271 / 8283 / 8399 / 8404 / 27072 /
+    // 156456 / 156466; 9079 / 9085 / 9091 did NOT move in the installed 5.1.40
+    // bundle and are therefore not stale. Any of the eight reappearing as an
+    // ANCHOR LINE means the refresh is incomplete.
+    const staleLines = [8231, 8271, 8283, 8399, 8404, 27072, 156456, 156466];
+    const found = shippedAnchors
+      .map((a) => a.line)
+      .filter((n) => staleLines.includes(n));
+    expect({ staleAnchorLinesStillPresent: found }).toEqual({
+      staleAnchorLinesStillPresent: [],
+    });
+
+    for (const stale of [
+      "index.js:8231",
+      "index.js:8271",
+      "index.js:8283",
+      "index.js:8399",
+      "index.js:8404",
+      "index.js:27072",
+      "index.js:156456",
+      "index.js:156466",
+      "index.js:27071",
+      "index.js:156458",
+      "index.js:8271-8312",
+      "index.js:156456-156479",
+      "index.js:21414-21430",
+      "index.js:26355-26369",
+      "index.js:8401",
+      "index.js:8406",
+    ]) {
+      expect({ stale, found: doctor.includes(stale) }).toEqual({
+        stale,
+        found: false,
+      });
+    }
+  });
+
   test("each GATE range starts on a line the anchors actually check", () => {
     // Only the three silent-failure gate ranges are covered by the check-5
-    // anchor table. The config-resolution ranges (21414-21430, 26355-26369) are
+    // anchor table. The config-resolution ranges (86041-86057, 88313-88327) are
     // deliberately NOT anchors -- they describe which file is read, not what is
     // at a line -- and they are verified by the isolated-home cases in
     // scripts/windows/harness/install-config-probe.ps1 instead.
     const GATE_RANGES: ReadonlyArray<readonly [string, number]> = [
       ["9079-9100", 9079],
-      ["8271-8312", 8271],
-      ["156456-156479", 156456],
+      ["8275-8316", 8275],
+      ["156488-156511", 156488],
     ];
     for (const [span, start] of GATE_RANGES) {
       expect({
@@ -265,7 +303,7 @@ describe("bridge-doctor check-5 anchors match the contract as PAIRS", () => {
     }
 
     // And the config ranges are cited without being passed off as anchors.
-    for (const span of ["21414-21430", "26355-26369"]) {
+    for (const span of ["86041-86057", "88313-88327"]) {
       expect({
         span,
         cited: doctor.includes(`index.js:${span}`),
@@ -286,7 +324,7 @@ describe("bridge-doctor frozen version", () => {
   test("the pin this file reads is the one the contract checker reads", () => {
     // If pins.json ever stops carrying omo.verifiedAgainst, this file would
     // silently start comparing against `undefined`.
-    expect(pins.omo.verifiedAgainst).toBe("5.1.35");
+    expect(pins.omo.verifiedAgainst).toBe("5.1.40");
     expect(pins.omo.bundleGlob).toContain("oh-my-openagent");
   });
 

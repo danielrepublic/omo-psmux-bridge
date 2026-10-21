@@ -65,6 +65,22 @@ foreach ($m in $anchorRe.Matches($doctorText)) {
     $anchorTable += [pscustomobject]@{ Line = [int]$m.Groups[1].Value; Text = $m.Groups[2].Value.Replace("''", "'") }
 }
 
+# The anchor line case C corrupts, DERIVED from the table above rather than
+# hardcoded. A hardcoded line number is a silent no-op the moment the doctor is
+# re-anchored: the synthetic bundle would then corrupt a line the doctor no
+# longer checks, case C would still exit 50 for the wrong reason, and the
+# drift detector would look tested while testing nothing. The anchor is picked
+# by its TEXT -- the `[opencode].tmux.enabled` default, the one anchor that
+# proves the config gate -- so the choice survives a re-anchoring, and the
+# assertion below can name the same line and text it corrupts.
+$driftAnchorRows = @($anchorTable | Where-Object { $_.Text -like '*default(false)*' })
+$driftAnchorLine = 0
+$driftAnchorText = ''
+if ($driftAnchorRows.Count -eq 1) {
+    $driftAnchorLine = [int]$driftAnchorRows[0].Line
+    $driftAnchorText = [string]$driftAnchorRows[0].Text
+}
+
 $totalClock = [System.Diagnostics.Stopwatch]::StartNew()
 $log = New-Object System.Collections.Generic.List[string]
 $script:Pass = 0
@@ -374,7 +390,7 @@ $emptyFixtureDir = New-Dir (Join-Path $work 'registry-fixture-empty')
 # --- package fixtures for check 5 -------------------------------------------
 #
 # A synthetic bundle proves the drift DETECTOR works. It does not prove anything
-# about the real 5.1.35 bundle, and case J below is the one that does that, by
+# about the real 5.1.40 bundle, and case J below is the one that does that, by
 # reading the INSTALLED package tree read-only.
 function New-SyntheticBundle {
     param([string] $Root, [int] $DriftLine)
@@ -385,7 +401,7 @@ function New-SyntheticBundle {
     $maxLine = 1
     foreach ($a in $anchorTable) { if ($a.Line -gt $maxLine) { $maxLine = $a.Line } }
     # 1-BASED source line N lives at $lines[N-1], and the array is written with
-    # WriteAllLines rather than `+=` in a loop: the highest anchor is line 156466,
+    # WriteAllLines rather than `+=` in a loop: the highest anchor is line 156498,
     # and PowerShell's string `+=` is O(n^2), which hangs on a 5 MB document.
     $lines = New-Object 'string[]' $maxLine
     for ($i = 1; $i -le $maxLine; $i++) { $lines[$i - 1] = 'var filler_line_' + $i + ' = ' + $i + ';' }
@@ -401,7 +417,7 @@ function New-SyntheticBundle {
     return $Root
 }
 $pkgGood = New-SyntheticBundle -Root (Join-Path $work 'pkg-clean') -DriftLine 0
-$pkgDrift = New-SyntheticBundle -Root (Join-Path $work 'pkg-drift') -DriftLine 27072
+$pkgDrift = New-SyntheticBundle -Root (Join-Path $work 'pkg-drift') -DriftLine $driftAnchorLine
 
 $livePkgRoot = Join-Path $env:USERPROFILE '.cache\opencode\packages'
 $livePkgOk = (Test-Path -LiteralPath (Join-Path $livePkgRoot 'oh-my-openagent@latest\node_modules\oh-my-openagent\dist\index.js')) -or
@@ -464,7 +480,7 @@ Say ('  host opencode listener : ' + $opencodeListener + '  fallback_4096_busy='
 Say ('  contract version       : ' + $contractVersion)
 Say ('  anchors read from doctor: ' + $anchorTable.Count + ' rows, max line ' + $(if ($anchorTable.Count -gt 0) { [string](($anchorTable | Measure-Object -Property Line -Maximum).Maximum) } else { 'n/a' }))
 Assert -Ok ($anchorTable.Count -eq 11) -Name 'the doctor still declares exactly 11 check-5 anchors' -Detail ('found=' + $anchorTable.Count)
-Assert -Ok (@($anchorTable | Where-Object { $_.Line -eq 27072 }).Count -eq 1) -Name 'the anchor this harness corrupts in case C exists at line 27072'
+Assert -Ok ($driftAnchorLine -gt 0 -and @($anchorTable | Where-Object { $_.Line -eq $driftAnchorLine }).Count -eq 1) -Name ('the anchor this harness corrupts in case C exists at line ' + $driftAnchorLine) -Detail ('found=' + $driftAnchorLine)
 
 $snapBefore = Get-ReadOnlySnapshot -ExtraDirs @($fixtureBin)
 $procBefore = Get-ProcSnapshot
@@ -482,7 +498,7 @@ $healthyArgs = @('-Namespace', 'fxlive', '-Session', 'fresh', '-DataDir', $liveF
 # --- config-resolution fixtures ------------------------------------------------
 # The doctor's default -ConfigPath used to be a hardcoded
 # %USERPROFILE%\.omo\omo.jsonc. OmO resolves it as HOME ?? USERPROFILE ?? cwd and
-# then omo.jsonc, else omo.json (index.js:21414-21430), so the old default could
+# then omo.jsonc, else omo.json (index.js:86041-86057), so the old default could
 # point at a file OmO never opens. These two sandboxes drive the DEFAULT end to
 # end, through the real doctor, with no -ConfigPath at all.
 $cfgHomeJsonRoot = New-Dir (Join-Path $work 'cfg-home-json')
@@ -609,7 +625,7 @@ Assert -Ok ($cFail.Count -ge 1) -Name 'C: at least one FAIL line' -Detail ('fail
 Assert -Ok ($cFail[0].N -eq 5) -Name 'C: the FIRST failing check is 5' -Detail ('first=' + $cFail[0].N)
 Assert -Ok ($cc.Text -match 'installed_version=' + $contractVersion) -Name 'C: the version is CORRECT, so this isolates the ANCHOR half of check 5'
 Assert -Ok ($cc.Text -match 'frozen_line_anchors_resolved=10/11') -Name 'C: exactly one of eleven anchors failed to resolve'
-Assert -Ok ($cc.Text -match 'line 27072 drifted: expected `enabled: z49\.boolean\(\)\.default\(false\),`') -Name 'C: the drift line names the line number and the expected text'
+Assert -Ok ($cc.Text -match ('line ' + $driftAnchorLine + ' drifted: expected `' + [regex]::Escape($driftAnchorText) + '`')) -Name 'C: the drift line names the line number and the expected text'
 Assert -Ok ($cc.Text -match 'verdict_basis=version-equality') -Name 'C: the version half PASSED and was reported as such'
 Assert -Ok (-not ($cc.Text -match '\[FAIL \] [1-4] ')) -Name 'C: no other check failed, so the drift really is isolated to check 5'
 } else { Skip-Case -Name 'C-asserts' -Reason 'case C did not run' }
