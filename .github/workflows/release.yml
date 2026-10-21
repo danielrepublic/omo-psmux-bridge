@@ -733,12 +733,14 @@ jobs:
 
           This is the setting people miss. Without it you get **zero subagent panes and no
           error message at all** — `[opencode].tmux.enabled` defaults to `false`, so the plugin
-          never tries to spawn a pane. Add this to your opencode config (`opencode.json` /
-          `opencode.jsonc`):
+          never tries to spawn a pane. Add this to your **OmO** config,
+          `%USERPROFILE%\.omo\omo.jsonc`, not to the OpenCode config:
 
           ```json
           {
-            "tmux": { "enabled": true }
+            "[opencode]": {
+              "tmux": { "enabled": true }
+            }
           }
           ```
 
