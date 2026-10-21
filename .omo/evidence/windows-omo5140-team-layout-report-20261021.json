@@ -1,0 +1,771 @@
+{
+  "tool": "omo5140-team-default.cjs",
+  "ok": true,
+  "started_utc": "2026-10-21T04:22:20.042Z",
+  "namespace": "(default psmux namespace)",
+  "my_session": "omo5140-team-10128785564",
+  "mux": "C:\\Users\\Daniel\\AppData\\Local\\opencode-psmux-bridge\\bin\\tmux.exe",
+  "psmux": "C:\\Users\\Daniel\\AppData\\Local\\psmux\\psmux.exe",
+  "assertions": [
+    {
+      "name": "bridge-shim-present",
+      "pass": true,
+      "detail": "C:\\Users\\Daniel\\AppData\\Local\\opencode-psmux-bridge\\bin\\tmux.exe"
+    },
+    {
+      "name": "psmux-present",
+      "pass": true,
+      "detail": "C:\\Users\\Daniel\\AppData\\Local\\psmux\\psmux.exe"
+    },
+    {
+      "name": "new-session-in-default-namespace",
+      "pass": true,
+      "detail": "exit=0 caller=%1"
+    },
+    {
+      "name": "our-session-discoverable",
+      "pass": true,
+      "detail": "omo5140-team-10128785564"
+    },
+    {
+      "name": "display-caller-session",
+      "pass": true,
+      "detail": "stdout=$61"
+    },
+    {
+      "name": "display-caller-window-target",
+      "pass": true,
+      "detail": "stdout=omo5140-team-10128785564:0"
+    },
+    {
+      "name": "list-panes-in-window",
+      "pass": true,
+      "detail": "panes=1"
+    },
+    {
+      "name": "split-window-a",
+      "pass": true,
+      "detail": "pane=%2 exit=0"
+    },
+    {
+      "name": "set-option-p-absorbed-a",
+      "pass": true,
+      "detail": "url exit=0 stderr= | sid exit=0"
+    },
+    {
+      "name": "send-keys-a",
+      "pass": true,
+      "detail": "exit=0"
+    },
+    {
+      "name": "pane-a-marker",
+      "pass": true,
+      "detail": "marker=OMO5140_MARKER_A_10128785564"
+    },
+    {
+      "name": "split-window-b",
+      "pass": true,
+      "detail": "pane=%3 exit=0"
+    },
+    {
+      "name": "set-option-p-absorbed-b",
+      "pass": true,
+      "detail": "url exit=0 stderr= | sid exit=0"
+    },
+    {
+      "name": "send-keys-b",
+      "pass": true,
+      "detail": "exit=0"
+    },
+    {
+      "name": "pane-b-marker",
+      "pass": true,
+      "detail": "marker=OMO5140_MARKER_B_10128785564"
+    },
+    {
+      "name": "select-layout-main-vertical",
+      "pass": true,
+      "detail": "exit=0 stderr="
+    },
+    {
+      "name": "resize-pane-30pct",
+      "pass": true,
+      "detail": "exit=0 stderr="
+    },
+    {
+      "name": "resize-changed-geometry-after-layout",
+      "pass": true,
+      "detail": "after_layout=[%1 0 119 | %2 120 80 | %3 120 80] after_resize=[%1 0 59 | %2 60 140 | %3 60 140]"
+    },
+    {
+      "name": "caller-pane-at-~30pct-after-resize",
+      "pass": true,
+      "detail": "caller width=59 of total=200 => 29.5%"
+    },
+    {
+      "name": "targeted-kill-session",
+      "pass": true,
+      "detail": "exit=0 target=omo5140-team-10128785564"
+    },
+    {
+      "name": "no-kill-server-ever-issued",
+      "pass": true,
+      "detail": "none"
+    },
+    {
+      "name": "only-our-session-was-killed",
+      "pass": true,
+      "detail": "kill-session -t omo5140-team-10128785564"
+    },
+    {
+      "name": "our-session-gone",
+      "pass": true,
+      "detail": "after=0,default"
+    },
+    {
+      "name": "user-sessions-survived",
+      "pass": true,
+      "detail": "before=0,default after=0,default lost=none"
+    },
+    {
+      "name": "no-session-count-growth",
+      "pass": true,
+      "detail": "before=2 after=2"
+    }
+  ],
+  "observations": [
+    {
+      "name": "baseline-sessions",
+      "detail": "0, default"
+    },
+    {
+      "name": "baseline-clients",
+      "detail": "/dev/pts/43640: default [133x71 xterm-256color] (attached,UTF-8)"
+    },
+    {
+      "name": "geometry-before-layout",
+      "detail": "%1 0 59 | %2 60 140 | %3 60 140"
+    },
+    {
+      "name": "geometry-after-layout",
+      "detail": "%1 0 119 | %2 120 80 | %3 120 80"
+    },
+    {
+      "name": "geometry-after-resize",
+      "detail": "%1 0 59 | %2 60 140 | %3 60 140"
+    },
+    {
+      "name": "after-clients",
+      "detail": "/dev/pts/43640: default [133x71 xterm-256color] (attached,UTF-8)"
+    }
+  ],
+  "invocations": [
+    {
+      "binary": "psmux.exe",
+      "ns": "(default)",
+      "argv": [
+        "list-sessions",
+        "-F",
+        "#{session_name}"
+      ],
+      "exit": 0,
+      "stdout": "0\ndefault",
+      "stderr": "",
+      "error": null,
+      "duration_ms": 27
+    },
+    {
+      "binary": "psmux.exe",
+      "ns": "(default)",
+      "argv": [
+        "list-windows",
+        "-a",
+        "-F",
+        "#{session_name}|#{window_index}|#{window_name}"
+      ],
+      "exit": 0,
+      "stdout": "0|0|powershell\ndefault|0|powershell",
+      "stderr": "",
+      "error": null,
+      "duration_ms": 24
+    },
+    {
+      "binary": "psmux.exe",
+      "ns": "(default)",
+      "argv": [
+        "list-panes",
+        "-a",
+        "-F",
+        "#{session_name}|#{window_index}|#{pane_id}"
+      ],
+      "exit": 0,
+      "stdout": "0|0|%1\ndefault|0|%1",
+      "stderr": "",
+      "error": null,
+      "duration_ms": 22
+    },
+    {
+      "binary": "psmux.exe",
+      "ns": "(default)",
+      "argv": [
+        "list-clients"
+      ],
+      "exit": 0,
+      "stdout": "/dev/pts/43640: default [133x71 xterm-256color] (attached,UTF-8)",
+      "stderr": "",
+      "error": null,
+      "duration_ms": 24
+    },
+    {
+      "binary": "tmux.exe",
+      "ns": "(default)",
+      "argv": [
+        "new-session",
+        "-d",
+        "-s",
+        "omo5140-team-10128785564",
+        "-x",
+        "200",
+        "-y",
+        "50",
+        "-P",
+        "-F",
+        "#{pane_id}"
+      ],
+      "exit": 0,
+      "stdout": "%1",
+      "stderr": "",
+      "error": null,
+      "duration_ms": 129
+    },
+    {
+      "binary": "tmux.exe",
+      "ns": "(default)",
+      "argv": [
+        "list-sessions",
+        "-F",
+        "#{session_name}"
+      ],
+      "exit": 0,
+      "stdout": "0\ndefault\nomo5140-team-10128785564",
+      "stderr": "",
+      "error": null,
+      "duration_ms": 80
+    },
+    {
+      "binary": "tmux.exe",
+      "ns": "(default)",
+      "argv": [
+        "display",
+        "-p",
+        "-F",
+        "#{session_id}",
+        "-t",
+        "%1"
+      ],
+      "exit": 0,
+      "stdout": "$61",
+      "stderr": "",
+      "error": null,
+      "duration_ms": 82
+    },
+    {
+      "binary": "tmux.exe",
+      "ns": "(default)",
+      "argv": [
+        "display",
+        "-p",
+        "-F",
+        "#{session_name}:#{window_index}",
+        "-t",
+        "%1"
+      ],
+      "exit": 0,
+      "stdout": "omo5140-team-10128785564:0",
+      "stderr": "",
+      "error": null,
+      "duration_ms": 79
+    },
+    {
+      "binary": "tmux.exe",
+      "ns": "(default)",
+      "argv": [
+        "list-panes",
+        "-t",
+        "omo5140-team-10128785564:0",
+        "-F",
+        "#{pane_id}"
+      ],
+      "exit": 0,
+      "stdout": "%1",
+      "stderr": "",
+      "error": null,
+      "duration_ms": 75
+    },
+    {
+      "binary": "tmux.exe",
+      "ns": "(default)",
+      "argv": [
+        "split-window",
+        "-t",
+        "%1",
+        "-h",
+        "-d",
+        "-l",
+        "70%",
+        "-P",
+        "-F",
+        "#{pane_id}",
+        "-c",
+        "C:\\Users\\Daniel"
+      ],
+      "exit": 0,
+      "stdout": "%2",
+      "stderr": "",
+      "error": null,
+      "duration_ms": 82
+    },
+    {
+      "binary": "tmux.exe",
+      "ns": "(default)",
+      "argv": [
+        "select-pane",
+        "-t",
+        "%2",
+        "-T",
+        "omo5140-team-10128785564-a"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": "",
+      "error": null,
+      "duration_ms": 96
+    },
+    {
+      "binary": "tmux.exe",
+      "ns": "(default)",
+      "argv": [
+        "set-option",
+        "-p",
+        "-t",
+        "%2",
+        "@omo_attach_server_url",
+        "http://127.0.0.1:59999"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": "",
+      "error": null,
+      "duration_ms": 60
+    },
+    {
+      "binary": "tmux.exe",
+      "ns": "(default)",
+      "argv": [
+        "set-option",
+        "-p",
+        "-t",
+        "%2",
+        "@omo_attach_session_id",
+        "ses_10128785564_a"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": "",
+      "error": null,
+      "duration_ms": 60
+    },
+    {
+      "binary": "tmux.exe",
+      "ns": "(default)",
+      "argv": [
+        "send-keys",
+        "-t",
+        "%2",
+        "echo OMO5140_MARKER_A_10128785564",
+        "Enter"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": "",
+      "error": null,
+      "duration_ms": 78
+    },
+    {
+      "binary": "tmux.exe",
+      "ns": "(default)",
+      "argv": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "%2"
+      ],
+      "exit": 0,
+      "stdout": "PS C:\\Users\\Daniel> echo OMO5140_MARKER_A_10128785564\nOMO5140_MARKER_A_10128785564\nPS C:\\Users\\Daniel>",
+      "stderr": "",
+      "error": null,
+      "duration_ms": 84
+    },
+    {
+      "binary": "tmux.exe",
+      "ns": "(default)",
+      "argv": [
+        "split-window",
+        "-t",
+        "%2",
+        "-v",
+        "-d",
+        "-P",
+        "-F",
+        "#{pane_id}",
+        "-c",
+        "C:\\Users\\Daniel"
+      ],
+      "exit": 0,
+      "stdout": "%3",
+      "stderr": "",
+      "error": null,
+      "duration_ms": 86
+    },
+    {
+      "binary": "tmux.exe",
+      "ns": "(default)",
+      "argv": [
+        "select-pane",
+        "-t",
+        "%3",
+        "-T",
+        "omo5140-team-10128785564-b"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": "",
+      "error": null,
+      "duration_ms": 88
+    },
+    {
+      "binary": "tmux.exe",
+      "ns": "(default)",
+      "argv": [
+        "set-option",
+        "-p",
+        "-t",
+        "%3",
+        "@omo_attach_server_url",
+        "http://127.0.0.1:59999"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": "",
+      "error": null,
+      "duration_ms": 62
+    },
+    {
+      "binary": "tmux.exe",
+      "ns": "(default)",
+      "argv": [
+        "set-option",
+        "-p",
+        "-t",
+        "%3",
+        "@omo_attach_session_id",
+        "ses_10128785564_b"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": "",
+      "error": null,
+      "duration_ms": 65
+    },
+    {
+      "binary": "tmux.exe",
+      "ns": "(default)",
+      "argv": [
+        "send-keys",
+        "-t",
+        "%3",
+        "echo OMO5140_MARKER_B_10128785564",
+        "Enter"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": "",
+      "error": null,
+      "duration_ms": 82
+    },
+    {
+      "binary": "tmux.exe",
+      "ns": "(default)",
+      "argv": [
+        "capture-pane",
+        "-p",
+        "-t",
+        "%3"
+      ],
+      "exit": 0,
+      "stdout": "PS C:\\Users\\Daniel> echo OMO5140_MARKER_B_10128785564\nOMO5140_MARKER_B_10128785564\nPS C:\\Users\\Daniel>",
+      "stderr": "",
+      "error": null,
+      "duration_ms": 86
+    },
+    {
+      "binary": "tmux.exe",
+      "ns": "(default)",
+      "argv": [
+        "list-panes",
+        "-t",
+        "omo5140-team-10128785564:0",
+        "-F",
+        "#{pane_id} #{pane_left} #{pane_width}"
+      ],
+      "exit": 0,
+      "stdout": "%1 0 59\n%2 60 140\n%3 60 140",
+      "stderr": "",
+      "error": null,
+      "duration_ms": 117
+    },
+    {
+      "binary": "tmux.exe",
+      "ns": "(default)",
+      "argv": [
+        "select-layout",
+        "-t",
+        "omo5140-team-10128785564:0",
+        "main-vertical"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": "",
+      "error": null,
+      "duration_ms": 90
+    },
+    {
+      "binary": "tmux.exe",
+      "ns": "(default)",
+      "argv": [
+        "list-panes",
+        "-t",
+        "omo5140-team-10128785564:0",
+        "-F",
+        "#{pane_id} #{pane_left} #{pane_width}"
+      ],
+      "exit": 0,
+      "stdout": "%1 0 119\n%2 120 80\n%3 120 80",
+      "stderr": "",
+      "error": null,
+      "duration_ms": 84
+    },
+    {
+      "binary": "tmux.exe",
+      "ns": "(default)",
+      "argv": [
+        "resize-pane",
+        "-t",
+        "%1",
+        "-x",
+        "30%"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": "",
+      "error": null,
+      "duration_ms": 99
+    },
+    {
+      "binary": "tmux.exe",
+      "ns": "(default)",
+      "argv": [
+        "list-panes",
+        "-t",
+        "omo5140-team-10128785564:0",
+        "-F",
+        "#{pane_id} #{pane_left} #{pane_width}"
+      ],
+      "exit": 0,
+      "stdout": "%1 0 59\n%2 60 140\n%3 60 140",
+      "stderr": "",
+      "error": null,
+      "duration_ms": 94
+    },
+    {
+      "binary": "tmux.exe",
+      "ns": "(default)",
+      "argv": [
+        "kill-session",
+        "-t",
+        "omo5140-team-10128785564"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": "",
+      "error": null,
+      "duration_ms": 307
+    },
+    {
+      "binary": "psmux.exe",
+      "ns": "(default)",
+      "argv": [
+        "list-sessions",
+        "-F",
+        "#{session_name}"
+      ],
+      "exit": 0,
+      "stdout": "0\ndefault",
+      "stderr": "",
+      "error": null,
+      "duration_ms": 25
+    },
+    {
+      "binary": "psmux.exe",
+      "ns": "(default)",
+      "argv": [
+        "list-windows",
+        "-a",
+        "-F",
+        "#{session_name}|#{window_index}|#{window_name}"
+      ],
+      "exit": 0,
+      "stdout": "0|0|powershell\ndefault|0|powershell",
+      "stderr": "",
+      "error": null,
+      "duration_ms": 20
+    },
+    {
+      "binary": "psmux.exe",
+      "ns": "(default)",
+      "argv": [
+        "list-panes",
+        "-a",
+        "-F",
+        "#{session_name}|#{window_index}|#{pane_id}"
+      ],
+      "exit": 0,
+      "stdout": "0|0|%1\ndefault|0|%1",
+      "stderr": "",
+      "error": null,
+      "duration_ms": 20
+    },
+    {
+      "binary": "psmux.exe",
+      "ns": "(default)",
+      "argv": [
+        "list-clients"
+      ],
+      "exit": 0,
+      "stdout": "/dev/pts/43640: default [133x71 xterm-256color] (attached,UTF-8)",
+      "stderr": "",
+      "error": null,
+      "duration_ms": 38
+    }
+  ],
+  "baseline_before": {
+    "label": "before",
+    "session_names": [
+      "0",
+      "default"
+    ],
+    "session_name_set": [
+      "0",
+      "default"
+    ],
+    "windows": [
+      "0|0|powershell",
+      "default|0|powershell"
+    ],
+    "panes": [
+      "0|0|%1",
+      "default|0|%1"
+    ],
+    "clients": "/dev/pts/43640: default [133x71 xterm-256color] (attached,UTF-8)"
+  },
+  "baseline_after": {
+    "label": "after",
+    "session_names": [
+      "0",
+      "default"
+    ],
+    "session_name_set": [
+      "0",
+      "default"
+    ],
+    "windows": [
+      "0|0|powershell",
+      "default|0|powershell"
+    ],
+    "panes": [
+      "0|0|%1",
+      "default|0|%1"
+    ],
+    "clients": "/dev/pts/43640: default [133x71 xterm-256color] (attached,UTF-8)"
+  },
+  "layout": {
+    "created": {
+      "exit": 0,
+      "stdout": "%1",
+      "stderr": "",
+      "caller": "%1"
+    },
+    "resolve": {
+      "session_id_display": {
+        "exit": 0,
+        "stdout": "$61",
+        "stderr": ""
+      },
+      "window_target_display": {
+        "exit": 0,
+        "stdout": "omo5140-team-10128785564:0",
+        "stderr": ""
+      },
+      "window_target_used": "omo5140-team-10128785564:0"
+    },
+    "existing_panes": [
+      "%1"
+    ],
+    "panes": {
+      "a": "%2",
+      "b": "%3"
+    },
+    "capture_a": "PS C:\\Users\\Daniel> echo OMO5140_MARKER_A_10128785564\nOMO5140_MARKER_A_10128785564\nPS C:\\Users\\Daniel>",
+    "capture_b": "PS C:\\Users\\Daniel> echo OMO5140_MARKER_B_10128785564\nOMO5140_MARKER_B_10128785564\nPS C:\\Users\\Daniel>",
+    "geometry_before": {
+      "step": "before-layout",
+      "exit": 0,
+      "stdout": "%1 0 59\n%2 60 140\n%3 60 140",
+      "target": "omo5140-team-10128785564:0"
+    },
+    "geometry_after_layout": {
+      "step": "after-layout",
+      "exit": 0,
+      "stdout": "%1 0 119\n%2 120 80\n%3 120 80",
+      "target": "omo5140-team-10128785564:0"
+    },
+    "geometry_after_resize": {
+      "step": "after-resize",
+      "exit": 0,
+      "stdout": "%1 0 59\n%2 60 140\n%3 60 140",
+      "target": "omo5140-team-10128785564:0"
+    },
+    "callerWidthPctAfterResize": 29.5
+  },
+  "cleanup": {
+    "kill_session": {
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    "baseline_guard": {
+      "sessions_before": [
+        "0",
+        "default"
+      ],
+      "sessions_after": [
+        "0",
+        "default"
+      ],
+      "lost": [],
+      "clients_before": "/dev/pts/43640: default [133x71 xterm-256color] (attached,UTF-8)",
+      "clients_after": "/dev/pts/43640: default [133x71 xterm-256color] (attached,UTF-8)"
+    }
+  },
+  "notes": "Team-visualization layout replayed in the DEFAULT psmux namespace inside a uniquely named session. Teardown used a targeted kill-session on that session only; no kill-server was issued in any namespace; the user's own sessions were verified to survive."
+}

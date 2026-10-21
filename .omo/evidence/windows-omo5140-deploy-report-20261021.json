@@ -1,0 +1,180 @@
+{
+    "tool":  "win-deploy.ps1",
+    "stamp_utc":  "2026-10-21T04:21:22Z",
+    "stage_dir":  "C:/Users/Daniel/AppData/Local/Temp/omo5140-stage",
+    "deployed_root":  "C:\\Users\\Daniel\\AppData\\Local\\opencode-psmux-bridge",
+    "backup_root":  "C:/Users/Daniel/AppData/Local/Temp/omo5140-backup",
+    "files":  [
+                  {
+                      "rel":  "bin/tmux.exe",
+                      "target":  "C:\\Users\\Daniel\\AppData\\Local\\opencode-psmux-bridge\\bin\\tmux.exe",
+                      "predeploy_sha256":  "994875a97663ac4fe8a26a0bae11fa904b3ed16bed580929aebcbd92fcd8b513",
+                      "predeploy_bytes":  86135808,
+                      "expected_sha256":  "4e94e1df2735dc70a559f807ce0bc2eb37b7414acca0470aaece5505e9d28e39",
+                      "staged_sha256":  "4e94e1df2735dc70a559f807ce0bc2eb37b7414acca0470aaece5505e9d28e39",
+                      "installed_sha256":  "4e94e1df2735dc70a559f807ce0bc2eb37b7414acca0470aaece5505e9d28e39",
+                      "installed_bytes":  96429056,
+                      "changed":  true,
+                      "ok":  true
+                  },
+                  {
+                      "rel":  "bin/bridge-doctor.ps1",
+                      "target":  "C:\\Users\\Daniel\\AppData\\Local\\opencode-psmux-bridge\\bin\\bridge-doctor.ps1",
+                      "predeploy_sha256":  "16114bbf9c3cc013718670671d79c0b920c884c9f945a91269189f17c8e60bc3",
+                      "predeploy_bytes":  56644,
+                      "expected_sha256":  "426c8d3183ad5d0806f6ed0dce221aba0516538562c4559890ca2f3116ff3269",
+                      "staged_sha256":  "426c8d3183ad5d0806f6ed0dce221aba0516538562c4559890ca2f3116ff3269",
+                      "installed_sha256":  "426c8d3183ad5d0806f6ed0dce221aba0516538562c4559890ca2f3116ff3269",
+                      "installed_bytes":  56980,
+                      "changed":  true,
+                      "ok":  true
+                  },
+                  {
+                      "rel":  "bin/install.ps1",
+                      "target":  "C:\\Users\\Daniel\\AppData\\Local\\opencode-psmux-bridge\\bin\\install.ps1",
+                      "predeploy_sha256":  "120a80580051352ec38a2d660d0d8d51d86f8023fb7d9549eee856ea473d32ff",
+                      "predeploy_bytes":  35690,
+                      "expected_sha256":  "109d0ac465047009437bc64b625769da492f433316c21a1a2a6d060a36d80fd3",
+                      "staged_sha256":  "109d0ac465047009437bc64b625769da492f433316c21a1a2a6d060a36d80fd3",
+                      "installed_sha256":  "109d0ac465047009437bc64b625769da492f433316c21a1a2a6d060a36d80fd3",
+                      "installed_bytes":  35926,
+                      "changed":  true,
+                      "ok":  true
+                  }
+              ],
+    "checks":  [
+                   {
+                       "name":  "manifest-non-empty",
+                       "pass":  true,
+                       "detail":  "3 file(s)"
+                   },
+                   {
+                       "name":  "staged-hash:bin/tmux.exe",
+                       "pass":  true,
+                       "detail":  "staged=4e94e1df2735dc70a559f807ce0bc2eb37b7414acca0470aaece5505e9d28e39 expected=4e94e1df2735dc70a559f807ce0bc2eb37b7414acca0470aaece5505e9d28e39"
+                   },
+                   {
+                       "name":  "staged-hash:bin/bridge-doctor.ps1",
+                       "pass":  true,
+                       "detail":  "staged=426c8d3183ad5d0806f6ed0dce221aba0516538562c4559890ca2f3116ff3269 expected=426c8d3183ad5d0806f6ed0dce221aba0516538562c4559890ca2f3116ff3269"
+                   },
+                   {
+                       "name":  "staged-hash:bin/install.ps1",
+                       "pass":  true,
+                       "detail":  "staged=109d0ac465047009437bc64b625769da492f433316c21a1a2a6d060a36d80fd3 expected=109d0ac465047009437bc64b625769da492f433316c21a1a2a6d060a36d80fd3"
+                   },
+                   {
+                       "name":  "deployed-root-exists",
+                       "pass":  true,
+                       "detail":  "C:\\Users\\Daniel\\AppData\\Local\\opencode-psmux-bridge"
+                   },
+                   {
+                       "name":  "deployed-root-not-reparse",
+                       "pass":  true,
+                       "detail":  "attrs=Directory"
+                   },
+                   {
+                       "name":  "deployed-root-zero-reparse",
+                       "pass":  true,
+                       "detail":  "reparse_count=0"
+                   },
+                   {
+                       "name":  "backup-manifest-exists",
+                       "pass":  true,
+                       "detail":  "C:/Users/Daniel/AppData/Local/Temp/omo5140-backup/backup-manifest.json"
+                   },
+                   {
+                       "name":  "backup-manifest-readable",
+                       "pass":  true,
+                       "detail":  "C:/Users/Daniel/AppData/Local/Temp/omo5140-backup/backup-manifest.json"
+                   },
+                   {
+                       "name":  "backup-manifest-ok",
+                       "pass":  true,
+                       "detail":  "ok=True errors=0"
+                   },
+                   {
+                       "name":  "backup-copied-every-cache-file",
+                       "pass":  true,
+                       "detail":  "copied=8875/8875"
+                   },
+                   {
+                       "name":  "backup-cache-tree-ok",
+                       "pass":  true,
+                       "detail":  "tree_ok=True"
+                   },
+                   {
+                       "name":  "backup-old-plugin-bundle-matches",
+                       "pass":  true,
+                       "detail":  "src=886b7a3cb275609649ab5083670d87fe66c4c1248dfa801d83963f187f824930 backup=886b7a3cb275609649ab5083670d87fe66c4c1248dfa801d83963f187f824930"
+                   },
+                   {
+                       "name":  "backup-bridge-tree-ok",
+                       "pass":  true,
+                       "detail":  "tree_ok=True"
+                   },
+                   {
+                       "name":  "backup-work-root-present",
+                       "pass":  true,
+                       "detail":  "C:/Users/Daniel/AppData/Local/Temp/omo5140-backup"
+                   },
+                   {
+                       "name":  "installed-hash:bin/tmux.exe",
+                       "pass":  true,
+                       "detail":  "installed=4e94e1df2735dc70a559f807ce0bc2eb37b7414acca0470aaece5505e9d28e39 expected=4e94e1df2735dc70a559f807ce0bc2eb37b7414acca0470aaece5505e9d28e39"
+                   },
+                   {
+                       "name":  "installed-hash:bin/bridge-doctor.ps1",
+                       "pass":  true,
+                       "detail":  "installed=426c8d3183ad5d0806f6ed0dce221aba0516538562c4559890ca2f3116ff3269 expected=426c8d3183ad5d0806f6ed0dce221aba0516538562c4559890ca2f3116ff3269"
+                   },
+                   {
+                       "name":  "installed-hash:bin/install.ps1",
+                       "pass":  true,
+                       "detail":  "installed=109d0ac465047009437bc64b625769da492f433316c21a1a2a6d060a36d80fd3 expected=109d0ac465047009437bc64b625769da492f433316c21a1a2a6d060a36d80fd3"
+                   },
+                   {
+                       "name":  "user-path-unchanged",
+                       "pass":  true,
+                       "detail":  "before=fa64dd34bbfa4a327c3f796fea7806cba1aa59201ccbacfbe1b28fa39ea527ec after=fa64dd34bbfa4a327c3f796fea7806cba1aa59201ccbacfbe1b28fa39ea527ec"
+                   },
+                   {
+                       "name":  "machine-path-unchanged",
+                       "pass":  true,
+                       "detail":  "before=1d11fe7f05771a3f9122c2cd079aa58944cced2cd3cee40afaec5e553864fd63 after=1d11fe7f05771a3f9122c2cd079aa58944cced2cd3cee40afaec5e553864fd63"
+                   },
+                   {
+                       "name":  "opencode-pids-unchanged",
+                       "pass":  true,
+                       "detail":  "before= after="
+                   },
+                   {
+                       "name":  "psmux-pids-unchanged",
+                       "pass":  true,
+                       "detail":  "before=11624,18816,22332,43640 after=11624,18816,22332,43640"
+                   },
+                   {
+                       "name":  "backup-present-after-deploy",
+                       "pass":  true,
+                       "detail":  "C:/Users/Daniel/AppData/Local/Temp/omo5140-backup"
+                   }
+               ],
+    "errors":  [
+
+               ],
+    "ok":  true,
+    "baseline":  {
+                     "path_user_sha256":  "fa64dd34bbfa4a327c3f796fea7806cba1aa59201ccbacfbe1b28fa39ea527ec",
+                     "path_machine_sha256":  "1d11fe7f05771a3f9122c2cd079aa58944cced2cd3cee40afaec5e553864fd63",
+                     "opencode_pids":  {
+
+                                       },
+                     "psmux_pids":  [
+                                        11624,
+                                        18816,
+                                        22332,
+                                        43640
+                                    ]
+                 },
+    "preflight_failed":  0
+}

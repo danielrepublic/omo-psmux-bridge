@@ -1,0 +1,796 @@
+﻿bun test v1.4.2 (744846f84)
+bun : 
+位於 線路:1 字元:69
++ ... rs/Daniel/AppData/Local/Temp/omo5140-worktree'; bun test 2>&1 | Tee-O ...
++                                                     ~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+test\backend.test.ts:
+(pass) install directory precedence > case 1 ??OMO_PSMUX_INSTALL_DIR wins over a present registry value [1.17ms]
+(pass) install directory precedence > case 2 ??the registry value wins when the env override is unset [0.14ms]
+(pass) install directory precedence > case 3 ??an absent registry value falls through to %LOCALAPPDATA%\psmux [0.14ms]
+(pass) install directory precedence > case 4 ??an install directory with no backend in it is a failure, not a fallback 
+[0.13ms]
+(pass) install directory precedence > no source at all is its own failure mode, and never invents a path [0.06ms]
+(pass) install directory precedence > every non-resolved kind carries the one exit-code accessor todo 12 will call [0.3
+2ms]
+(pass) locating tmux.exe / psmux.exe > both candidate names are accepted, in the documented order [0.13ms]
+(pass) locating tmux.exe / psmux.exe > a bare `psmux.exe` (no extension) is not accepted ??the shim needs a real image 
+[0.03ms]
+(pass) locating tmux.exe / psmux.exe > a directory named like the backend does not count as the backend [0.02ms]
+(pass) chain guard: the backend is never the shim > an exact self-match exits 78 with a message naming both paths [0.09
+ms]
+(pass) chain guard: the backend is never the shim > the guard is case-insensitive and separator-insensitive, as Windows
+ is [0.35ms]
+(pass) chain guard: the backend is never the shim > a `..`-bearing spelling of the shim path is still the shim [0.13ms]
+(pass) chain guard: the backend is never the shim > a second candidate that is the SAME FILE as the shim is also refuse
+d [0.12ms]
+(pass) chain guard: the backend is never the shim > a self candidate is SKIPPED and resolution continues to a real back
+end [0.10ms]
+(pass) chain guard: the backend is never the shim > the guard is PROMPT ??a hang is the bug it prevents [0.06ms]
+(pass) chain guard: the backend is never the shim > the resolver is a bounded synchronous read: no promise, no walk, no
+ exec [0.28ms]
+(pass) chain guard: the backend is never the shim > an extra shim path supplied by the caller is guarded too [0.54ms]
+(pass) malformed OMO_PSMUX_INSTALL_DIR > an empty override is ignored, not obeyed ??precedence continues [0.15ms]
+(pass) malformed OMO_PSMUX_INSTALL_DIR > a whitespace-only override is ignored the same way [0.09ms]
+(pass) malformed OMO_PSMUX_INSTALL_DIR > an empty registry value counts as absent [0.23ms]
+(pass) malformed OMO_PSMUX_INSTALL_DIR > an override naming a directory that does not exist fails with its name [0.07ms
+]
+(pass) malformed OMO_PSMUX_INSTALL_DIR > an override with a trailing separator resolves identically [0.14ms]
+(pass) malformed OMO_PSMUX_INSTALL_DIR > the resolver is total: it never throws on hostile input [0.47ms]
+(pass) malformed OMO_PSMUX_INSTALL_DIR > an unresolvable override never falls back to a home directory [0.12ms]
+(pass) path identity > Windows comparison folds case, separators and `..` [0.09ms]
+(pass) path identity > a trailing separator never changes a directory's identity [0.02ms]
+(pass) path identity > a POSIX path is compared POSIX-style, so this suite can run on Linux [0.07ms]
+(pass) path identity > the real filesystem is consulted when both paths exist [1.78ms]
+(pass) reg query output parsing > a REG_SZ value is extracted verbatim [0.20ms]
+(pass) reg query output parsing > a REG_EXPAND_SZ value has its %VAR% references expanded [0.08ms]
+(pass) reg query output parsing > an unexpandable reference is left alone rather than blanked [0.13ms]
+(pass) reg query output parsing > a missing value yields undefined, not an empty string [0.04ms]
+(pass) reg query output parsing > only the InstallDir value is read, never a neighbouring one [0.02ms]
+(pass) reg query output parsing > the expander only touches whole-name references [0.04ms]
+(pass) forwarding to the backend > `-V` propagates the backend's EXACT two-line stdout and exit code 0 [37.13ms]
+(pass) forwarding to the backend > a non-zero backend exit code is propagated unchanged, with both streams [26.49ms]
+(pass) forwarding to the backend > argv reaches the backend directly: no shell, no `cmd`, no `/c` [39.93ms]
+(pass) forwarding to the backend > an empty argv is forwarded as an empty argv, not as a shell string [29.43ms]
+(pass) forwarding to the backend > an unrunnable backend is a non-zero outcome with a message, never a throw [1.10ms]
+(pass) forwarding to the backend > forwarding is prompt: a `-V` round trip does not hang [27.90ms]
+(pass) forwarding to the backend > a real chain attempt through a compiled binary exits 78 and terminates [797.29ms]
+(pass) no hardcoded machine path > src/backend.ts contains no home directory and no drive-letter literal [0.56ms]
+(pass) no hardcoded machine path > the default install directory is derived from %LOCALAPPDATA%, never assumed [0.04ms]
+(pass) no hardcoded machine path > resolution with no options reads the real environment and invents no install dir [10
+.96ms]
+(pass) no hardcoded machine path > the real environment override is honoured when it is set [8.43ms]
+
+test\bridge-doctor.test.ts:
+(pass) the anchor parser is not vacuous > it finds exactly the 11 contracted rows in the shipped script [0.02ms]
+(pass) the anchor parser is not vacuous > it rejects a PERMUTED table, which is the defect the old file missed [0.25ms]
+(pass) the anchor parser is not vacuous > it accepts the unmodified table [0.02ms]
+(pass) bridge-doctor check-5 anchors match the contract as PAIRS > every Line keeps the Text the contract pairs it with
+ [0.01ms]
+(pass) bridge-doctor check-5 anchors match the contract as PAIRS > the anchor line numbers are all distinct [0.05ms]
+(pass) bridge-doctor check-5 anchors match the contract as PAIRS > no stale 5.1.18-era anchor survives [0.10ms]
+(pass) bridge-doctor check-5 anchors match the contract as PAIRS > no superseded 5.1.30/5.1.33-era anchor or citation s
+urvives [0.11ms]
+(pass) bridge-doctor check-5 anchors match the contract as PAIRS > no superseded 5.1.35-era anchor or citation survives
+ [0.11ms]
+(pass) bridge-doctor check-5 anchors match the contract as PAIRS > each GATE range starts on a line the anchors actuall
+y check [0.15ms]
+(pass) bridge-doctor frozen version > defaults to the contracted version, read from pins.json [0.04ms]
+(pass) bridge-doctor frozen version > the pin this file reads is the one the contract checker reads [0.03ms]
+(pass) bridge-doctor frozen version > equivalent set no longer cites never-installed 5.1.17 [0.02ms]
+(pass) Write-* calls parenthesise every concatenation > the doctor has no unparenthesized concatenation call site [0.52
+ms]
+(pass) Write-* calls parenthesise every concatenation > the frozen version is named by the message that must name it [0
+.02ms]
+(pass) Write-* calls parenthesise every concatenation > the detector is not vacuous: it fires on the original defect [0
+.01ms]
+(pass) Write-* calls parenthesise every concatenation > the harness parenthesises too [0.33ms]
+(pass) bridge-doctor PATH shadow detection excludes its own bin dir > the loop skips an entry that IS $BinDir [0.02ms]
+(pass) bridge-doctor PATH shadow detection excludes its own bin dir > a repeated shadow directory is still reported onl
+y once [0.02ms]
+(pass) bridge-doctor check 5 can be pointed at a scratch package tree > -PackageRoot exists and defaults to the live ca
+che [0.03ms]
+(pass) bridge-doctor check 5 can be pointed at a scratch package tree > the override is a read, and cannot make a drift
+ed bundle pass [0.02ms]
+(pass) bridge-doctor launcher > still propagates the doctor exit code unchanged [0.01ms]
+(pass) bridge-doctor gate-4 JSONC converter > check 4 converts through a named trailing-comma-aware converter [0.02ms]
+(pass) bridge-doctor gate-4 JSONC converter > the old comment-only stripper is gone [0.02ms]
+(pass) bridge-doctor gate-4 JSONC converter > parse failures withhold content: stable class, never the message [0.06ms]
+(pass) trailing-comma fixture is not vacuous > it enables tmux and carries the four trailing commas [0.02ms]
+(pass) trailing-comma fixture is not vacuous > its hostile strings would punish a naive stripper [0.01ms]
+(pass) trailing-comma fixture is not vacuous > it is genuinely not plain JSON, so case M exercises the converter [0.05m
+s]
+(pass) doctor harness JSONC regression cases > cases M and N exist with the right gates [0.02ms]
+(pass) doctor harness JSONC regression cases > case N asserts the sentinel is absent from both streams [0.02ms]
+(pass) doctor harness JSONC regression cases > case J requires the real contracted bundle to pass without adapting its 
+expected exit [0.05ms]
+(pass) doctor harness portability > takes its paths as parameters with environment-derived defaults [0.04ms]
+(pass) doctor harness portability > no machine-specific path or pinned shim identity survives [0.07ms]
+(pass) doctor harness portability > the core cases own their fixtures instead of waiting on live state [0.02ms]
+(pass) doctor file byte invariants > the .ps1 is pure ASCII [0.52ms]
+(pass) doctor file byte invariants > the .ps1 uses LF only, so no CR is smuggled into a here-line [0.02ms]
+(pass) doctor file byte invariants > the .cmd launcher stays CRLF, with no bare LF [0.35ms]
+
+test\cli.test.ts:
+(pass) src/cli.ts exports main(argv: string[]): Promise<number> [2.64ms]
+(pass) wiring: grammar -> translate -> backend -> exec > -V exits 0 and the backend's stdout arrives byte-identically, 
+two lines and all [74.64ms]
+(pass) wiring: grammar -> translate -> backend -> exec > -V needs no special case: it is pass-through by the grammar's 
+own length rule [3.04ms]
+(pass) wiring: grammar -> translate -> backend -> exec > an unknown verb is forwarded verbatim, with the backend's exit
+ code and streams [69.77ms]
+(pass) wiring: grammar -> translate -> backend -> exec > empty argv, a verb with no operands, and unpaired surrogates a
+ll forward without a crash [139.26ms]
+(pass) wiring: grammar -> translate -> backend -> exec > a 30 KB single argument is forwarded whole, not truncated [48.
+16ms]
+(pass) wiring: grammar -> translate -> backend -> exec > a recognised placeholder shape is translated, and the record s
+ays how [4.46ms]
+(pass) wiring: grammar -> translate -> backend -> exec > the attach shape inserts `--` and reaches the helper as an `op
+encode attach` vector [3.14ms]
+(pass) the layout rules reach the backend as a corrected command plus a follow-up > the sizing option runs the re-appli
+ed layout AFTER it, and the follow-up's 42 does not become the exit code [53.91ms]
+(pass) the layout rules reach the backend as a corrected command plus a follow-up > the follow-up is run with its outpu
+t captured, so nothing reaches the shim's stdout [47.67ms]
+(pass) the layout rules reach the backend as a corrected command plus a follow-up > a suppressed `resize-pane -x` runs 
+NO backend, exits 0, and the record says suppressed [13.45ms]
+(pass) the layout rules reach the backend as a corrected command plus a follow-up > the follow-up is on the call log, w
+ith its reason, beside the primary argv [55.89ms]
+(pass) the layout rules reach the backend as a corrected command plus a follow-up > an ordinary pass-through runs one b
+ackend call and logs no follow-up [41.89ms]
+(pass) the layout rules reach the backend as a corrected command plus a follow-up > leading globals reach BOTH the sizi
+ng command and its follow-up [57.50ms]
+(pass) the layout rules reach the backend as a corrected command plus a follow-up > a NON-ZERO primary exit means NO fo
+llow-up: one backend call, not two [33.44ms]
+(pass) the layout rules reach the backend as a corrected command plus a follow-up > a zero primary exit still runs the 
+follow-up: the gate is SUCCESS, not mere execution [48.73ms]
+(pass) the layout rules reach the backend as a corrected command plus a follow-up > the gate is the PRIMARY's code, not
+ the follow-up's: a failing follow-up still exits 0 [44.87ms]
+(pass) the team-mode rules reach the backend as a suppression and a rewrite > D1: a pane-scoped `@omo_attach_*` option 
+runs NO backend, exits 0, and logs the reason [11.83ms]
+(pass) the team-mode rules reach the backend as a suppression and a rewrite > D1: the session-id form is suppressed the
+ same way [12.03ms]
+(pass) the team-mode rules reach the backend as a suppression and a rewrite > D2: the team resize runs `set-option main
+-pane-width 30` then `select-layout main-vertical` [61.83ms]
+(pass) the team-mode rules reach the backend as a suppression and a rewrite > D2: leading globals reach both the sizing
+ command and its follow-up [53.10ms]
+(pass) the record schema > recordVersion is 3, because `suppressionReason` is a new required key [3.89ms]
+(pass) the record schema > buildCallRecord emits exactly the documented key set, and no more [55.47ms]
+(pass) the record schema > buildTraceRecord is the same record minus the call-only keys [3.47ms]
+(pass) the record schema > a `"suppressed"` record carries the dropped argv and an empty follow-up list [16.21ms]
+(pass) the rewrite reason on the record > a D0 rewrite records the slug and a null suppressionReason [36.22ms]
+(pass) the rewrite reason on the record > a forwarded record with no hidden rewrite has rewriteReason null [36.69ms]
+(pass) the trace hook > unset: no trace destination is resolved and nothing is written there [29.82ms]
+(pass) the trace hook > blank counts as unset, and the call log still receives its one line [18.62ms]
+(pass) the trace hook > set: exactly one JSON line per invocation, and it names verb/classification/outcome/id [80.64ms
+]
+(pass) the trace hook > a relative trace setting is resolved against the working directory [4.79ms]
+(pass) the trace hook > the trace is a bonus signal: a log that cannot be written does not change the exit code [32.69m
+s]
+(pass) the fixed-path call log > the path is derived from the executable's own directory and no environment variable [2
+.25ms]
+(pass) the fixed-path call log > it is written with the trace variable UNSET, and the log exists in a directory that di
+d not [49.06ms]
+(pass) the fixed-path call log > append-only across three invocations: one line each, nothing rewritten [132.22ms]
+(pass) the fixed-path call log > every line is exactly one JSON object, newline-terminated, and the file ends with one 
+newline [45.37ms]
+(pass) the fixed-path call log > the record names the backend and the translated shape, which is what attributes a pane
+ [51.91ms]
+(pass) the fixed-path call log > a resolution failure is logged too, with the exit code an operator keys on [21.12ms]
+(pass) the fixed-path call log > the chain guard's 78 propagates and is recorded, and nothing is executed [33.08ms]
+(pass) no credential in either log > a password-bearing `-e` pair reaches neither file, and the value is delivered by f
+ile [49.15ms]
+(pass) no credential in either log > the same holds on the PASS-THROUGH path, where psmux itself receives the `-e` [53.
+25ms]
+(pass) no credential in either log > an unsensitively-named `-e` value is redacted anyway [5.94ms]
+(pass) no credential in either log > a sensitive NAME=VALUE element outside a `-e` pair is redacted by name [5.96ms]
+(pass) no credential in either log > a huge argv element is capped, with its real length stated [5.87ms]
+
+test\contract.test.ts:
+(pass) the citation core > a matching citation verifies [23.98ms]
+(pass) the citation core > a text-mismatch yields CITATION_MISMATCH [15.03ms]
+(pass) the citation core > a missing file yields CITATION_UNRESOLVED_FILE [5.25ms]
+(pass) the citation core > an out-of-range line yields CITATION_LINE_OUT_OF_RANGE [13.07ms]
+(pass) the citation core > a range where the text is on the first line of the range passes [14.17ms]
+(pass) the citation core > a range where the text is on a MIDDLE line of the range passes [15.83ms]
+(pass) the citation core > a range where the text spans the joined lines passes [18.88ms]
+(pass) the citation core > `index.js:...` routes to the OmO tree and `src/....rs:...` routes to the psmux tree [22.45ms
+]
+(pass) the citation core > markdown unescaping of `\``, `\\`, `\"` [18.97ms]
+warning: in the working copy of 'a.rs', LF will be replaced by CRLF the next time Git touches it
+(pass) the citation core > PIN_DRIFT when a git tree is at the wrong commit, and PIN_TREE_MISSING when absent [250.63ms
+]
+(pass) the citation core > the OmO pin reports a missing bundle and a drifted version [11.28ms]
+(pass) the citation core > an @latest tree holding a newer bundle than verifiedAgainst still drifts [7.79ms]
+(pass) the citation core > prose lines without a line number or arrow do not parse as citations [0.08ms]
+(pass) the citation core > the summary line states citations checked and problems found [0.04ms]
+(pass) the citation core > a document with no citations is a problem, not a clean run [1.98ms]
+(pass) the citation core > an OmO bundle whose manifest cannot confirm the pin reports rather than passes [10.23ms]
+(pass) the citation core > a psmux file named index.js still resolves against the psmux tree [8.71ms]
+
+test\descriptor.test.ts:
+(pass) the credential never reaches argv > no generated argv element carries a NAME=VALUE pair with a sensitive name [0
+.45ms]
+(pass) the credential never reaches argv > the sentinel value itself is absent from every generated argv element [0.07m
+s]
+(pass) the credential never reaches argv > the credential lives in exactly one place: the numbered env slots [0.06ms]
+(pass) the credential never reaches argv > nothing the descriptor exposes to a log carries the value [0.20ms]
+(pass) the credential never reaches argv > redactArgv masks a sensitive assignment for logging [0.07ms]
+(pass) the credential never reaches argv > POSITIVE CONTROL: the test-side detector really does find a leaked pair [0.0
+6ms]
+(pass) environment slots are the delivery mechanism > the NORMAL empty -e case needs no slots and no fallback file [0.2
+3ms]
+(pass) environment slots are the delivery mechanism > every slot is read from the helper's own process environment [0.2
+1ms]
+(pass) environment slots are the delivery mechanism > an assignment splits on the FIRST `=` only, so a hostile value su
+rvives [0.02ms]
+(pass) environment slots are the delivery mechanism > an assignment with no `=`, or with no name, is rejected [0.02ms]
+(pass) environment slots are the delivery mechanism > a hostile value round-trips byte-for-byte through BOTH mechanisms
+ [0.37ms]
+(pass) environment slots are the delivery mechanism > a missing slot never yields a PARTIAL delivery [0.17ms]
+(pass) environment slots are the delivery mechanism > no descriptor file is needed, and none is read, when the environm
+ent has the slots [0.10ms]
+(pass) the file fallback is restricted, single-read and verified-deleted > the file lives under the user's profile: not
+ TEMP, not the bridge tree [0.10ms]
+(pass) the file fallback is restricted, single-read and verified-deleted > the filename is derived from the correlation
+ id, so it is predictable and bounded [0.08ms]
+(pass) the file fallback is restricted, single-read and verified-deleted > the on-disk format is documented and pinned:
+ version, digest, count, assignments [0.12ms]
+(pass) the file fallback is restricted, single-read and verified-deleted > serialise then parse returns the assignments
+ unchanged [0.10ms]
+(pass) the file fallback is restricted, single-read and verified-deleted > a corrupted payload is REJECTED by digest, b
+efore any value is used [0.11ms]
+(pass) the file fallback is restricted, single-read and verified-deleted > a payload whose slot COUNT disagrees with --
+env-slots is rejected [0.07ms]
+(pass) the file fallback is restricted, single-read and verified-deleted > an unparseable payload is rejected rather th
+an half-applied [0.09ms]
+(pass) the file fallback is restricted, single-read and verified-deleted > an ABSENT descriptor file exits non-zero wit
+h a message, and launches nothing [0.09ms]
+(pass) the file fallback is restricted, single-read and verified-deleted > after a successful fallback read the file is
+ GONE and that is verified [0.08ms]
+(pass) the file fallback is restricted, single-read and verified-deleted > a deletion that cannot be verified is a FAIL
+URE, not a warning [0.09ms]
+(pass) a descriptor is consumed exactly once > the first consume claims it; the second is refused without re-executing 
+[0.25ms]
+(pass) a descriptor is consumed exactly once > consume-once holds for the EMPTY -e case too [0.09ms]
+(pass) a descriptor is consumed exactly once > two DIFFERENT descriptors do not interfere [0.12ms]
+(pass) a descriptor is consumed exactly once > the claim marker IS the trace file, and it carries no credential [0.10ms
+]
+(pass) the attach retry fires once, and only for `opencode attach` > isAttachCommand matches exactly `opencode attach` 
+and nothing else [0.03ms]
+(pass) the attach retry fires once, and only for `opencode attach` > the policy is bounded and capped at ONE retry [0.0
+3ms]
+(pass) the attach retry fires once, and only for `opencode attach` > a caller may shorten the waits but may NOT raise t
+he retry cap [0.03ms]
+(pass) the attach retry fires once, and only for `opencode attach` > a non-attach command gets no retry at all [0.01ms]
+(pass) the attach retry fires once, and only for `opencode attach` > before the first run: run, having waited for readi
+ness [0.05ms]
+(pass) the attach retry fires once, and only for `opencode attach` > a zero exit stops immediately [0.02ms]
+(pass) the attach retry fires once, and only for `opencode attach` > a non-zero exit schedules EXACTLY ONE retry [0.02m
+s]
+(pass) the attach retry fires once, and only for `opencode attach` > two failures STOP: the simulation never runs a thi
+rd time [0.08ms]
+(pass) the attach retry fires once, and only for `opencode attach` > a first failure then a success is the recovery cas
+e IS-3 asks for [0.03ms]
+(pass) the attach retry fires once, and only for `opencode attach` > success on the first run never retries [0.02ms]
+(pass) the attach retry fires once, and only for `opencode attach` > a NON-attach command is run once and never retried
+, however it fails [0.03ms]
+(pass) the attach retry fires once, and only for `opencode attach` > the simulation is total: no exit codes, or far too
+ many, still terminate [0.03ms]
+(pass) the trace line names the pane command and the retry, and no value > it carries the correlation id, the wait and 
+the retry count [0.12ms]
+(pass) the trace line names the pane command and the retry, and no value > it carries NO value, no URL, no session id a
+nd no directory [0.16ms]
+(pass) the trace line names the pane command and the retry, and no value > it is ONE JSON object and names a placeholde
+r command correctly [0.08ms]
+(pass) the trace line names the pane command and the retry, and no value > the trace path is under <bridgeRoot>\state a
+nd is derived from the correlation id [0.06ms]
+(pass) the trace line names the pane command and the retry, and no value > a generated correlation id cannot escape the
+ state directory [0.08ms]
+(pass) the trace line names the pane command and the retry, and no value > a SUPPLIED correlation id that is not path-s
+afe is REFUSED, not sanitised [0.12ms]
+(pass) correlation ids > are lowercase, filename-safe, bounded, and distinct per seed [0.04ms]
+(pass) correlation ids > the id survives the round trip through the helper command line [0.11ms]
+(pass) the descriptor is coherent with the translation it came from > command, cwd, slot count and correlation id all a
+gree with the invocation [0.15ms]
+(pass) the descriptor is coherent with the translation it came from > with no --cwd the descriptor records no working d
+irectory at all [0.08ms]
+(pass) the descriptor is coherent with the translation it came from > a pass-through translation has NO descriptor at a
+ll [0.06ms]
+(pass) the descriptor is coherent with the translation it came from > a helper translation with no correlation id has n
+o descriptor either [0.12ms]
+(pass) the descriptor is coherent with the translation it came from > a descriptor for an attach carries the retry; one
+ for a placeholder does not [0.11ms]
+(pass) the descriptor is coherent with the translation it came from > the helper path and slot prefix are the ones HELP
+ER_CONTRACT names [0.02ms]
+(pass) the descriptor is coherent with the translation it came from > the exit-code family is disjoint, non-zero, and n
+ever the chain guard's 78 [0.06ms]
+(pass) the descriptor is coherent with the translation it came from > the fields an operator keys on are frozen [0.08ms
+]
+(pass) fixture integrity: the password-bearing argv still yields an attach translation [0.06ms]
+
+test\grammar.test.ts:
+(pass) payload shape > the payload is ONE argv element containing the shell text, not three [0.05ms]
+(pass) placeholder-split > split-window carrying Template B, with -e pairs [0.05ms]
+(pass) placeholder-split > split-window with the EMPTY authEnvArgs case (:8341 returns []) [0.02ms]
+(pass) placeholder-split > split-window with no -t target (targetPaneId unset, :8416) [0.01ms]
+(pass) placeholder-respawn > respawn-pane carrying Template B, with -e pairs before -t [0.03ms]
+(pass) placeholder-respawn > respawn-pane carrying Template B with no -e pairs at all [0.02ms]
+(pass) attach-respawn > respawn-pane carrying Template A, no -e pairs [0.05ms]
+(pass) attach-respawn > respawn-pane carrying Template A with -e pairs [0.03ms]
+(pass) placeholder-newwindow > new-window with the literal window name omo-agents (:8654) [0.02ms]
+(pass) placeholder-newwindow > new-window targeting an existing session (:8734-8743, no -d, no -n) [0.02ms]
+(pass) placeholder-newsession > new-session with sizeArgs and -e pairs [0.03ms]
+(pass) placeholder-newsession > new-session with NO sizeArgs (dimensions unreadable, :8721) [0.02ms]
+(pass) pass-through ??unrecognised verbs > send-keys (teardown, :8448) is pass-through [0.02ms]
+(pass) pass-through ??unrecognised verbs > display-message with a format string is pass-through [0.02ms]
+(pass) pass-through ??unrecognised verbs > the trailing select-pane title call (:8419) is pass-through [0.02ms]
+(pass) pass-through ??unrecognised verbs > split-window carrying the ATTACH payload is not one of the five forms [0.01m
+s]
+(pass) pass-through ??malformed input > truncated payload: missing the closing double quote [0.02ms]
+(pass) pass-through ??malformed input > truncated payload on respawn-pane does not yield a partial command [0.01ms]
+(pass) pass-through ??malformed input > unterminated -e: -e is the last element, so no value exists [0.01ms]
+(pass) pass-through ??malformed input > unterminated -e: -e sits where the payload's value would have to be
+(pass) pass-through ??malformed input > -e value without an = is malformed
+(pass) pass-through ??malformed input > empty argv
+(pass) pass-through ??malformed input > argv with only a verb [0.01ms]
+(pass) pass-through ??malformed input > a right verb whose last element is not the shell payload is pass-through
+(pass) pass-through ??malformed input > a foreign shell's payload is pass-through, not misparsed
+(pass) pass-through ??malformed input > an empty payload body is pass-through
+(pass) hostile quoting > placeholder description with ' \ $ ` " is extracted byte-identically [0.04ms]
+(pass) hostile quoting > hostile placeholder still classifies as placeholder-split [0.02ms]
+(pass) hostile quoting > attach session id containing ' and --dir is read as one token [0.04ms]
+(pass) hostile quoting > an -e value containing = and spaces is preserved whole [0.02ms]
+(pass) hostile quoting > an empty -e value is preserved as an empty string [0.01ms]
+(pass) purity > classifying does not mutate the input array [0.01ms]
+(pass) purity > classifying a frozen argv array does not throw [0.08ms]
+(pass) purity > classification is deterministic across repeated calls [0.02ms]
+(pass) purity > pass-through carries a copy, so the caller's argv is not aliased [0.03ms]
+(pass) splitLeadingGlobals > a bare -L namespace pair is split off and reported verbatim [0.03ms]
+(pass) splitLeadingGlobals > -S and -f are recognised on the same footing as -L [0.02ms]
+(pass) splitLeadingGlobals > several globals combine, in the order given [0.02ms]
+(pass) splitLeadingGlobals > a dangling global with no value is left alone rather than guessed at [0.01ms]
+(pass) splitLeadingGlobals > a value that looks like a verb is still consumed as the value
+(pass) splitLeadingGlobals > no globals means an untouched argv [0.01ms]
+(pass) splitLeadingGlobals > a global is only a global before the verb: -t later in the line is not one
+(pass) a leading -L namespace does not defeat classification > placeholder-split survives a leading -L [0.02ms]
+(pass) a leading -L namespace does not defeat classification > placeholder-newwindow survives a leading -L
+(pass) a leading -L namespace does not defeat classification > placeholder-newsession survives a leading -L
+(pass) a leading -L namespace does not defeat classification > placeholder-respawn survives a leading -L
+(pass) a leading -L namespace does not defeat classification > attach-respawn survives a leading -L
+(pass) a leading -L namespace does not defeat classification > the emitted argv keeps the namespace in front of the rew
+ritten shape [0.08ms]
+(pass) placeholder, 5.1.35 single-quoted banner > split-window carrying the 5.1.35 banner classifies, old E shape untou
+ched [0.06ms]
+(pass) placeholder, 5.1.35 single-quoted banner > hostile Q banner (apostrophe, backslash, $, backtick, doublequote) ex
+tracts byte-identically [0.04ms]
+(pass) placeholder, 5.1.35 single-quoted banner > 5.1.35 banner on new-window and new-session [0.04ms]
+(pass) placeholder, 5.1.35 single-quoted banner > upstream-truncated description (2000 chars plus ellipsis) classifies 
+[0.05ms]
+(pass) placeholder, 5.1.35 single-quoted banner > NUL-cleaned description classifies as upstream emits it [0.02ms]
+(pass) placeholder, 5.1.35 single-quoted banner > a 5.1.35 banner with the wrong hint text is pass-through, not mispars
+ed [0.01ms]
+(pass) placeholder, 5.1.35 single-quoted banner > a truncated 5.1.35 banner (missing closing quote) is pass-through [0.
+01ms]
+
+test\install-config.test.ts:
+(pass) the old raw-regex tmux probe is gone > install.ps1 no longer probes tmux with a raw regex over raw text [0.06ms]
+(pass) the old raw-regex tmux probe is gone > the raw regex WOULD have matched the comment decoy, so the defect is real
+ [0.21ms]
+(pass) install.ps1 resolves the OMO config the way the bundle does > Get-OmoConfigPath exists and prefers HOME over USE
+RPROFILE [0.03ms]
+(pass) install.ps1 resolves the OMO config the way the bundle does > it is a NULL test, because `??` is null-coalescing
+ and not truthiness [0.06ms]
+(pass) install.ps1 resolves the OMO config the way the bundle does > it tries omo.jsonc, then omo.json, then reports th
+e expected jsonc path [0.05ms]
+(pass) install.ps1 resolves the OMO config the way the bundle does > Get-OpencodeConfigPath is kept, for the plugin dec
+laration only [0.02ms]
+(pass) install.ps1 reads the setting truthfully > it parses the document rather than regexing it [0.02ms]
+(pass) install.ps1 reads the setting truthfully > it reads the nested [opencode] -> tmux -> enabled path [0.02ms]
+(pass) install.ps1 reads the setting truthfully > only a JSON boolean true counts [0.01ms]
+(pass) install.ps1 reads the setting truthfully > the comment stripper is string-aware, or a $schema https:// eats the 
+file [0.11ms]
+(pass) install.ps1 reads the setting truthfully > trailing commas are removed, or a valid JSONC reports UNPARSEABLE on 
+PS 5.1 [0.02ms]
+(pass) install.ps1 reads the setting truthfully > a malformed document is UNPARSEABLE rather than silently FALSE
+(pass) install.ps1 advice names the file OmO actually reads > the advice block points at the omo config, not the openco
+de config [0.08ms]
+(pass) install.ps1 advice names the file OmO actually reads > it states the real resolution rules instead of asserting 
+omo.jsonc [0.13ms]
+(pass) install.ps1 advice names the file OmO actually reads > it still reports rather than writes [0.02ms]
+(pass) the native probe extracts functions instead of running the installer > it pulls named functions out of the AST [
+0.05ms]
+(pass) the native probe extracts functions instead of running the installer > it asserts each function was found, so an
+ empty extraction cannot pass [0.02ms]
+(pass) the native probe extracts functions instead of running the installer > it compiles ONLY those definitions, so no
+ PATH write exists as code [0.04ms]
+(pass) the native probe extracts functions instead of running the installer > it covers HOME precedence, the json fallb
+ack and the comment decoy [0.11ms]
+(pass) install.ps1 byte invariants > pure ASCII, LF only [0.98ms]
+
+test\translate.test.ts:
+(pass) fixture corpus integrity > every payload fixture classifies as its declared kind [0.08ms]
+(pass) fixture corpus integrity > production classification recovers each fixture's exact payload body [0.05ms]
+(pass) fixture corpus integrity > the hostile description survives the round trip production performs on it [0.04ms]
+(pass) pass-through ??argv comes back untouched > every adversarial argv comes back deep-equal, in original order [0.31
+ms]
+[false-positive-translation] BEFORE send-keys: ["send-keys","-t","%1","/bin/sh -c \"echo hi\""]
+[false-positive-translation] AFTER  send-keys: ["send-keys","-t","%1","/bin/sh -c \"echo hi\""]
+[false-positive-translation] BEFORE display   : ["display","-p","-e","A=B"]
+[false-positive-translation] AFTER  display   : ["display","-p","-e","A=B"]
+(pass) pass-through ??argv comes back untouched > the two named false-positive cases are reported with their real array
+s [0.25ms]
+(pass) pass-through ??argv comes back untouched > pass-through does not alias the caller's array [0.05ms]
+(pass) pass-through ??argv comes back untouched > a credential-bearing pass-through is NOT scrubbed ??verbatim is the c
+ontract [0.07ms]
+(pass) -- insertion > `--` precedes the command operand for exactly the two respawn forms [0.86ms]
+(pass) -- insertion > exactly two of the six classifications insert `--` [0.26ms]
+(pass) -- insertion > the emitted respawn argv is verb, flags, `--`, command line ??nothing after [0.19ms]
+(pass) flag preservation > every non-`-e` element survives, in order, ahead of the command operand [0.62ms]
+(pass) flag preservation > the protected flags keep their exact text and their operands [0.17ms]
+(pass) flag preservation > `-c <dir>` on a payload form is forwarded untouched [0.16ms]
+(pass) flag preservation > the window name literal `omo-agents` is not renamed [0.13ms]
+(pass) round-trip byte identity > `--payload` decodes to the original payload body for every case [2.23ms]
+(pass) round-trip byte identity > `--command` decodes to the expected Windows-native token vector [0.66ms]
+(pass) round-trip byte identity > the hostile placeholder survives the whole round trip byte-for-byte [0.18ms]
+(pass) round-trip byte identity > the hostile attach session id is recovered exactly [0.14ms]
+(pass) round-trip byte identity > attach values carrying $, backtick and quotes decode to the raw values [0.13ms]
+(pass) escaping reversal > unescapeDoubleQuoted recovers the raw description from E(description) [0.07ms]
+(pass) escaping reversal > unescapeSingleQuotedToken recovers the raw value from Q(value) [0.08ms]
+(pass) helper invocation contract > the command line starts with the shell and the five documented flags [0.11ms]
+(pass) helper invocation contract > the exact flag sequence is payload, command, [cwd], env-slots, [correlation] [0.26m
+s]
+(pass) helper invocation contract > a caller-supplied shell path is used verbatim [0.13ms]
+(pass) helper invocation contract > `--cwd` is absent unless the caller supplies one, and then it round-trips [0.52ms]
+(pass) helper invocation contract > `--correlation` is absent by default and present when supplied [0.30ms]
+(pass) helper invocation contract > the emitted fields are base64url and therefore need no quoting [0.21ms]
+[credential-leak] IN  argv     : ["respawn-pane","-k","-e","OPENCODE_SERVER_PASSWORD=SENTINEL_SECRET_a1b2c3","-e","OPENCODE_SERVER_USERNAME=daniel","-t","%7","/bin/sh -c \"opencode attach 'http://127.0.0.1:4096' --session 'ses_abc123' --dir '/home/dev/proj'\""]
+[credential-leak] OUT argv     : ["respawn-pane","-k","-t","%7","--","powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"C:\\Users\\Test User\\AppData\\Local\\opencode-psmux-bridge\\runtime\\Start-PaneFromDescriptor.ps1\" --payload b3BlbmNvZGUgYXR0YWNoICdodHRwOi8vMTI3LjAuMC4xOjQwOTYnIC0tc2Vzc2lvbiAnc2VzX2FiYzEyMycgLS1kaXIgJy9ob21lL2Rldi9wcm9qJw --command WyJvcGVuY29kZSIsImF0dGFjaCIsImh0dHA6Ly8xMjcuMC4wLjE6NDA5NiIsIi0tc2Vzc2lvbiIsInNlc19hYmMxMjMiLCItLWRpciIsIi9ob21lL2Rldi9wcm9qIl0 --env-slots 2"]
+[credential-leak] OUT cmdline  : powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "C:\Users\Test User\AppData\Local\opencode-psmux-bridge\runtime\Start-PaneFromDescriptor.ps1" --payload b3BlbmNvZGUgYXR0YWNoICdodHRwOi8vMTI3LjAuMC4xOjQwOTYnIC0tc2Vzc2lvbiAnc2VzX2FiYzEyMycgLS1kaXIgJy9ob21lL2Rldi9wcm9qJw --command WyJvcGVuY29kZSIsImF0dGFjaCIsImh0dHA6Ly8xMjcuMC4wLjE6NDA5NiIsIi0tc2Vzc2lvbiIsInNlc19hYmMxMjMiLCItLWRpciIsIi9ob21lL2Rldi9wcm9qIl0 --env-slots 2
+[credential-leak] OUT env slots : ["OMO_PANE_ENV_0","OMO_PANE_ENV_1"]
+[credential-leak] OUT slot 0 is : OMO_PANE_ENV_0 (value withheld)
+(pass) helper invocation contract > parseHelperCommandLine rejects a line that is not a helper invocation [0.13ms]
+(pass) credentials never reach argv > the sentinel is absent from every emitted element, for every payload shape [2.59m
+s]
+(pass) credentials never reach argv > the emitted argv is printed so the sentinel's absence is visible [0.31ms]
+(pass) credentials never reach argv > the credential travels in numbered env slots the helper reads [0.16ms]
+(pass) credentials never reach argv > the EMPTY authEnvArgs case emits zero slots and says so in the argv [0.13ms]
+(pass) credentials never reach argv > slot names are positional and predictable, so the helper needs no manifest [0.19m
+s]
+(pass) credentials never reach argv > an -e value containing `=` and spaces is preserved whole in the slot [0.14ms]
+(pass) credentials never reach argv > an empty -e value is preserved as an empty string, not dropped [0.07ms]
+(pass) translation result > a payload translation reports kind, psmuxPath and the command line [0.07ms]
+(pass) translation result > the result never carries the original payload or any env value in a loggable field [0.10ms]
+(pass) translation result > translation is deterministic across repeated calls [0.10ms]
+(pass) translation result > translating does not mutate the caller's argv or the Classified value [0.10ms]
+(pass) translation result > translate() and translateArgv(classifyArgv(x)) agree [0.44ms]
+(pass) no shell wrapper, no cat special case > the command line never begins with `cat`, which psmux special-cases [0.2
+8ms]
+(pass) no shell wrapper, no cat special case > the emitted command operand is ONE argv element, because psmux joins the
+ `--` tail [0.07ms]
+(pass) layout rule 1a: one trailing `%` is stripped from a main-pane sizing option > `set-window-option main-pane-width
+ 50%` becomes `50`, with `select-layout main-vertical` as the follow-up [0.12ms]
+(pass) layout rule 1a: one trailing `%` is stripped from a main-pane sizing option > `main-pane-height` maps to `main-h
+orizontal`, because that is the layout that reads it [0.11ms]
+(pass) layout rule 1a: one trailing `%` is stripped from a main-pane sizing option > a value with no `%` is forwarded b
+yte-identically and asks for no follow-up [0.06ms]
+(pass) layout rule 1a: one trailing `%` is stripped from a main-pane sizing option > exactly ONE trailing `%` comes off
+, so `50%%` becomes `50%` [0.05ms]
+(pass) layout rule 1a: one trailing `%` is stripped from a main-pane sizing option > a non-sizing option is forwarded b
+yte-identically, `%` and all [0.10ms]
+(pass) layout rule 1a: one trailing `%` is stripped from a main-pane sizing option > all four set-option spellings are 
+handled, because psmux accepts all four [0.10ms]
+(pass) layout rule 1a: one trailing `%` is stripped from a main-pane sizing option > `-g` and `-t <target>` keep their 
+positions, and NO follow-up is invented [0.06ms]
+(pass) layout rule 1a: one trailing `%` is stripped from a main-pane sizing option > leading globals land on BOTH comma
+nds, so the re-layout reaches the same server [0.06ms]
+(pass) layout rule 1a: one trailing `%` is stripped from a main-pane sizing option > a `-t` with no value, and a sizing
+ option with no value, are both left alone [0.05ms]
+(pass) layout rule 1a: one trailing `%` is stripped from a main-pane sizing option > OmO's own un-targeted `select-layo
+ut` is still pass-through, with no follow-up of its own [0.05ms]
+(pass) layout rule 1b: the follow-up fires ONLY for the exact shape OmO emits > the POSITIVE case: the bare three-eleme
+nt shape still gets exactly one follow-up [0.07ms]
+(pass) layout rule 1b: the follow-up fires ONLY for the exact shape OmO emits > `set-window-option -u main-pane-width 5
+0%`: the `%` IS stripped, and no follow-up is invented [0.05ms]
+(pass) layout rule 1b: the follow-up fires ONLY for the exact shape OmO emits > `set-window-option -ga main-pane-width 
+50%`: same, via `SetOptionAppend` [0.04ms]
+(pass) layout rule 1b: the follow-up fires ONLY for the exact shape OmO emits > a bare untargeted `main-pane-height 50%
+` is the gated-IN shape, and is NOT residual exposure [0.05ms]
+(pass) layout rule 1b: the follow-up fires ONLY for the exact shape OmO emits > every flagged shape loses the follow-up
+ while keeping the `%` strip [0.22ms]
+(pass) layout rule 1b: the follow-up fires ONLY for the exact shape OmO emits > a `-g` on its own is enough to close th
+e gate: one flag, no value, still not flagless [0.03ms]
+(pass) layout rule 1c: `resize-pane -x` / `-y` is suppressed, not forwarded > `resize-pane -t %1 -x 99` is marked suppr
+essed, runs nothing, and records what it dropped [0.13ms]
+(pass) layout rule 1c: `resize-pane -x` / `-y` is suppressed, not forwarded > EVERY non-team value form is suppressed, 
+because psmux mishandles all of them [0.35ms]
+(pass) layout rule 1c: `resize-pane -x` / `-y` is suppressed, not forwarded > both verb spellings and a bare `-x` with 
+no target are suppressed [0.11ms]
+(pass) layout rule 1c: `resize-pane -x` / `-y` is suppressed, not forwarded > `resize-pane -Z` is forwarded byte-identi
+cally: zoom is a different, working path [0.07ms]
+(pass) layout rule 1c: `resize-pane -x` / `-y` is suppressed, not forwarded > `-Z` WINS over `-x`/`-y` in the same argv
+: `resize-pane -Z -x 99` is a zoom, not a resize [0.12ms]
+(pass) layout rule 1c: `resize-pane -x` / `-y` is suppressed, not forwarded > a `resize-pane` with neither `-x`, `-y` n
+or anything broken is forwarded byte-identically [0.10ms]
+(pass) layout rule 1c: `resize-pane -x` / `-y` is suppressed, not forwarded > only the two resize verbs are suppressed:
+ a `-x` elsewhere is none of this module's business [0.07ms]
+(pass) layout rule 1c: `resize-pane -x` / `-y` is suppressed, not forwarded > the suppression survives a payload-shaped
+ tail element, which is still pass-through [0.10ms]
+(pass) team rule 1d: pane-scoped `@omo_attach_*` options are suppressed > both bundle forms are suppressed with the pan
+e-option reason, and the argv is recorded [0.17ms]
+(pass) team rule 1d: pane-scoped `@omo_attach_*` options are suppressed > leading globals are preserved on the recorded
+ argv [0.06ms]
+(pass) team rule 1d: pane-scoped `@omo_attach_*` options are suppressed > `remain-on-exit` is the one pane option psmux
+ stores, so it stays pass-through [0.09ms]
+(pass) team rule 1d: pane-scoped `@omo_attach_*` options are suppressed > `set-option -g status on` is not pane-scoped 
+and stays pass-through [0.06ms]
+(pass) team rule 1d: pane-scoped `@omo_attach_*` options are suppressed > the same option name WITHOUT `-p` is not supp
+ressed [0.04ms]
+(pass) team rule 1d: pane-scoped `@omo_attach_*` options are suppressed > a `-t` value that happens to be the option na
+me is not mistaken for it [0.05ms]
+(pass) team rule 1d: pane-scoped `@omo_attach_*` options are suppressed > all four set-option spellings suppress, not j
+ust `set-option` [0.10ms]
+(pass) team rule 1d: pane-scoped `@omo_attach_*` options are suppressed > an arbitrary other pane-scoped option name st
+ays pass-through [0.06ms]
+(pass) team rule 1e: the team resize becomes `main-pane-width` plus a re-layout > `resize-pane -t %5 -x 30%` becomes `s
+et-option main-pane-width 30` + `select-layout main-vertical` [0.10ms]
+(pass) team rule 1e: the team resize becomes `main-pane-width` plus a re-layout > leading globals land on BOTH the prim
+ary and the follow-up [0.06ms]
+(pass) team rule 1e: the team resize becomes `main-pane-width` plus a re-layout > the `resizep` spelling is handled ide
+ntically [0.05ms]
+(pass) team rule 1e: the team resize becomes `main-pane-width` plus a re-layout > `-x 99` (cells, no `%`) stays suppres
+sed with rule 1c's reason [0.05ms]
+(pass) team rule 1e: the team resize becomes `main-pane-width` plus a re-layout > `-Z` keeps winning: `resize-pane -Z -
+x 99` is forwarded byte-identically [0.06ms]
+(pass) team rule 1e: the team resize becomes `main-pane-width` plus a re-layout > `-y 30%` stays suppressed: the team e
+mits `-x` only [0.04ms]
+(pass) team rule 1e: the team resize becomes `main-pane-width` plus a re-layout > `-x 0%` stays suppressed: a zero-widt
+h main pane is not a size [0.07ms]
+(pass) team rule 1e: the team resize becomes `main-pane-width` plus a re-layout > both axes present stays suppressed, e
+ven with a percentage on `-x` [0.04ms]
+(pass) team rule 1e: the team resize becomes `main-pane-width` plus a re-layout > two `-x` elements are not the team sh
+ape and stay suppressed [0.05ms]
+(pass) team rule 1e: the team resize becomes `main-pane-width` plus a re-layout > only a whole-number percentage rewrit
+es; every other `-x` value stays suppressed [0.17ms]
+(pass) team rule 1e: the team resize becomes `main-pane-width` plus a re-layout > `0%` stays suppressed: rule 1e requir
+es a NON-ZERO percentage [0.04ms]
+(pass) team rule 1e: the team resize becomes `main-pane-width` plus a re-layout > `-Z` wins over a percentage on `-x`, 
+because zoom is checked first [0.09ms]
+(pass) team rule 1e: the team resize becomes `main-pane-width` plus a re-layout > a percentage on `-x` is now rule 1e's
+ shape, NOT rule 1c's suppression [0.07ms]
+(pass) team rule 1e: the team resize becomes `main-pane-width` plus a re-layout > a dangling `-x` with no value is not 
+the team shape and stays suppressed [0.04ms]
+(pass) the layout rules leave every other path untouched > `followUps` is empty on a plain pass-through, with and witho
+ut leading globals [0.08ms]
+(pass) the layout rules leave every other path untouched > `followUps` is empty on the helper path [0.13ms]
+(pass) the layout rules leave every other path untouched > translating the whole layout trio yields one corrected comma
+nd, one follow-up and one suppression [0.45ms]
+(pass) rule D0: the `-F` element is dropped from `display` / `display-message` > `display -p -F #{session_id} -t %1` lo
+ses exactly the `-F` element [0.11ms]
+(pass) rule D0: the `-F` element is dropped from `display` / `display-message` > `display -p -F #{session_name}:#{windo
+w_index} -t %1` loses exactly the `-F` element [0.11ms]
+(pass) rule D0: the `-F` element is dropped from `display` / `display-message` > the `display-message` alias is rewritt
+en identically [0.05ms]
+(pass) rule D0: the `-F` element is dropped from `display` / `display-message` > a `display` with no `-F` is byte-ident
+ical and carries no rewrite reason [0.06ms]
+(pass) rule D0: the `-F` element is dropped from `display` / `display-message` > a dangling `-F` as the last element is
+ byte-identical [0.05ms]
+(pass) rule D0: the `-F` element is dropped from `display` / `display-message` > another verb's `-F` is parsed correctl
+y by psmux and stays byte-identical [0.04ms]
+(pass) rule D0: the `-F` element is dropped from `display` / `display-message` > two `-F` elements: the FIRST non-final
+ one goes, and the result is recorded [0.06ms]
+(pass) rule D0: the `-F` element is dropped from `display` / `display-message` > leading globals survive the `-F` rewri
+te [0.04ms]
+(pass) 5.1.35 placeholder banner decodes through the translator > the 5.1.35 plain banner translates to the same Window
+s command as the old E shape [0.22ms]
+(pass) 5.1.35 placeholder banner decodes through the translator > the hostile Q banner decodes to the raw description i
+n the helper script [0.20ms]
+(pass) 5.1.35 placeholder banner decodes through the translator > truncated and NUL-cleaned banners translate with no r
+e-escaping layer [0.87ms]
+(pass) 5.1.35 placeholder banner decodes through the translator > unescapeQContent reverses the Q banner escapes [0.13m
+s]
+
+test\windows-helper-runtime.test.ts:
+(pass) interpreter discovery > Windows PowerShell 5.1 is present and is version 5.1 [220.39ms]
+(pass) Start-PaneFromDescriptor.ps1 under Windows PowerShell 5.1 > exit 64: a malformed invocation is refused before an
+ything runs > a missing --payload is refused [806.61ms]
+(pass) Start-PaneFromDescriptor.ps1 under Windows PowerShell 5.1 > exit 64: a malformed invocation is refused before an
+ything runs > a missing --command is refused [447.01ms]
+(pass) Start-PaneFromDescriptor.ps1 under Windows PowerShell 5.1 > exit 64: a malformed invocation is refused before an
+ything runs > a dangling flag is refused, not read as a value [427.45ms]
+(pass) Start-PaneFromDescriptor.ps1 under Windows PowerShell 5.1 > exit 64: a malformed invocation is refused before an
+ything runs > an unknown flag is refused [464.80ms]
+(pass) Start-PaneFromDescriptor.ps1 under Windows PowerShell 5.1 > exit 64: a malformed invocation is refused before an
+ything runs > a --command that is not base64url is refused [482.68ms]
+(pass) Start-PaneFromDescriptor.ps1 under Windows PowerShell 5.1 > exit 64: a malformed invocation is refused before an
+ything runs > an unsafe --correlation is refused before a trace is named [487.66ms]
+(pass) Start-PaneFromDescriptor.ps1 under Windows PowerShell 5.1 > exit 64: a malformed invocation is refused before an
+ything runs > a top-level JSON string in --command is refused [422.10ms]
+(pass) Start-PaneFromDescriptor.ps1 under Windows PowerShell 5.1 > exit 64: a malformed invocation is refused before an
+ything runs > a one-element --command array still runs [656.53ms]
+(pass) Start-PaneFromDescriptor.ps1 under Windows PowerShell 5.1 > exit 64: a malformed invocation is refused before an
+ything runs > an empty --command array is refused [493.43ms]
+(pass) Start-PaneFromDescriptor.ps1 under Windows PowerShell 5.1 > exit 65: a slot that is not an assignment is refused
+ > an environment slot with no '=' is malformed [580.57ms]
+(pass) Start-PaneFromDescriptor.ps1 under Windows PowerShell 5.1 > exit 65: a slot that is not an assignment is refused
+ > an environment slot with an empty name is malformed [592.63ms]
+(pass) Start-PaneFromDescriptor.ps1 under Windows PowerShell 5.1 > exit 65: a slot that is not an assignment is refused
+ > a fallback file whose digest does not match is malformed [2034.17ms]
+(pass) Start-PaneFromDescriptor.ps1 under Windows PowerShell 5.1 > exit 66: a promised credential that is nowhere is re
+fused > no environment slot and no fallback file is absent [542.94ms]
+(pass) Start-PaneFromDescriptor.ps1 under Windows PowerShell 5.1 > exit 67: a descriptor is claimed by exclusive creati
+on > a second run for the same correlation id refuses to launch [1492.97ms]
+(pass) Start-PaneFromDescriptor.ps1 under Windows PowerShell 5.1 > credential delivery: environment first, then the res
+tricted file > a complete environment is used and no file is touched [560.92ms]
+(pass) Start-PaneFromDescriptor.ps1 under Windows PowerShell 5.1 > credential delivery: environment first, then the res
+tricted file > a value containing '=' survives whole [577.93ms]
+(pass) Start-PaneFromDescriptor.ps1 under Windows PowerShell 5.1 > credential delivery: environment first, then the res
+tricted file > the trace records slot NAMES and never the values [581.21ms]
+(pass) Start-PaneFromDescriptor.ps1 under Windows PowerShell 5.1 > credential delivery: environment first, then the res
+tricted file > an incomplete environment falls back to the restricted file, and the file is gone afterwards [1076.06ms]
+(pass) Start-PaneFromDescriptor.ps1 under Windows PowerShell 5.1 > the pane command is execed as a token vector > every
+ token arrives, in order, with the requested cwd [989.31ms]
+(pass) Start-PaneFromDescriptor.ps1 under Windows PowerShell 5.1 > the pane command is execed as a token vector > the p
+ane command's own exit code is propagated [977.77ms]
+(pass) Start-PaneFromDescriptor.ps1 under Windows PowerShell 5.1 > the pane command is execed as a token vector > a pro
+gram that cannot be started exits 127 [1570.00ms]
+(pass) Start-PaneFromDescriptor.ps1 under Windows PowerShell 5.1 > measured native argv fidelity > spaces and shell met
+acharacters round-trip exactly [961.24ms]
+(pass) Start-PaneFromDescriptor.ps1 under Windows PowerShell 5.1 > measured native argv fidelity > an attach-shaped vec
+tor with spaces and non-ASCII round-trips exactly [975.20ms]
+(pass) Start-PaneFromDescriptor.ps1 under Windows PowerShell 5.1 > measured native argv fidelity > an embedded double q
+uote is DROPPED by this native binder [968.41ms]
+(pass) Start-PaneFromDescriptor.ps1 under Windows PowerShell 5.1 > measured native argv fidelity > an empty token DISAP
+PEARS under this native binder [966.93ms]
+(pass) Start-PaneFromDescriptor.ps1 under Windows PowerShell 5.1 > an attach command is retried exactly once, never twi
+ce [9354.88ms]
+(pass) Start-PaneFromDescriptor.ps1 under PowerShell 7 > exit 64: a malformed invocation is refused before anything run
+s > a missing --payload is refused [570.79ms]
+(pass) Start-PaneFromDescriptor.ps1 under PowerShell 7 > exit 64: a malformed invocation is refused before anything run
+s > a missing --command is refused [500.61ms]
+(pass) Start-PaneFromDescriptor.ps1 under PowerShell 7 > exit 64: a malformed invocation is refused before anything run
+s > a dangling flag is refused, not read as a value [487.68ms]
+(pass) Start-PaneFromDescriptor.ps1 under PowerShell 7 > exit 64: a malformed invocation is refused before anything run
+s > an unknown flag is refused [480.00ms]
+(pass) Start-PaneFromDescriptor.ps1 under PowerShell 7 > exit 64: a malformed invocation is refused before anything run
+s > a --command that is not base64url is refused [518.43ms]
+(pass) Start-PaneFromDescriptor.ps1 under PowerShell 7 > exit 64: a malformed invocation is refused before anything run
+s > an unsafe --correlation is refused before a trace is named [530.97ms]
+(pass) Start-PaneFromDescriptor.ps1 under PowerShell 7 > exit 64: a malformed invocation is refused before anything run
+s > a top-level JSON string in --command is refused [517.75ms]
+(pass) Start-PaneFromDescriptor.ps1 under PowerShell 7 > exit 64: a malformed invocation is refused before anything run
+s > a one-element --command array still runs [626.57ms]
+(pass) Start-PaneFromDescriptor.ps1 under PowerShell 7 > exit 64: a malformed invocation is refused before anything run
+s > an empty --command array is refused [515.68ms]
+(pass) Start-PaneFromDescriptor.ps1 under PowerShell 7 > exit 65: a slot that is not an assignment is refused > an envi
+ronment slot with no '=' is malformed [606.62ms]
+(pass) Start-PaneFromDescriptor.ps1 under PowerShell 7 > exit 65: a slot that is not an assignment is refused > an envi
+ronment slot with an empty name is malformed [592.62ms]
+(pass) Start-PaneFromDescriptor.ps1 under PowerShell 7 > exit 65: a slot that is not an assignment is refused > a fallb
+ack file whose digest does not match is malformed [1437.54ms]
+(pass) Start-PaneFromDescriptor.ps1 under PowerShell 7 > exit 66: a promised credential that is nowhere is refused > no
+ environment slot and no fallback file is absent [587.87ms]
+(pass) Start-PaneFromDescriptor.ps1 under PowerShell 7 > exit 67: a descriptor is claimed by exclusive creation > a sec
+ond run for the same correlation id refuses to launch [1601.03ms]
+(pass) Start-PaneFromDescriptor.ps1 under PowerShell 7 > credential delivery: environment first, then the restricted fi
+le > a complete environment is used and no file is touched [616.47ms]
+(pass) Start-PaneFromDescriptor.ps1 under PowerShell 7 > credential delivery: environment first, then the restricted fi
+le > a value containing '=' survives whole [619.85ms]
+(pass) Start-PaneFromDescriptor.ps1 under PowerShell 7 > credential delivery: environment first, then the restricted fi
+le > the trace records slot NAMES and never the values [621.12ms]
+(pass) Start-PaneFromDescriptor.ps1 under PowerShell 7 > credential delivery: environment first, then the restricted fi
+le > an incomplete environment falls back to the restricted file, and the file is gone afterwards [718.19ms]
+(pass) Start-PaneFromDescriptor.ps1 under PowerShell 7 > the pane command is execed as a token vector > every token arr
+ives, in order, with the requested cwd [994.06ms]
+(pass) Start-PaneFromDescriptor.ps1 under PowerShell 7 > the pane command is execed as a token vector > the pane comman
+d's own exit code is propagated [986.41ms]
+(pass) Start-PaneFromDescriptor.ps1 under PowerShell 7 > the pane command is execed as a token vector > a program that 
+cannot be started exits 127 [1241.94ms]
+(pass) Start-PaneFromDescriptor.ps1 under PowerShell 7 > measured native argv fidelity > spaces and shell metacharacter
+s round-trip exactly [1035.81ms]
+(pass) Start-PaneFromDescriptor.ps1 under PowerShell 7 > measured native argv fidelity > an attach-shaped vector with s
+paces and non-ASCII round-trips exactly [1005.76ms]
+(pass) Start-PaneFromDescriptor.ps1 under PowerShell 7 > measured native argv fidelity > an embedded double quote is bo
+und exactly by this native binder [978.92ms]
+(pass) Start-PaneFromDescriptor.ps1 under PowerShell 7 > measured native argv fidelity > an empty token is bound exactl
+y by this native binder [1016.28ms]
+
+test\windows-opencode-port.test.ts:
+(pass) omo-opencode-port.ps1 propagates the real opencode's exit code > the fixture is a real exe and is what the resol
+ver would pick [0.21ms]
+(pass) omo-opencode-port.ps1 propagates the real opencode's exit code > the TMUX unset route returns the child's non-ze
+ro code, not 0 [484.59ms]
+(pass) omo-opencode-port.ps1 propagates the real opencode's exit code > the --version route returns the child's non-zer
+o code, not 0 [318.59ms]
+(pass) omo-opencode-port.ps1 propagates the real opencode's exit code > the passthrough subcommand route returns the ch
+ild's non-zero code, not 0 [323.69ms]
+(pass) omo-opencode-port.ps1 propagates the real opencode's exit code > the explicit OPENCODE_PORT route returns the ch
+ild's non-zero code, not 0 [345.41ms]
+(pass) omo-opencode-port.ps1 propagates the real opencode's exit code > a child that succeeds still returns 0, so the f
+ix did not invert the contract [339.55ms]
+(pass) omo-opencode-port.ps1 propagates the real opencode's exit code > a second distinct non-zero code propagates unch
+anged, so it is not hardcoded to one value [334.74ms]
+
+test\windows-scripts.test.ts:
+(pass) the shipped .cmd files are CRLF > the file set is discovered, not hardcoded, so it cannot pass vacuously [0.02ms
+]
+(pass) the shipped .cmd files are CRLF > bridge-doctor.cmd has no bare LF [1.42ms]
+(pass) the shipped .cmd files are CRLF > bridge-doctor.cmd has no doubled CR [0.27ms]
+(pass) the shipped .cmd files are CRLF > install.cmd has no bare LF [19.27ms]
+(pass) the shipped .cmd files are CRLF > install.cmd has no doubled CR [0.48ms]
+(pass) the shipped .cmd files are CRLF > opencode.cmd has no bare LF [38.31ms]
+(pass) the shipped .cmd files are CRLF > opencode.cmd has no doubled CR [0.28ms]
+(pass) the shipped .cmd files are CRLF > psmux.cmd has no bare LF [35.38ms]
+(pass) the shipped .cmd files are CRLF > psmux.cmd has no doubled CR [0.88ms]
+(pass) every shipped script is ASCII > bridge-doctor.cmd has no byte above 127 [0.72ms]
+(pass) every shipped script is ASCII > bridge-doctor.ps1 has no byte above 127 [1.10ms]
+(pass) every shipped script is ASCII > install.cmd has no byte above 127 [0.28ms]
+(pass) every shipped script is ASCII > install.ps1 has no byte above 127 [0.42ms]
+(pass) every shipped script is ASCII > omo-opencode-port.ps1 has no byte above 127 [0.31ms]
+(pass) every shipped script is ASCII > opencode.cmd has no byte above 127 [0.11ms]
+(pass) every shipped script is ASCII > psmux.cmd has no byte above 127 [0.13ms]
+(pass) every shipped script is ASCII > uninstall.ps1 has no byte above 127 [32.40ms]
+(pass) every shipped script is ASCII > Start-OpenCode.ps1 has no byte above 127 [31.50ms]
+(pass) every shipped script is ASCII > Start-PaneFromDescriptor.ps1 has no byte above 127 [0.37ms]
+(pass) the release manifest exists in this tree > INSTALL.md exists [0.23ms]
+(pass) the release manifest exists in this tree > scripts/windows/bin/install.cmd exists [0.07ms]
+(pass) the release manifest exists in this tree > scripts/windows/bin/install.ps1 exists [0.04ms]
+(pass) the release manifest exists in this tree > scripts/windows/bin/uninstall.ps1 exists [0.06ms]
+(pass) the release manifest exists in this tree > scripts/windows/bin/bridge-doctor.ps1 exists [0.04ms]
+(pass) the release manifest exists in this tree > scripts/windows/bin/bridge-doctor.cmd exists [0.06ms]
+(pass) the release manifest exists in this tree > scripts/windows/bin/psmux.cmd exists [0.04ms]
+(pass) the release manifest exists in this tree > scripts/windows/bin/opencode.cmd exists [0.04ms]
+(pass) the release manifest exists in this tree > scripts/windows/bin/omo-opencode-port.ps1 exists [0.06ms]
+(pass) the release manifest exists in this tree > scripts/windows/runtime/Start-PaneFromDescriptor.ps1 exists [0.04ms]
+(pass) the release manifest exists in this tree > install-bootstrap.ps1 exists, because the one-line install line fetch
+es it [0.10ms]
+(pass) install.cmd clears Mark-of-the-Web through Get-ChildItem, not Unblock-File -Recurse > the MotW step pipes Get-Ch
+ildItem -Recurse into Unblock-File [0.22ms]
+(pass) install.cmd clears Mark-of-the-Web through Get-ChildItem, not Unblock-File -Recurse > no Unblock-File invocation
+ passes -Recurse [0.47ms]
+
+test\windows-sweep-args.test.ts:
+(pass) parseSweepArgs defaults > no args resolves all three positional defaults [0.19ms]
+(pass) parseSweepArgs regression: flags are never positional paths > a flag in the third slot does not become the progr
+ess path [0.04ms]
+(pass) parseSweepArgs regression: flags are never positional paths > flags are accepted in any position [0.02ms]
+(pass) parseSweepArgs regression: flags are never positional paths > an unknown flag is refused, not treated as a path 
+[0.02ms]
+(pass) parseSweepArgs regression: flags are never positional paths > --run-id without a value is refused [0.01ms]
+(pass) run-id and namespace isolation > explicit run ids survive sanitising [0.08ms]
+(pass) run-id and namespace isolation > unsafe characters are replaced so the id is socket-safe [0.01ms]
+(pass) run-id and namespace isolation > the default run id embeds pid and time, so two processes differ [0.02ms]
+(pass) run-id and namespace isolation > the namespace carries the run id before the case tag [0.01ms]
+(pass) run-id and namespace isolation > two case tags in one run never collide
+(pass) preflightCases: a sweep of nothing is refused, not reported as a pass > the real corpus passes preflight [0.06ms
+]
+(pass) preflightCases: a sweep of nothing is refused, not reported as a pass > an empty case list is refused [0.02ms]
+(pass) preflightCases: a sweep of nothing is refused, not reported as a pass > a non-array case list is refused rather 
+than iterated [0.01ms]
+(pass) applyNegativeControl: the control must actually break something > it increments a-version and names it as the ta
+rget [0.30ms]
+(pass) applyNegativeControl: the control must actually break something > it does not mutate the corpus it was given [0.
+15ms]
+(pass) applyNegativeControl: the control must actually break something > every other case is passed through by referenc
+e, untouched [0.54ms]
+(pass) applyNegativeControl: the control must actually break something > a corpus with no a-version case is refused, no
+t silently un-broken [0.05ms]
+(pass) applyNegativeControl: the control must actually break something > the control off is an identity, and says it to
+uched nothing [0.04ms]
+(pass) finalizeSweep: the artifact is written, then the exit code is decided > the artifact is written before the exit 
+code is returned [0.30ms]
+(pass) finalizeSweep: the artifact is written, then the exit code is decided > failed cases make the exit code 1 [0.10m
+s]
+(pass) finalizeSweep: the artifact is written, then the exit code is decided > a clean run exits 0 [0.08ms]
+(pass) finalizeSweep: the artifact is written, then the exit code is decided > zero results is NOT green, even though f
+ailed_cases is 0 [0.15ms]
+(pass) finalizeSweep: the artifact is written, then the exit code is decided > a missing results array is treated as va
+cuous, not as a pass [0.06ms]
+(pass) finalizeSweep: the artifact is written, then the exit code is decided > meta reaches the artifact alongside the 
+counts [0.12ms]
+
+ 491 pass
+ 0 fail
+ 2428 expect() calls
+Ran 491 tests across 12 files. [56.15s]

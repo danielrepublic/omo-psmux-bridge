@@ -1,0 +1,288 @@
+{
+  "tool": "omo5140-smoke.cjs",
+  "ok": true,
+  "started_utc": "2026-10-21T04:21:30.731Z",
+  "versions": {
+    "node": "v24.19.0",
+    "omo": "5.1.40",
+    "omoPackagePath": "C:\\Users\\Daniel\\.cache\\opencode\\packages\\oh-my-openagent@latest\\node_modules\\oh-my-openagent\\package.json",
+    "omoBundleSha256": "d3d603598b6f0a9ce5da8681d6f0aa680220fd8216b314cfcf20a7bb127b36fd",
+    "opencode": "1.19.3",
+    "mux": "tmux 3.4.0\npsmux 3.4.0 (20aa1d7 2026-10-13)",
+    "doctor": "(see report)"
+  },
+  "namespace": "omo5140-44692159341",
+  "port": 54500,
+  "assertions": [
+    {
+      "name": "bridge-tmux-exe-present",
+      "pass": true,
+      "detail": "C:\\Users\\Daniel\\AppData\\Local\\opencode-psmux-bridge\\bin\\tmux.exe"
+    },
+    {
+      "name": "opencode-exe-present",
+      "pass": true,
+      "detail": "C:\\Users\\Daniel\\AppData\\Roaming\\npm\\node_modules\\opencode-ai\\bin\\opencode.exe"
+    },
+    {
+      "name": "omo-package-5.1.40",
+      "pass": true,
+      "detail": "version=5.1.40"
+    },
+    {
+      "name": "omo-bundle-sha256",
+      "pass": true,
+      "detail": "sha256=d3d603598b6f0a9ce5da8681d6f0aa680220fd8216b314cfcf20a7bb127b36fd"
+    },
+    {
+      "name": "omo-placeholder-source-present",
+      "pass": true,
+      "detail": "banner+hint constants found in the installed bundle"
+    },
+    {
+      "name": "opencode-version-1.19.3",
+      "pass": true,
+      "detail": "1.19.3"
+    },
+    {
+      "name": "mux-version-3.4.0",
+      "pass": true,
+      "detail": "tmux 3.4.0\npsmux 3.4.0 (20aa1d7 2026-10-13)"
+    },
+    {
+      "name": "serve-health-ok",
+      "pass": true,
+      "detail": "{healthy:true, version:1.19.3}"
+    },
+    {
+      "name": "serve-version-1.19.3",
+      "pass": true,
+      "detail": "1.19.3"
+    },
+    {
+      "name": "config-200",
+      "pass": true,
+      "detail": "GET /config -> 200"
+    },
+    {
+      "name": "agent-plugin-loaded",
+      "pass": true,
+      "detail": "24 agent(s), /^Sisyphus/ match required"
+    },
+    {
+      "name": "session-post-2xx",
+      "pass": true,
+      "detail": "POST /session -> 200"
+    },
+    {
+      "name": "session-id-captured",
+      "pass": true,
+      "detail": "id captured (30 chars, withheld)"
+    },
+    {
+      "name": "mux-new-session",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "mux-list-live-session",
+      "pass": true,
+      "detail": "live private session is discoverable"
+    },
+    {
+      "name": "mux-split-placeholder",
+      "pass": true,
+      "detail": "pane=%2 %2\n"
+    },
+    {
+      "name": "pane-banner-marker",
+      "pass": true,
+      "detail": "banner line rendered"
+    },
+    {
+      "name": "pane-hostile-apos",
+      "pass": true,
+      "detail": "apostrophe literal"
+    },
+    {
+      "name": "pane-hostile-hash-dollar",
+      "pass": true,
+      "detail": "# and $ literal"
+    },
+    {
+      "name": "pane-hostile-backtick",
+      "pass": true,
+      "detail": "backticks literal"
+    },
+    {
+      "name": "pane-hostile-backslash",
+      "pass": true,
+      "detail": "backslashes literal"
+    },
+    {
+      "name": "pane-hint",
+      "pass": true,
+      "detail": "hint line rendered"
+    },
+    {
+      "name": "pane-no-interpolation",
+      "pass": true,
+      "detail": "$() kept literal, not expanded"
+    },
+    {
+      "name": "pane-no-side-effect",
+      "pass": true,
+      "detail": "canary absent: C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo5140-sidefx-44692159341.marker"
+    },
+    {
+      "name": "mux-respawn-placeholder",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "pane-respawn-banner",
+      "pass": true,
+      "detail": "respawned banner core rendered"
+    },
+    {
+      "name": "pane-respawn-meta",
+      "pass": true,
+      "detail": "respawned # and $ literal"
+    },
+    {
+      "name": "session-seeded-without-model-call",
+      "pass": true,
+      "detail": "POST context-only message -> HTTP 200"
+    },
+    {
+      "name": "mux-respawn-attach",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "pane-real-opencode-session",
+      "pass": true,
+      "detail": "unique context-only message rendered by the real attached OpenCode session"
+    },
+    {
+      "name": "mux-kill-pane",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "doctor-exit-0",
+      "pass": true,
+      "detail": "exit=0"
+    },
+    {
+      "name": "doctor-anchors-11/11",
+      "pass": true,
+      "detail": "11/11 frozen anchors"
+    },
+    {
+      "name": "doctor-sees-5.1.40",
+      "pass": true,
+      "detail": "installed_version=5.1.40"
+    },
+    {
+      "name": "cleanup-session-deleted",
+      "pass": true,
+      "detail": "DELETE /session/:id -> HTTP 200 (id withheld)"
+    },
+    {
+      "name": "cleanup-serve-child",
+      "pass": true,
+      "detail": "exit=null signal=SIGTERM"
+    },
+    {
+      "name": "cleanup-namespace-only",
+      "pass": true,
+      "detail": "kill-server -L omo5140-44692159341 exit=0; ns gone=true"
+    },
+    {
+      "name": "preexisting-opencode-pids-not-signalled",
+      "pass": true,
+      "detail": "none existed at the start; nothing of the user's could be signalled"
+    },
+    {
+      "name": "preexisting-psmux-pids-not-signalled",
+      "pass": true,
+      "detail": "before=[psmux=11624,psmux=18816,psmux=22332,psmux=43640] after=[psmux=11624,psmux=18816,psmux=22332,psmux=43640]"
+    }
+  ],
+  "observations": [
+    {
+      "name": "user-process-baseline",
+      "detail": "psmux=11624 psmux=18816 psmux=22332 psmux=43640"
+    },
+    {
+      "name": "known-limitation-issue2-doublequote",
+      "detail": "respawn \"q\" quotes dropped (GitHub issue #2: PS5.1 helper strips embedded doublequotes)"
+    }
+  ],
+  "health": {
+    "healthy": true,
+    "version": "1.19.3"
+  },
+  "agents": [
+    "Sisyphus - ultraworker",
+    "Sisyphus - ultraworker",
+    "Hephaestus - Deep Agent",
+    "Hephaestus - Deep Agent",
+    "Prometheus - Plan Builder",
+    "Prometheus - Plan Builder",
+    "Atlas - Plan Executor",
+    "Atlas - Plan Executor",
+    "Metis - Plan Consultant",
+    "Metis - Plan Consultant",
+    "Momus - Plan Critic",
+    "Momus - Plan Critic",
+    "Sisyphus-Junior",
+    "Sisyphus-Junior",
+    "build",
+    "compaction",
+    "explore",
+    "general",
+    "librarian",
+    "multimodal-looker",
+    "oracle",
+    "plan",
+    "summary",
+    "title"
+  ],
+  "config": {
+    "status200": true,
+    "mentionsOmoPlugin": true
+  },
+  "session": {
+    "created": true,
+    "deleted": true
+  },
+  "paneSample": "┃\n  ┃  OMO5140_ATTACH_44692159341\n  ┃\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n  ┃\n  ┃\n  ┃\n  ┃  Sisyphus - Ultraworker · GPT-6.1 Sol OpenAI · high\n  ╹▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀\n   C:\\Users\\Daniel                                                     tab agents  ctrl+p commands",
+  "cleanup": {
+    "sessionDelete": "HTTP 200",
+    "killServerScopedOnly": "exit=0",
+    "namespaceGone": true,
+    "serveChild": "exit=null signal=SIGTERM",
+    "noBareKillServer": true
+  },
+  "notes": "Protocol smoke against the deployed bridge: placeholder/split/respawn/real OpenCode attach/close + serve health/agent/session + installed doctor (11/11 anchors, installed_version=5.1.40). Private -L namespace only; no LLM subagent exercised; no model call made. The only process this driver stopped is the `opencode serve` child it started itself.",
+  "userBaseline": {
+    "before": [
+      "psmux=11624",
+      "psmux=18816",
+      "psmux=22332",
+      "psmux=43640"
+    ],
+    "after": [
+      "psmux=11624",
+      "psmux=18816",
+      "psmux=22332",
+      "psmux=43640"
+    ],
+    "note": "pre-existing pids were observed and are re-checked below"
+  },
+  "attachPaneSample": "┃\n  ┃  OMO5140_ATTACH_44692159341\n  ┃\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n  ┃\n  ┃\n  ┃\n  ┃  Sisyphus - Ultraworker · GPT-6.1 Sol OpenAI · high\n  ╹▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀\n   C:\\Users\\Daniel                                                     tab agents  ctrl+p commands",
+  "doctorInstalledVersion": "5.1.40",
+  "hashErrors": []
+}
