@@ -9,8 +9,8 @@
     "mux": "tmux 3.4.0\npsmux 3.4.0 (20aa1d7 2026-10-13)",
     "doctor": "(see report)"
   },
-  "namespace": "omo-v5142-12068924932",
-  "port": 57918,
+  "namespace": "omo-v5142-2080052173",
+  "port": 62541,
   "assertions": [
     {
       "name": "bridge-tmux-exe-present",
@@ -125,7 +125,7 @@
     {
       "name": "pane-no-side-effect",
       "pass": true,
-      "detail": "canary absent: C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-smoke-sidefx-12068924932.marker"
+      "detail": "canary absent: C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-smoke-sidefx-2080052173.marker"
     },
     {
       "name": "mux-respawn-placeholder-5142",
@@ -185,17 +185,17 @@
     {
       "name": "cleanup-namespace-only",
       "pass": true,
-      "detail": "kill-server -L omo-v5142-12068924932 exit=0; ns gone=true"
+      "detail": "kill-server -L omo-v5142-2080052173 exit=0; ns gone=true"
     }
   ],
   "observations": [
     {
       "name": "start-process-read-direct-exe",
-      "detail": "exit=0 stdoutBytes=22 stderrBytes=0"
+      "detail": "exit=0 stdoutBytes=21 stderrBytes=0"
     },
     {
       "name": "start-process-read-cmd-launcher",
-      "detail": "exit=0 stdoutBytes=22 stderrBytes=0"
+      "detail": "exit=0 stdoutBytes=21 stderrBytes=0"
     },
     {
       "name": "known-limitation-issue2-doublequote",
@@ -240,7 +240,7 @@
     "created": true,
     "deleted": true
   },
-  "paneSample": "┃\n  ┃  BRIDGE_ATTACH_12068924932\n  ┃\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n  ┃\n  ┃\n  ┃\n  ┃  Sisyphus - Ultraworker · GPT-6.1 Sol OpenAI · high\n  ╹▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀\n   C:\\Users\\Daniel                                                     tab agents  ctrl+p commands",
+  "paneSample": "┃\n  ┃  BRIDGE_ATTACH_2080052173                     ┃                                              ┃\n  ┃                                               ┃  ◦ OhMyOpenCode 5.1.42                       ┃\n                                                  ┃                                              ┃\n                                                  ┃  Sisyphus on steroids is steering OpenCode.  ┃\n                                                  ┃                                              ┃\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n  ┃\n  ┃\n  ┃\n  ┃  Sisyphus - Ultraworker · GPT-6.1 Sol OpenAI · high\n  ╹▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀\n   C:\\Users\\Daniel                                                     tab agents  ctrl+p commands",
   "cleanup": {
     "sessionDelete": "HTTP 200",
     "killServerScopedOnly": "exit=0",
@@ -253,17 +253,17 @@
     {
       "route": "direct-exe",
       "exit": 0,
-      "stdout": "omo-v5142-12068924932\n",
+      "stdout": "omo-v5142-2080052173\n",
       "stderr": "",
       "wrapperStderr": ""
     },
     {
       "route": "cmd-launcher",
       "exit": 0,
-      "stdout": "omo-v5142-12068924932\n",
+      "stdout": "omo-v5142-2080052173\n",
       "stderr": "",
       "wrapperStderr": ""
     }
   ],
-  "attachPaneSample": "┃\n  ┃  BRIDGE_ATTACH_12068924932\n  ┃\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n  ┃\n  ┃\n  ┃\n  ┃  Sisyphus - Ultraworker · GPT-6.1 Sol OpenAI · high\n  ╹▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀\n   C:\\Users\\Daniel                                                     tab agents  ctrl+p commands"
+  "attachPaneSample": "┃\n  ┃  BRIDGE_ATTACH_2080052173                     ┃                                              ┃\n  ┃                                               ┃  ◦ OhMyOpenCode 5.1.42                       ┃\n                                                  ┃                                              ┃\n                                                  ┃  Sisyphus on steroids is steering OpenCode.  ┃\n                                                  ┃                                              ┃\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n  ┃\n  ┃\n  ┃\n  ┃  Sisyphus - Ultraworker · GPT-6.1 Sol OpenAI · high\n  ╹▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀\n   C:\\Users\\Daniel                                                     tab agents  ctrl+p commands"
 }

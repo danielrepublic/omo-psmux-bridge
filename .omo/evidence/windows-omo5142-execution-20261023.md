@@ -3,7 +3,7 @@
 Date: 2026-10-23. Host: `WINDOWS-DANIEL` (Windows 11, build 26300), user `daniel`,
 Windows PowerShell 5.1.26100.9711, node v24.19.0, Bun 1.4.2.
 Machine-readable report: `.omo/evidence/omo5142-windows-smoke-report-20261023.json`
-(sha256 `c89360a0789e2a6ad4da7c03c04672904f9fb3bc206271fe0f32c8a80dacacf1`).
+(sha256 `94a9a2fd63fc7c72044fc8954d65c295e67b94a40dee43a49a78d91fbf6579b6`).
 
 ---
 
@@ -14,7 +14,7 @@ Machine-readable report: `.omo/evidence/omo5142-windows-smoke-report-20261023.js
 | opencode updated 1.19.3 → **1.19.4** | **yes** — npm global `opencode-ai@1.19.4`; `opencode.exe --version` = `1.19.4`; `/global/health` reports `version:"1.19.4"` |
 | OmO plugin updated 5.1.40 → **5.1.42** | **yes** — installed `package.json` version `5.1.42`; bundle 6 083 565 B; `GET /agent` returns 24 agents with a `/^Sisyphus/` match |
 | Bridge retargeted at 5.1.42 | **yes** — doctor `contract_frozen_version=5.1.42`, `installed_version=5.1.42`, `verdict_basis=version-equality`, `frozen_line_anchors_resolved=11/11` |
-| Deployed files match the repo | **yes** — 3 files installed, each installed sha256 == repo working-tree sha256 |
+| Deployed files match the published artifact | **yes** — `bridge-doctor.ps1` and `install.ps1` equal their repo/HEAD bytes; `tmux.exe` equals the `v5.1.42` release asset (CI-built with bun 1.4.2) |
 | Protocol smoke | **yes** — 35/35 assertions pass, 0 fail (split, placeholder, hostile chars, respawn, real attach, close, doctor, scoped cleanup) |
 | Source gates (Linux) | **yes** — `bun test` 432 pass / 34 skip / **0 fail**; `bunx tsc --noEmit` exit 0; `contract:verify` **180 citations / 0 problems** |
 | User data preserved | **yes** — psmux 3.4.0 and its sessions untouched; `.omo/omo.jsonc`, `opencode.json`, `auth.json`, `opencode.db` untouched; no PATH change |
@@ -68,14 +68,18 @@ Built on Linux with `bun build --compile src/cli.ts --target=bun-windows-x64`
 
 | File | sha256 | Bytes |
 | --- | --- | --- |
-| `bin\tmux.exe` | `4E94E1DF2735DC70A559F807CE0BC2EB37B7414ACCA0470AAECE5505E9D28E39` | 96 429 056 |
+| `bin\tmux.exe` | `994875A97663AC4FE8A26A0BAE11FA904B3ED16BED580929AEBCBD92FCD8B513` | 86 135 808 |
 | `bin\bridge-doctor.ps1` | `F788923E98EC5388E9F3476F29FD346E37B4A388CC289F2786590A7FF7EDF9C8` | 56 980 |
 | `bin\install.ps1` | `79D4F36CDABFA85B9494D260F5D780895C63B81D027C30F3C3DDA7BC9F89CA13` | 35 926 |
 
-`bin\tmux.exe` is byte-identical to the previously installed shim, which is the
-expected consequence of `src/` being unchanged. `bin\install.cmd` (the Mark-of-the-Web
-hotfix, `5146A4CC…`) was not touched. The other installed payload files already matched
-the repo and were not touched.
+`bin\tmux.exe` is the binary shipped inside
+`opencode-psmux-bridge-v5.1.42-win-x64.zip`, cross-compiled by `release.yml` with
+the pinned **bun 1.4.2**. A local build with bun 1.4.3 (96 429 056 B,
+`4E94E1DF…`) was installed first and passed the smoke; it was then replaced by the
+published 1.4.2 artifact and the smoke was re-run against that binary (35/35 again),
+so the host now runs exactly what a user downloads. `bin\install.cmd` (the
+Mark-of-the-Web hotfix, `5146A4CC…`) was not touched. The other installed payload
+files already matched the repo and were not touched.
 
 ---
 
@@ -84,7 +88,9 @@ the repo and were not touched.
 ### 4.1 Protocol smoke — 35/35
 
 `omo5142-windows-smoke-20261023.cjs`, one ssh lifetime, private `-L omo-v5142-<rand>`
-namespace, its own `opencode serve` child.
+namespace, its own `opencode serve` child. The committed report is the run against
+the **published v5.1.42 `tmux.exe`** (`994875A9…`); the same 35 assertions also
+passed against the earlier local bun-1.4.3 build.
 
 | Group | Checks |
 | --- | --- |
