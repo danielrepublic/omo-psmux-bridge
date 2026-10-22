@@ -1,4 +1,4 @@
-// Regression coverage for the contracted 5.1.40 bridge-doctor anchors.
+// Regression coverage for the contracted 5.1.42 bridge-doctor anchors.
 // Both the version and the line/text pairs must match the installed bundle.
 //
 // WHAT THE PREVIOUS VERSION OF THIS FILE GOT WRONG, because it is the whole
@@ -90,7 +90,7 @@ function parseAnchors(source: string): Anchor[] {
 
 const shippedAnchors = parseAnchors(doctor);
 
-/** The 11 check-5 anchors, verified against the installed 5.1.40 dist/index.js. */
+/** The 11 check-5 anchors, verified against the installed 5.1.42 dist/index.js. */
 const EXPECTED_ANCHORS: ReadonlyArray<Anchor> = [
   { line: 8235, text: "function isInsideTmuxEnvironment(environment) {" },
   { line: 8275, text: "async function isServerRunning(serverUrl, options = {}) {" },
@@ -100,10 +100,10 @@ const EXPECTED_ANCHORS: ReadonlyArray<Anchor> = [
   { line: 9079, text: "async function findVerifiedTmuxPath() {" },
   { line: 9085, text: 'const verifyProc = spawn([path, "-V"], {' },
   { line: 9091, text: "if (verifyExitCode !== 0) {" },
-  { line: 89030, text: "enabled: z49.boolean().default(false)," },
-  { line: 156488, text: "function resolveServerUrl(rawServerUrl, env, log) {" },
+  { line: 89108, text: "enabled: z50.boolean().default(false)," },
+  { line: 156566, text: "function resolveServerUrl(rawServerUrl, env, log) {" },
   {
-    line: 156498,
+    line: 156576,
     text: 'log("[tmux-session-manager] ctx.serverUrl has port 0; falling back. "',
   },
 ];
@@ -247,7 +247,7 @@ describe("bridge-doctor check-5 anchors match the contract as PAIRS", () => {
 
   test("no superseded 5.1.35-era anchor or citation survives", () => {
     // The 5.1.35 anchors were 8231 / 8271 / 8283 / 8399 / 8404 / 27072 /
-    // 156456 / 156466; 9079 / 9085 / 9091 did NOT move in the installed 5.1.40
+    // 156456 / 156466; 9079 / 9085 / 9091 did NOT move in the installed 5.1.42
     // bundle and are therefore not stale. Any of the eight reappearing as an
     // ANCHOR LINE means the refresh is incomplete.
     const staleLines = [8231, 8271, 8283, 8399, 8404, 27072, 156456, 156466];
@@ -285,14 +285,14 @@ describe("bridge-doctor check-5 anchors match the contract as PAIRS", () => {
 
   test("each GATE range starts on a line the anchors actually check", () => {
     // Only the three silent-failure gate ranges are covered by the check-5
-    // anchor table. The config-resolution ranges (86041-86057, 88313-88327) are
+    // anchor table. The config-resolution ranges (86113-86129, 88391-88405) are
     // deliberately NOT anchors -- they describe which file is read, not what is
     // at a line -- and they are verified by the isolated-home cases in
     // scripts/windows/harness/install-config-probe.ps1 instead.
     const GATE_RANGES: ReadonlyArray<readonly [string, number]> = [
       ["9079-9100", 9079],
       ["8275-8316", 8275],
-      ["156488-156511", 156488],
+      ["156566-156589", 156566],
     ];
     for (const [span, start] of GATE_RANGES) {
       expect({
@@ -303,7 +303,7 @@ describe("bridge-doctor check-5 anchors match the contract as PAIRS", () => {
     }
 
     // And the config ranges are cited without being passed off as anchors.
-    for (const span of ["86041-86057", "88313-88327"]) {
+    for (const span of ["86113-86129", "88391-88405"]) {
       expect({
         span,
         cited: doctor.includes(`index.js:${span}`),
@@ -324,7 +324,7 @@ describe("bridge-doctor frozen version", () => {
   test("the pin this file reads is the one the contract checker reads", () => {
     // If pins.json ever stops carrying omo.verifiedAgainst, this file would
     // silently start comparing against `undefined`.
-    expect(pins.omo.verifiedAgainst).toBe("5.1.40");
+    expect(pins.omo.verifiedAgainst).toBe("5.1.42");
     expect(pins.omo.bundleGlob).toContain("oh-my-openagent");
   });
 

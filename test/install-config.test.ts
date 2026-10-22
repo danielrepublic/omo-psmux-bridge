@@ -10,7 +10,7 @@
 //
 //   * Wrong FILE. `tmux.enabled` is read by
 //       isTmuxIntegrationEnabled(pluginConfig) -> pluginConfig.tmux?.enabled ?? false
-//     (index.js:141275-141276), and pluginConfig is the `[opencode]` block of the
+//     (index.js:141385-141386), and pluginConfig is the `[opencode]` block of the
 //     OMO config chain (index.js:26355-26369). It is never a top-level `tmux` key
 //     in opencode.jsonc.
 //   * Wrong METHOD. A raw regex answers TRUE for a config whose only match is a
@@ -30,15 +30,15 @@
 //          must not be used to model loading.
 //
 // The SHIPPED citations are the CURRENT ones, verified against the installed
-// oh-my-openagent@5.1.40 bundle (dist/index.js):
-//   86041-86057   resolveHomeDir / detectUserOmoJsonPath -- the user file rules
-//   86112         resolveOmoConfigPaths, the LOADER (86115 calls
-//                 detectUserOmoJsonPath); resolveUserOmoConfigPath (86045) is
+// oh-my-openagent@5.1.42 bundle (dist/index.js):
+//   86113-86129   resolveHomeDir / detectUserOmoJsonPath -- the user file rules
+//   86184         resolveOmoConfigPaths, the LOADER (86187 calls
+//                 detectUserOmoJsonPath); resolveUserOmoConfigPath (86117) is
 //                 still only the WRITE path
-//   88313-88327   loadOmoOpenCodeConfigChain -- the config chain
-//   88324-88327   its appendViews block: baseView, the "[opencode]." prefix,
+//   88391-88405   loadOmoOpenCodeConfigChain -- the config chain
+//   88402-88405   its appendViews block: baseView, the "[opencode]." prefix,
 //                 the profile block, and the profile+[opencode] combination
-//   141307-141308 isTmuxIntegrationEnabled: pluginConfig.tmux?.enabled ?? false
+//   141385-141386 isTmuxIntegrationEnabled: pluginConfig.tmux?.enabled ?? false
 //
 // The 5.1.35 spelling of that appendViews block was 26366-26369. In 5.1.40 that
 // range is a model catalogue entry, so a live citation of it names nothing.
@@ -186,7 +186,7 @@ describe("install.ps1 advice names the file OmO actually reads", () => {
 
   test("it states the real resolution rules instead of asserting omo.jsonc", () => {
     expect(install).toContain("omo.jsonc when it exists, else omo.json");
-    expect(install).toContain("index.js:86041-86057");
+    expect(install).toContain("index.js:86113-86129");
     // The merged-layer caveat: a project config can enable tmux while the user
     // file says false, so a FAIL here is not proof about the effective config.
     expect(install).toContain("merges");
@@ -199,7 +199,7 @@ describe("install.ps1 advice names the file OmO actually reads", () => {
     const advice = install
       .split(/\r?\n/)
       .find((line) => line.includes("project layers and a profile block")) ?? "";
-    expect(advice).toContain("88324-88327");
+    expect(advice).toContain("88402-88405");
     expect(install).not.toContain("26366-26369");
     expect(install).not.toContain("index.js:86054,21430");
   });

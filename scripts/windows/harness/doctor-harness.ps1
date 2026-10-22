@@ -390,7 +390,7 @@ $emptyFixtureDir = New-Dir (Join-Path $work 'registry-fixture-empty')
 # --- package fixtures for check 5 -------------------------------------------
 #
 # A synthetic bundle proves the drift DETECTOR works. It does not prove anything
-# about the real 5.1.40 bundle, and case J below is the one that does that, by
+# about the real 5.1.42 bundle, and case J below is the one that does that, by
 # reading the INSTALLED package tree read-only.
 function New-SyntheticBundle {
     param([string] $Root, [int] $DriftLine)
@@ -401,7 +401,7 @@ function New-SyntheticBundle {
     $maxLine = 1
     foreach ($a in $anchorTable) { if ($a.Line -gt $maxLine) { $maxLine = $a.Line } }
     # 1-BASED source line N lives at $lines[N-1], and the array is written with
-    # WriteAllLines rather than `+=` in a loop: the highest anchor is line 156498,
+    # WriteAllLines rather than `+=` in a loop: the highest anchor is line 156576,
     # and PowerShell's string `+=` is O(n^2), which hangs on a 5 MB document.
     $lines = New-Object 'string[]' $maxLine
     for ($i = 1; $i -le $maxLine; $i++) { $lines[$i - 1] = 'var filler_line_' + $i + ' = ' + $i + ';' }
@@ -498,7 +498,7 @@ $healthyArgs = @('-Namespace', 'fxlive', '-Session', 'fresh', '-DataDir', $liveF
 # --- config-resolution fixtures ------------------------------------------------
 # The doctor's default -ConfigPath used to be a hardcoded
 # %USERPROFILE%\.omo\omo.jsonc. OmO resolves it as HOME ?? USERPROFILE ?? cwd and
-# then omo.jsonc, else omo.json (index.js:86041-86057), so the old default could
+# then omo.jsonc, else omo.json (index.js:86113-86129), so the old default could
 # point at a file OmO never opens. These two sandboxes drive the DEFAULT end to
 # end, through the real doctor, with no -ConfigPath at all.
 $cfgHomeJsonRoot = New-Dir (Join-Path $work 'cfg-home-json')

@@ -16,11 +16,11 @@
                       `GET /global/health` and treats anything that is not `ok` as
                       "not running", logging "[spawnTmuxPane] SKIP: server not
                       running" (index.js:8405). `resolveServerUrl`
-                      (index.js:156488-156511) falls back to `http://localhost:4096`
+                      (index.js:156566-156589) falls back to `http://localhost:4096`
                       when OPENCODE_PORT is unset and the host server URL carries
                       port 0.
       GATE 0  CONFIG `[opencode].tmux.enabled` defaults to FALSE
-                      (index.js:89030), which is why a stock Windows OmO produces
+                      (index.js:89108), which is why a stock Windows OmO produces
                       zero panes and no error.
       GATE 2  STALE  a psmux server is long-lived and its panes inherit ITS
                       environment; the client-side attach never transmits one. A
@@ -81,7 +81,7 @@
 
 .PARAMETER FrozenOmoVersion
     The version CONTRACT.md is frozen against. Reported on every run. This is
-    5.1.40. CONTRACT.md section 0.1 states 5.1.17 "is not installed and must
+    5.1.42. CONTRACT.md section 0.1 states 5.1.17 "is not installed and must
     never be cited"; see check 5 for why the version-string comparison alone is
     insufficient and the line-anchor check is the load-bearing guard.
 
@@ -124,7 +124,7 @@ param(
     [string] $ConfigPath,
     [string] $PackageRoot,
     [string] $ExpectedShimSha256 = '9EA5E733FD78F4EA966A85A5CF062D1113C644FEFF80AD3B3084574c2BA2A858',
-    [string] $FrozenOmoVersion = '5.1.40',
+    [string] $FrozenOmoVersion = '5.1.42',
     [string[]] $KnownEquivalentOmoVersions = @(),
     [int]    $HealthTimeoutMs = 2000
 )
@@ -225,13 +225,13 @@ function Get-Sha256 {
 #     omo.json was told their config was missing, and the "it defaults to false"
 #     advice was attached to a path that does not exist.
 #
-# index.js:86041  function resolveHomeDir(env = process.env) {
-# index.js:86042    const homeDir = env.HOME ?? env.USERPROFILE ?? process.cwd();
-# index.js:86051  function detectUserOmoJsonPath(env, fileSystem) {
-# index.js:86053    const jsoncPath = join34(configDir, "omo.jsonc");
-# index.js:86054    if (fileSystem.existsSync(jsoncPath)) return jsoncPath;
-# index.js:86056    const jsonPath = join34(configDir, "omo.json");
-# index.js:86057    return fileSystem.existsSync(jsonPath) ? jsonPath : jsoncPath;
+# index.js:86113  function resolveHomeDir(env = process.env) {
+# index.js:86114    const homeDir = env.HOME ?? env.USERPROFILE ?? process.cwd();
+# index.js:86123  function detectUserOmoJsonPath(env, fileSystem) {
+# index.js:86125    const jsoncPath = join34(configDir, "omo.jsonc");
+# index.js:86126    if (fileSystem.existsSync(jsoncPath)) return jsoncPath;
+# index.js:86128    const jsonPath = join34(configDir, "omo.json");
+# index.js:86129    return fileSystem.existsSync(jsonPath) ? jsonPath : jsoncPath;
 #
 # `join34` is node's `path.join` under the bundle's own import alias. The alias
 # suffix is a bundler artefact (a name collision renumbered it at 5.1.40), so it
@@ -255,12 +255,12 @@ function Resolve-OmoUserConfigPath {
     $rule = ''
     $chosen = $jsoncPath
     if ($jsoncExists) {
-        $rule = 'omo.jsonc exists (index.js:86054)'
+        $rule = 'omo.jsonc exists (index.js:86126)'
     } elseif ($jsonExists) {
-        $rule = 'omo.jsonc absent, omo.json exists (index.js:86057)'
+        $rule = 'omo.jsonc absent, omo.json exists (index.js:86129)'
         $chosen = $jsonPath
     } else {
-        $rule = 'neither file exists; reporting the path OmO expects (index.js:86057)'
+        $rule = 'neither file exists; reporting the path OmO expects (index.js:86129)'
     }
     return [pscustomobject]@{ Path = $chosen; Rule = $rule; Home = $homeDir; Dir = $configDir }
 }
@@ -754,11 +754,11 @@ if ($envPortRaw -match '^[0-9]{1,5}$') {
     $n = [int]$envPortRaw
     if ($n -ge 1 -and $n -le 65535) { $envPort = $n; $envPortValid = $true }
 }
-# omo dist/index.js:156490 -- `configuredPort ? Number(configuredPort) : 4096`.
+# omo dist/index.js:156568 -- `configuredPort ? Number(configuredPort) : 4096`.
 $FallbackPort = 4096
 Write-Line -Text ('OPENCODE_PORT=' + $(if ($envPortValid) { [string]$envPort } elseif ([string]::IsNullOrEmpty($envPortRaw)) { '<unset>' } else { '<' + (As-AsciiLine $envPortRaw -Max 40) + '> (not a usable port)' }))
 Write-Line -Text ('OPENCODE_SERVER=' + (Get-SafeUrlShape $env:OPENCODE_SERVER) + '  (query/fragment/userinfo withheld)')
-Write-Line -Text ('fallback_port_used_by_omo=' + $FallbackPort + ' (index.js:156490, when OPENCODE_PORT is unset)')
+Write-Line -Text ('fallback_port_used_by_omo=' + $FallbackPort + ' (index.js:156568, when OPENCODE_PORT is unset)')
 
 # Only ports the OS says are LISTENING are probed. This host DROPS a connect to a
 # closed loopback port instead of refusing it, so a blind probe of a dead port
@@ -833,7 +833,7 @@ if ($check3Ok) {
     Write-Cause -Text 'and skip every pane with no user-visible error.'
     Write-Fix   -Text 'start the server with an explicit port and export it for the same shell:'
     Write-Fix   -Text '  set OPENCODE_PORT=<n>   then   opencode --port <n>'
-    Write-Fix   -Text 'opencode prints this remedy itself (index.js:156498, issue #3963).'
+    Write-Fix   -Text 'opencode prints this remedy itself (index.js:156576, issue #3963).'
     Write-Line -Text ''
     Add-Failure -CheckNumber 3 -Code 30
 }
@@ -844,9 +844,9 @@ if ($check3Ok) {
 Write-Verdict '....' 4 'OmO config [opencode].tmux.enabled'
 Write-Line -Text ('config=' + $ConfigPath + '  exists=' + (Test-Path -LiteralPath $ConfigPath -PathType Leaf))
 Write-Line -Text ('config_path_rule=' + $(if ($omoConfigDefault.Path -ceq $ConfigPath) { $omoConfigDefault.Rule } else { 'explicit -ConfigPath (caller override; resolution rule not applied)' }))
-Write-Line -Text ('config_home=' + $omoConfigDefault.Home + '  config_dir=' + $omoConfigDefault.Dir + '  (index.js:86041-86057)')
+Write-Line -Text ('config_home=' + $omoConfigDefault.Home + '  config_dir=' + $omoConfigDefault.Dir + '  (index.js:86113-86129)')
 Write-Note  -Text 'this is the ONE SELECTED user file. OmO also merges project layers and a'
-Write-Note  -Text 'profile block (index.js:88313-88327), so a project .omo\omo.jsonc can set'
+Write-Note  -Text 'profile block (index.js:88391-88405), so a project .omo\omo.jsonc can set'
 Write-Note  -Text 'tmux.enabled true while this file says false. PASS/FAIL here is about'
 Write-Note  -Text 'this file only.'
 $configKey = '[opencode].tmux.enabled'
@@ -917,7 +917,7 @@ if ($configOk) {
 } else {
     Write-Verdict 'FAIL ' 4 'OmO config [opencode].tmux.enabled'
     Write-Cause -Text ('key ' + $configKey + ' is not true (state: ' + $configState + ') in ' + $ConfigPath)
-    Write-Cause -Text 'omo reads [opencode].tmux.enabled with default(false) (index.js:89030), so a'
+    Write-Cause -Text 'omo reads [opencode].tmux.enabled with default(false) (index.js:89108), so a'
     Write-Cause -Text 'false value is not an error -- it silently produces zero panes.'
     Write-Fix   -Text ('set ' + $configKey + ' = true in ' + $ConfigPath)
     Write-Fix   -Text 'this doctor does not edit the config for you, on purpose.'
@@ -980,9 +980,9 @@ $anchors = @(
     [pscustomobject]@{ Line = 9079;  Text = 'async function findVerifiedTmuxPath() {' }
     [pscustomobject]@{ Line = 9085;  Text = 'const verifyProc = spawn([path, "-V"], {' }
     [pscustomobject]@{ Line = 9091;  Text = 'if (verifyExitCode !== 0) {' }
-    [pscustomobject]@{ Line = 89030; Text = 'enabled: z49.boolean().default(false),' }
-    [pscustomobject]@{ Line = 156488; Text = 'function resolveServerUrl(rawServerUrl, env, log) {' }
-    [pscustomobject]@{ Line = 156498; Text = 'log("[tmux-session-manager] ctx.serverUrl has port 0; falling back. "' }
+    [pscustomobject]@{ Line = 89108; Text = 'enabled: z50.boolean().default(false),' }
+    [pscustomobject]@{ Line = 156566; Text = 'function resolveServerUrl(rawServerUrl, env, log) {' }
+    [pscustomobject]@{ Line = 156576; Text = 'log("[tmux-session-manager] ctx.serverUrl has port 0; falling back. "' }
 )
 $indexPath = ''
 if ($pkgPath -ne '') { $indexPath = Join-Path (Split-Path $pkgPath -Parent) 'dist\index.js' }

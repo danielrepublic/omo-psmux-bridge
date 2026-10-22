@@ -117,7 +117,7 @@ lives and where it keeps living.
 $HOME/.cache/opencode/packages/oh-my-openagent@latest/node_modules/oh-my-openagent/dist/index.js
 ```
 
-**Which version this document was last verified against:** **5.1.40**, read from
+**Which version this document was last verified against:** **5.1.42**, read from
 that package's own `package.json`. This number is a *record of a past
 verification*, not an install instruction, and the two must not be confused —
 that confusion is what made the pin unusable before.
@@ -127,8 +127,8 @@ that confusion is what made the pin unusable before.
 
 | installed in `@latest` | `omo.verifiedAgainst` | result |
 |---|---|---|
-| 5.1.40 | 5.1.40 | clean |
-| 5.1.41 | 5.1.40 | `PIN_DRIFT`, naming both |
+| 5.1.42 | 5.1.42 | clean |
+| 5.1.43 | 5.1.42 | `PIN_DRIFT`, naming both |
 
 **A `PIN_DRIFT` on the OmO side is routine, not an incident.** OmO ships with the
 agent and moves to a new version often, so `@latest` will outrun this document
@@ -320,13 +320,43 @@ branches were already present at `5.1.35`; they are not a consequence of this
 upgrade, they only move with the region they sit in. No new gate is introduced
 by `5.1.40`.
 
-**The zod aliases did not churn this time.** The note below predicted that the
-four zod-alias citations would change again on the next release, because the
-alias number is a bundler artefact rather than a name. That prediction is
-**falsified at `5.1.40`**: `z45` and `z49` are the same aliases in both
-bundles, and those four citations resolve unchanged apart from the relocation.
-The prediction still stands as a *risk*, not as a schedule: the aliases are
-generated, and `PIN_DRIFT` naming them is the honest outcome when they move.
+**The zod aliases did not churn at `5.1.40` -- but they did at `5.1.42`.** The
+note below predicted that the four zod-alias citations would change again on
+the next release, because the alias number is a bundler artefact rather than a
+name. That prediction did not fire at `5.1.40`: `z45` and `z49` were the same
+aliases in both bundles, and those four citations resolved unchanged apart from
+the relocation. It **did** fire at `5.1.42`, where the eighth discrepancy below
+records `z45`→`z46` and `z49`→`z50`: those four citations now name the new
+aliases. The prediction therefore stands as a recurring risk, not a one-off:
+the aliases are generated, and `PIN_DRIFT` naming them is the honest outcome
+when they move.
+
+**Eighth discrepancy, recorded 2026-10-23.** The tree reached **`5.1.42`**.
+Of the 90 OmO citations, **84 stayed on their existing lines and 6 moved**:
+no claim needed rewriting, and the tmux grammar region is byte-identical
+between the two bundles, so no `src/*.ts` behaviour change was needed or made.
+The six movers all shift by a uniform **+78**, the same kind of regional
+bundler relocation recorded for the previous release:
+
+- **4** are the zod-schema rows. Two alias renames account for all four text
+  changes: `z45`→`z46` at `index.js:88956` (now `index.js:89034`) and
+  `index.js:88958` (now `index.js:89036`) in `TeamModeConfigSchema`, and
+  `z49`→`z50` at `index.js:89029` (now `index.js:89107`) and `index.js:89030`
+  (now `index.js:89108`) in `TmuxConfigSchema`. The schema bodies are otherwise
+  byte-identical, field for field and default for default.
+- **2** are pure line moves with no text change: `resolveServerUrl` from
+  `index.js:156488` to `index.js:156566`, and its port-0 fallback warning from
+  `index.js:156498` to `index.js:156576`. Both bodies are byte-identical.
+
+This **falsifies the "the zod aliases did not churn this time" claim recorded
+for `5.1.40`** above. That claim was true of that release; it is not a
+standing property of the bundle, and it did not survive the next one. The
+config-resolution helpers also renumbered nothing this pass: `join34` and the
+other import aliases cited in comments are unchanged, only their line numbers
+move with the `+72`/`+78` regional shifts. Nothing else this document depends
+on changed: the five payload verbs, the argv ordering, the `-e` auth
+environment, the layout commands, the `-F` rewrite target, every gate in
+section 4 and both schema bodies are unchanged as *behaviour*.
 
 **A note on the bare references in the dated paragraphs above.** A bare
 `` `index.js:NNNN` `` inside a discrepancy record names a line in the tree that
@@ -348,8 +378,10 @@ because the alias number is a bundler artefact rather than a name. That is the
 cost of quoting a generated identifier, and `PIN_DRIFT` naming it is the honest
 outcome — the alternative, quoting a shorter span that dodges the counter, would
 cite a fragment too small to carry the claim. The seventh discrepancy above
-records that the churn did **not** happen at `5.1.40`, so this is a standing
-risk rather than a schedule: the aliases survived that release unchanged.
+records that the churn did **not** happen at `5.1.40`; the eighth records that
+it **did** happen at `5.1.42` (`z45`→`z46`, `z49`→`z50`). This is therefore a
+recurring cost rather than a one-off: the aliases survived one release and
+moved on the next.
 
 ### 0.2 psmux
 
@@ -1148,10 +1180,10 @@ well-corroborated and their *consequences* as argued rather than demonstrated.
 OmO's team-mode visualization is gated separately from the subagent-pane gates
 in section 4. The config key is `team_mode.tmux_visualization`, off by default:
 
-- `index.js:88956` → `var TeamModeConfigSchema = z45.object({`
-- `index.js:88958` → `tmux_visualization: z45.boolean().default(false),`
+- `index.js:89034` → `var TeamModeConfigSchema = z46.object({`
+- `index.js:89036` → `tmux_visualization: z46.boolean().default(false),`
 
-(The schema runs to `index.js:88968`; the default is the whole of the gating
+(The schema runs to `index.js:89046`; the default is the whole of the gating
 fact.) When `resolveCallerTmuxSession` (`index.js:19581-19602`) returns null,
 no layout is attempted at all:
 
@@ -1368,8 +1400,8 @@ look identical from outside, which is why they are recorded together.
 
 ### 4.1 Gate one: config enabled
 
-- `index.js:89029` → `var TmuxConfigSchema = z49.object({`
-- `index.js:89030` → `enabled: z49.boolean().default(false),`
+- `index.js:89107` → `var TmuxConfigSchema = z50.object({`
+- `index.js:89108` → `enabled: z50.boolean().default(false),`
 
 Off by default. This is the reason a stock Windows OmO produces zero panes and
 no error.
@@ -1389,8 +1421,8 @@ that is enough, given psmux.
 
 - `index.js:8403` → `const serverRunning = await deps.isServerRunning(serverUrl);`
 - `index.js:8408` → `const tmux = await deps.getTmuxPath();`
-- `index.js:156488` → `function resolveServerUrl(rawServerUrl, env, log) {`
-- `index.js:156498` → `ctx.serverUrl has port 0; falling back.`
+- `index.js:156566` → `function resolveServerUrl(rawServerUrl, env, log) {`
+- `index.js:156576` → `ctx.serverUrl has port 0; falling back.`
 
 INFERRED: `resolveServerUrl` reads `OPENCODE_PORT` and otherwise falls back to a
 default, so on Windows an `opencode` that binds no explicit port produces a
@@ -1423,7 +1455,7 @@ being no error branch on that path.
 
 ### 4.5 There is no config field for the tmux binary
 
-`TmuxConfigSchema` (`index.js:89029`) has no path or binary field, and its
+`TmuxConfigSchema` (`index.js:89107`) has no path or binary field, and its
 generated JSON schema sets `additionalProperties: false`.
 
 INFERRED: therefore no OmO configuration key and no environment variable can
@@ -2487,7 +2519,7 @@ placeholder shell is switched to `pwsh`, that input is lossy on Windows PowerShe
 ## 14. Maintenance
 
 This document is only true of the oh-my-openagent recorded as
-`omo.verifiedAgainst` in `scripts/contract/pins.json` (**5.1.40** at this
+`omo.verifiedAgainst` in `scripts/contract/pins.json` (**5.1.42** at this
 revision) and of psmux **v3.3.8**. When either is upgraded:
 
 1. Run `bun run contract:fetch && bun run contract:verify`. This step used to be
