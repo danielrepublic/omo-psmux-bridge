@@ -31,8 +31,8 @@ $script:NS      = 'omo_t16'
 $script:Root    = "$env:TEMP\t16"
 $script:DirD    = "$env:TEMP\t16_D"
 $script:DirE    = "$env:TEMP\t16_E"
-$script:Launcher = "$env:LOCALAPPDATA\opencode-psmux-bridge\bin\psmux.cmd"
-$script:BridgeExe = "$env:LOCALAPPDATA\opencode-psmux-bridge\bin\tmux.exe"
+$script:Launcher = "$env:LOCALAPPDATA\omo-psmux-bridge\bin\psmux.cmd"
+$script:BridgeExe = "$env:LOCALAPPDATA\omo-psmux-bridge\bin\tmux.exe"
 $script:PsmuxHome = "$env:USERPROFILE\.psmux"
 
 # ---------------------------------------------------------------- C# ConPTY ---
@@ -471,7 +471,7 @@ function Get-UserPathEntries {
         raw          = $raw
         entry_count  = $entries.Count
         entries      = $entries
-        has_bridge   = (@($entries | Where-Object { $_ -like '*opencode-psmux-bridge*' }).Count -gt 0)
+        has_bridge   = (@($entries | Where-Object { $_ -like '*omo-psmux-bridge*' -or $_ -like '*opencode-psmux-bridge*' }).Count -gt 0)
     }
 }
 

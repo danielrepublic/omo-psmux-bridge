@@ -7,7 +7,7 @@
     "shim_expected_sha256": "990ad315391c5b2870c103fab8e8b49b1b6a19825ccf636bce4bf8cb5206f577",
     "real_relative_to_env": "psmux\\tmux.exe",
     "psmux_control_relative_to_env": "psmux\\psmux.exe",
-    "launcher_relative_to_env": "opencode-psmux-bridge\\bin\\psmux.cmd",
+    "launcher_relative_to_env": "omo-psmux-bridge\\bin\\psmux.cmd",
     "version_two_line_stdout_bytes": 44,
     "version_two_line_stdout_sha256": "3038810cad2c36912875ba34d09e47bfaa4f8f73e9238c790a8da9230b97e0b8",
     "rebuilt_from": "bun build --compile --target=bun-windows-x64 src/cli.ts --outfile dist/tmux.exe"
