@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    opencode-psmux-bridge one-line installer bootstrap.
+    omo-psmux-bridge one-line installer bootstrap.
 
 .DESCRIPTION
     The "paste one line into a terminal" path. This script is the whole of that
@@ -97,7 +97,7 @@ $apiBase = 'https://api.github.com/repos/' + $Repository + '/releases'
 $headers = @{
     # The GitHub API rejects a request with no User-Agent outright, and the
     # rejection is a 403 with a body that does not mention the real cause.
-    'User-Agent' = 'opencode-psmux-bridge-bootstrap'
+    'User-Agent' = 'omo-psmux-bridge-bootstrap'
     'Accept'     = 'application/vnd.github+json'
 }
 
@@ -201,7 +201,7 @@ try {
 # The archive is required to have exactly one top-level directory. Guessing which
 # directory holds bin\install.cmd would be the same class of mistake as the
 # one-liner this file replaced; refusing to guess is the point.
-$entryPoint = Join-Path $extractRoot 'opencode-psmux-bridge\bin\install.cmd'
+$entryPoint = Join-Path $extractRoot 'omo-psmux-bridge\bin\install.cmd'
 if (-not (Test-Path -LiteralPath $entryPoint)) {
     $found = @(Get-ChildItem -LiteralPath $extractRoot -Recurse -Filter 'install.cmd' -File -ErrorAction SilentlyContinue |
         ForEach-Object { $_.FullName })

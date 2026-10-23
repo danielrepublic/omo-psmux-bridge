@@ -1,10 +1,10 @@
 # ============================================================================
-#  release.yml -- produce the opencode-psmux-bridge win-x64 zip and publish it
+#  release.yml -- produce the omo-psmux-bridge win-x64 zip and publish it
 #                 as a GitHub release.
 #
 #  This is the repository's first CI workflow. It exists to make ONE guarantee
 #  that has no other enforcement point: that the .ps1/.cmd files shipped to
-#  %LOCALAPPDATA%\opencode-psmux-bridge are byte-identical to the tracked bytes
+#  %LOCALAPPDATA%\omo-psmux-bridge are byte-identical to the tracked bytes
 #  in this repository.
 #
 #  WHY THAT GUARANTEE NEEDS A GATE, not a convention
@@ -87,9 +87,9 @@ env:
   VERIFIED_PSMUX_VERSION: '3.3.8'
   # Single top-level directory inside the zip. Never a versioned name: the
   # install instructions and the doctor both resolve %LOCALAPPDATA%\
-  # opencode-psmux-bridge\bin, so the extracted folder name must be stable
+  # omo-psmux-bridge\bin, so the extracted folder name must be stable
   # across versions or every upgrade moves the target out from under PATH.
-  STAGE_PKG: 'opencode-psmux-bridge'
+  STAGE_PKG: 'omo-psmux-bridge'
 
 jobs:
   release:
@@ -217,7 +217,7 @@ jobs:
           # construction rather than by careful exclusion globs.
           STAGE_PARENT="$RUNNER_TEMP/stage"
           STAGE_PKG_DIR="$STAGE_PARENT/$STAGE_PKG"
-          ASSET_NAME="opencode-psmux-bridge-${TAG}-win-x64.zip"
+          ASSET_NAME="omo-psmux-bridge-${TAG}-win-x64.zip"
           ZIP_PATH="$RUNNER_TEMP/$ASSET_NAME"
 
           # The bootstrap is published under a VERSION-LESS name on purpose. It is
@@ -550,7 +550,7 @@ jobs:
 
       # -------------------------------------------------------------------------
       # Run from INSIDE $STAGE_PARENT so the archive's single top-level entry is
-      # opencode-psmux-bridge/. Zipping the package directory from the repo root
+      # omo-psmux-bridge/. Zipping the package directory from the repo root
       # instead would put the whole checkout in the user's download folder.
       - name: Create the release zip
         run: |
@@ -576,7 +576,7 @@ jobs:
           # directory into the stage still cannot ship Finder debris.
           #
           # -D stores no DIRECTORY entries. Without it `zip -r` records one entry
-          # per directory (`opencode-psmux-bridge/`, `.../bin/`, `.../runtime/`),
+          # per directory (`omo-psmux-bridge/`, `.../bin/`, `.../runtime/`),
           # and then `unzip -l` counts 14 entries against 11 files. The archive
           # would still be correct -- an extraction recreates the directories from
           # the file paths -- but a count that silently includes directories is not
@@ -629,7 +629,7 @@ jobs:
           set -euo pipefail
 
           {
-            echo "### opencode-psmux-bridge $TAG (win-x64)"
+            echo "### omo-psmux-bridge $TAG (win-x64)"
             echo
             echo "| fact | value |"
             echo "| --- | --- |"
@@ -677,7 +677,7 @@ jobs:
           DOWNLOAD_URL="$REPO_URL/releases/download/$TAG/$ASSET_NAME"
 
           {
-            printf '## opencode-psmux-bridge %s (win-x64)\n\n' "$TAG"
+            printf '## omo-psmux-bridge %s (win-x64)\n\n' "$TAG"
             printf 'Windows executable shim that answers to the name `tmux`, so the opencode\n'
             printf '`oh-my-openagent` (OmO) plugin opens subagent panes under **psmux** instead\n'
             printf 'of real tmux. No WSL, no Git Bash, no Cygwin.\n\n'
@@ -698,10 +698,10 @@ jobs:
 
           ### Contents
 
-          One top-level directory, `opencode-psmux-bridge/`, containing exactly these files:
+          One top-level directory, `omo-psmux-bridge/`, containing exactly these files:
 
           ```
-          opencode-psmux-bridge/
+          omo-psmux-bridge/
           ├── INSTALL.md
           ├── bin/
           │   ├── tmux.exe
@@ -758,27 +758,42 @@ jobs:
           there.
 
           **From the zip you just downloaded.** Extract it, then double-click
-          `opencode-psmux-bridge\bin\install.cmd` — or run it from a terminal:
+          `omo-psmux-bridge\bin\install.cmd`. From a **PowerShell** prompt you can also run:
 
           ```
-          & .\opencode-psmux-bridge\bin\install.cmd
+          & .\omo-psmux-bridge\bin\install.cmd
           ```
 
-          **Without downloading anything by hand.** Use the one-line command at the very
-          end of these notes. It fetches a small bootstrap script rather than the zip,
-          and the bootstrap does the downloading.
+          (In `cmd.exe` the equivalent is `.\omo-psmux-bridge\bin\install.cmd`. The `&`
+          call operator is PowerShell syntax and is a parse error in cmd.)
+
+          **Without downloading anything by hand.** Use the one-line PowerShell command at
+          the very end of these notes. It fetches a small bootstrap script rather than the
+          zip, and the bootstrap does the downloading.
 
           `install.ps1` **refuses** (exit 2, writes nothing) if a *different*
-          `opencode-psmux-bridge\bin` directory is already on your PATH, because owning the
+          `omo-psmux-bridge\bin` directory is already on your PATH, because owning the
           `psmux`/`tmux`/`opencode` names from two directories at once is a silent-failure
           factory. It never touches the machine (HKLM) PATH, never uses `setx`, preserves
           the registry value kind, and is idempotent. **Open a new terminal afterwards** —
           a running shell keeps its old environment.
 
+          ### Upgrading from `opencode-psmux-bridge`
+
+          Releases up to and including `v5.1.43-1` installed into
+          `%LOCALAPPDATA%\opencode-psmux-bridge`. Installing this release migrates that
+          installation: the old user PATH entry is replaced by
+          `%LOCALAPPDATA%\omo-psmux-bridge\bin` (the new entry is first, and there is still
+          exactly one bridge entry), and the old `state\` and `bin\state\` files are copied
+          into the new root without overwriting anything already there. The old directory
+          is left in place on purpose — a psmux server that was already running may still
+          hold files under it. Close those sessions yourself before deleting the old folder;
+          this installer never stops a psmux session.
+
           ### Uninstall
 
           ```
-          powershell -NoProfile -ExecutionPolicy Bypass -File "%LOCALAPPDATA%\opencode-psmux-bridge\bin\uninstall.ps1"
+          powershell -NoProfile -ExecutionPolicy Bypass -File "%LOCALAPPDATA%\omo-psmux-bridge\bin\uninstall.ps1"
           ```
 
           It removes only that one PATH entry, leaves every other entry in its original
@@ -802,14 +817,17 @@ jobs:
           # parse. Both defects only ever appear on somebody else's machine. The
           # complexity lives in a reviewed, testable file instead of a string.
           {
-            printf '\n### Install in one line\n\n'
-            printf 'Open a terminal (PowerShell or cmd) and paste this single line:\n\n'
+            printf '\n### Install in one line (PowerShell)\n\n'
+            printf 'Open **PowerShell** (not `cmd.exe`) and paste this single line:\n\n'
             printf '```\n'
             printf 'iwr -useb %s -OutFile "$env:TEMP\\omo-bridge-install.ps1"; powershell -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\\omo-bridge-install.ps1"\n' "$BOOTSTRAP_URL"
             printf '```\n\n'
             printf 'That fetches the newest published release, prints the archive size and its\n'
             printf 'sha256, unpacks it somewhere disposable, runs the installer, and removes\n'
-            printf 'its own temp files. It needs no git, no bun, and no admin rights.\n'
+            printf 'its own temp files. It needs no git, no bun, and no admin rights.\n\n'
+            printf '`iwr` and `$env:TEMP` are PowerShell syntax: this line does **not** work in\n'
+            printf '`cmd.exe`. If you are already in cmd, run `powershell` first and paste the line\n'
+            printf 'at the new prompt.\n'
           } >> "$NOTES_FILE"
 
           if [ -n "${MISSING_OPTIONAL:-}" ]; then
@@ -910,7 +928,7 @@ jobs:
           gh release create "$TAG" "$ZIP_PATH" "$BOOTSTRAP_PATH" \
             --repo "${{ github.repository }}" \
             --target "$GITHUB_SHA" \
-            --title "opencode-psmux-bridge $TAG (win-x64)" \
+            --title "omo-psmux-bridge $TAG (win-x64)" \
             --notes-file "$RUNNER_TEMP/release-notes.md"
 
           echo "[release] published $TAG -> https://github.com/${{ github.repository }}/releases/tag/$TAG"
