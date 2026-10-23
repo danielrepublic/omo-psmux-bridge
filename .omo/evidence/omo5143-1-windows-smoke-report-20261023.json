@@ -1,0 +1,269 @@
+{
+  "tool": "omo5143-1-windows-smoke-20261023.cjs",
+  "ok": true,
+  "versions": {
+    "node": "v24.19.0",
+    "omo": "5.1.43",
+    "omoPackagePath": "C:\\Users\\Daniel\\.cache\\opencode\\packages\\oh-my-openagent@latest\\node_modules\\oh-my-openagent\\package.json",
+    "opencode": "1.19.4",
+    "mux": "tmux 3.4.0\npsmux 3.4.0 (20aa1d7 2026-10-13)",
+    "doctor": "(see report)"
+  },
+  "namespace": "omo-v5143-1-34012727209",
+  "port": 57776,
+  "assertions": [
+    {
+      "name": "bridge-tmux-exe-present",
+      "pass": true,
+      "detail": "C:\\Users\\Daniel\\AppData\\Local\\opencode-psmux-bridge\\bin\\tmux.exe"
+    },
+    {
+      "name": "opencode-exe-present",
+      "pass": true,
+      "detail": "C:\\Users\\Daniel\\AppData\\Roaming\\npm\\node_modules\\opencode-ai\\bin\\opencode.exe"
+    },
+    {
+      "name": "omo-package-5.1.43",
+      "pass": true,
+      "detail": "C:\\Users\\Daniel\\.cache\\opencode\\packages\\oh-my-openagent@latest\\node_modules\\oh-my-openagent\\package.json version=5.1.43"
+    },
+    {
+      "name": "opencode-version-1.19.4",
+      "pass": true,
+      "detail": "1.19.4"
+    },
+    {
+      "name": "mux-version-3.4.0",
+      "pass": true,
+      "detail": "tmux 3.4.0\npsmux 3.4.0 (20aa1d7 2026-10-13)"
+    },
+    {
+      "name": "serve-health-ok",
+      "pass": true,
+      "detail": "{healthy:true, version:1.19.4}"
+    },
+    {
+      "name": "serve-version-1.19.4",
+      "pass": true,
+      "detail": "1.19.4"
+    },
+    {
+      "name": "config-200",
+      "pass": true,
+      "detail": "GET /config -> 200"
+    },
+    {
+      "name": "agent-plugin-loaded",
+      "pass": true,
+      "detail": "24 agent(s), /^Sisyphus/ match required"
+    },
+    {
+      "name": "session-post-2xx",
+      "pass": true,
+      "detail": "POST /session -> 200"
+    },
+    {
+      "name": "session-id-captured",
+      "pass": true,
+      "detail": "id captured (30 chars, withheld)"
+    },
+    {
+      "name": "mux-new-session",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "mux-list-live-session",
+      "pass": true,
+      "detail": "live private session is discoverable"
+    },
+    {
+      "name": "launcher-list-live-session",
+      "pass": true,
+      "detail": "installed .cmd launcher discovers the same live private session"
+    },
+    {
+      "name": "mux-split-placeholder-5143-1",
+      "pass": true,
+      "detail": "pane=%2 %2\n"
+    },
+    {
+      "name": "pane-banner-marker",
+      "pass": true,
+      "detail": "banner line rendered"
+    },
+    {
+      "name": "pane-hostile-apos",
+      "pass": true,
+      "detail": "apostrophe literal"
+    },
+    {
+      "name": "pane-hostile-hash-dollar",
+      "pass": true,
+      "detail": "# and $ literal"
+    },
+    {
+      "name": "pane-hostile-backtick",
+      "pass": true,
+      "detail": "backticks literal"
+    },
+    {
+      "name": "pane-hostile-backslash",
+      "pass": true,
+      "detail": "backslashes literal"
+    },
+    {
+      "name": "pane-hint",
+      "pass": true,
+      "detail": "hint line rendered"
+    },
+    {
+      "name": "pane-no-interpolation",
+      "pass": true,
+      "detail": "$() kept literal, not expanded"
+    },
+    {
+      "name": "pane-no-side-effect",
+      "pass": true,
+      "detail": "canary absent: C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-smoke-sidefx-34012727209.marker"
+    },
+    {
+      "name": "mux-respawn-placeholder-5143-1",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "pane-respawn-banner",
+      "pass": true,
+      "detail": "respawned banner core rendered"
+    },
+    {
+      "name": "pane-respawn-meta",
+      "pass": true,
+      "detail": "respawned # and $ literal"
+    },
+    {
+      "name": "session-seeded-without-model-call",
+      "pass": true,
+      "detail": "POST context-only message -> HTTP 200"
+    },
+    {
+      "name": "mux-respawn-attach",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "pane-real-opencode-session",
+      "pass": true,
+      "detail": "unique context-only message rendered by the real attached OpenCode session"
+    },
+    {
+      "name": "mux-kill-pane",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "doctor-exit-0",
+      "pass": true,
+      "detail": "exit=0"
+    },
+    {
+      "name": "doctor-anchors-11/11",
+      "pass": true,
+      "detail": "11/11 frozen anchors"
+    },
+    {
+      "name": "cleanup-session-deleted",
+      "pass": true,
+      "detail": "DELETE /session/:id -> HTTP 200 (id withheld)"
+    },
+    {
+      "name": "cleanup-serve-child",
+      "pass": true,
+      "detail": "exit=null signal=SIGTERM"
+    },
+    {
+      "name": "cleanup-namespace-only",
+      "pass": true,
+      "detail": "kill-server -L omo-v5143-1-34012727209 exit=0; ns gone=true"
+    }
+  ],
+  "observations": [
+    {
+      "name": "start-process-read-direct-exe",
+      "detail": "exit=0 stdoutBytes=24 stderrBytes=0"
+    },
+    {
+      "name": "start-process-read-cmd-launcher",
+      "detail": "exit=0 stdoutBytes=24 stderrBytes=0"
+    },
+    {
+      "name": "known-limitation-issue2-doublequote",
+      "detail": "respawn \"q\" quotes dropped (matches GitHub issue #2: PS5.1 helper strips embedded doublequotes; scope is grammar+$/apos/# safety, not transport redesign)"
+    }
+  ],
+  "health": {
+    "healthy": true,
+    "version": "1.19.4"
+  },
+  "agents": [
+    "Sisyphus - ultraworker",
+    "Sisyphus - ultraworker",
+    "Hephaestus - Deep Agent",
+    "Hephaestus - Deep Agent",
+    "Prometheus - Plan Builder",
+    "Prometheus - Plan Builder",
+    "Atlas - Plan Executor",
+    "Atlas - Plan Executor",
+    "Metis - Plan Consultant",
+    "Metis - Plan Consultant",
+    "Momus - Plan Critic",
+    "Momus - Plan Critic",
+    "Sisyphus-Junior",
+    "Sisyphus-Junior",
+    "build",
+    "compaction",
+    "explore",
+    "general",
+    "librarian",
+    "multimodal-looker",
+    "oracle",
+    "plan",
+    "summary",
+    "title"
+  ],
+  "config": {
+    "status200": true,
+    "mentionsOmoPlugin": true
+  },
+  "session": {
+    "created": true,
+    "deleted": true
+  },
+  "paneSample": "┃\n  ┃  BRIDGE_ATTACH_34012727209\n  ┃\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n  ┃\n  ┃\n  ┃\n  ┃  Sisyphus - Ultraworker · GPT-6.1 Sol OpenAI · high\n  ╹▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀\n   C:\\Users\\Daniel                                                     tab agents  ctrl+p commands",
+  "cleanup": {
+    "sessionDelete": "HTTP 200",
+    "killServerScopedOnly": "exit=0",
+    "namespaceGone": true,
+    "serveChild": "exit=null signal=SIGTERM",
+    "noBareKillServer": true
+  },
+  "notes": "Protocol smoke: placeholder/split/respawn/real OpenCode attach/close + serve health/agent/session + doctor. No LLM subagent exercised; no model call made. Embedded-doublequote survival is a non-gating observation per GitHub issue #2 (PS5.1 default helper shell).",
+  "startProcessReadProbe": [
+    {
+      "route": "direct-exe",
+      "exit": 0,
+      "stdout": "omo-v5143-1-34012727209\n",
+      "stderr": "",
+      "wrapperStderr": ""
+    },
+    {
+      "route": "cmd-launcher",
+      "exit": 0,
+      "stdout": "omo-v5143-1-34012727209\n",
+      "stderr": "",
+      "wrapperStderr": ""
+    }
+  ],
+  "attachPaneSample": "┃\n  ┃  BRIDGE_ATTACH_34012727209\n  ┃\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n  ┃\n  ┃\n  ┃\n  ┃  Sisyphus - Ultraworker · GPT-6.1 Sol OpenAI · high\n  ╹▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀\n   C:\\Users\\Daniel                                                     tab agents  ctrl+p commands"
+}

@@ -390,7 +390,7 @@ $emptyFixtureDir = New-Dir (Join-Path $work 'registry-fixture-empty')
 # --- package fixtures for check 5 -------------------------------------------
 #
 # A synthetic bundle proves the drift DETECTOR works. It does not prove anything
-# about the real 5.1.42 bundle, and case J below is the one that does that, by
+# about the real 5.1.43 bundle, and case J below is the one that does that, by
 # reading the INSTALLED package tree read-only.
 function New-SyntheticBundle {
     param([string] $Root, [int] $DriftLine)

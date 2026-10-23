@@ -30,7 +30,7 @@
 //          must not be used to model loading.
 //
 // The SHIPPED citations are the CURRENT ones, verified against the installed
-// oh-my-openagent@5.1.42 bundle (dist/index.js):
+// oh-my-openagent@5.1.43 bundle (dist/index.js):
 //   86113-86129   resolveHomeDir / detectUserOmoJsonPath -- the user file rules
 //   86184         resolveOmoConfigPaths, the LOADER (86187 calls
 //                 detectUserOmoJsonPath); resolveUserOmoConfigPath (86117) is

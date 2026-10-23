@@ -4,8 +4,8 @@ A `tmux` shim, so that opencode's `oh-my-openagent` (OmO) plugin can open subage
 panes under [psmux](https://github.com/psmux/psmux) instead of real tmux. No WSL,
 no Git Bash, no Cygwin.
 
-Windows protocol smoke tested with **OpenCode v1 1.19.4**, **OmO 5.1.42**,
-and **psmux 3.4.0**. See the [runtime evidence](.omo/evidence/omo5142-windows-smoke-report-20261023.json)
+Windows protocol smoke tested with **OpenCode v1 1.19.4**, **OmO 5.1.43**,
+and **psmux 3.4.0**. See the [runtime evidence](.omo/evidence/omo5143-1-windows-smoke-report-20261023.json)
 for split, placeholder, respawn, real OpenCode attach, close, plugin loading,
 and doctor checks.
 This is not a full interactive-parity claim. The detailed source contract still

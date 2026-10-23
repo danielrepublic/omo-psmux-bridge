@@ -1,4 +1,4 @@
-// Regression coverage for the contracted 5.1.42 bridge-doctor anchors.
+// Regression coverage for the contracted 5.1.43 bridge-doctor anchors.
 // Both the version and the line/text pairs must match the installed bundle.
 //
 // WHAT THE PREVIOUS VERSION OF THIS FILE GOT WRONG, because it is the whole
@@ -90,7 +90,7 @@ function parseAnchors(source: string): Anchor[] {
 
 const shippedAnchors = parseAnchors(doctor);
 
-/** The 11 check-5 anchors, verified against the installed 5.1.42 dist/index.js. */
+/** The 11 check-5 anchors, verified against the installed 5.1.43 dist/index.js. */
 const EXPECTED_ANCHORS: ReadonlyArray<Anchor> = [
   { line: 8235, text: "function isInsideTmuxEnvironment(environment) {" },
   { line: 8275, text: "async function isServerRunning(serverUrl, options = {}) {" },
@@ -247,7 +247,7 @@ describe("bridge-doctor check-5 anchors match the contract as PAIRS", () => {
 
   test("no superseded 5.1.35-era anchor or citation survives", () => {
     // The 5.1.35 anchors were 8231 / 8271 / 8283 / 8399 / 8404 / 27072 /
-    // 156456 / 156466; 9079 / 9085 / 9091 did NOT move in the installed 5.1.42
+    // 156456 / 156466; 9079 / 9085 / 9091 did NOT move in the installed 5.1.43
     // bundle and are therefore not stale. Any of the eight reappearing as an
     // ANCHOR LINE means the refresh is incomplete.
     const staleLines = [8231, 8271, 8283, 8399, 8404, 27072, 156456, 156466];
@@ -324,7 +324,7 @@ describe("bridge-doctor frozen version", () => {
   test("the pin this file reads is the one the contract checker reads", () => {
     // If pins.json ever stops carrying omo.verifiedAgainst, this file would
     // silently start comparing against `undefined`.
-    expect(pins.omo.verifiedAgainst).toBe("5.1.42");
+    expect(pins.omo.verifiedAgainst).toBe("5.1.43");
     expect(pins.omo.bundleGlob).toContain("oh-my-openagent");
   });
 

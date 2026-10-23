@@ -81,7 +81,7 @@
 
 .PARAMETER FrozenOmoVersion
     The version CONTRACT.md is frozen against. Reported on every run. This is
-    5.1.42. CONTRACT.md section 0.1 states 5.1.17 "is not installed and must
+    5.1.43. CONTRACT.md section 0.1 states 5.1.17 "is not installed and must
     never be cited"; see check 5 for why the version-string comparison alone is
     insufficient and the line-anchor check is the load-bearing guard.
 
@@ -124,7 +124,7 @@ param(
     [string] $ConfigPath,
     [string] $PackageRoot,
     [string] $ExpectedShimSha256 = '9EA5E733FD78F4EA966A85A5CF062D1113C644FEFF80AD3B3084574c2BA2A858',
-    [string] $FrozenOmoVersion = '5.1.42',
+    [string] $FrozenOmoVersion = '5.1.43',
     [string[]] $KnownEquivalentOmoVersions = @(),
     [int]    $HealthTimeoutMs = 2000
 )

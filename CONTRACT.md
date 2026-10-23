@@ -117,7 +117,7 @@ lives and where it keeps living.
 $HOME/.cache/opencode/packages/oh-my-openagent@latest/node_modules/oh-my-openagent/dist/index.js
 ```
 
-**Which version this document was last verified against:** **5.1.42**, read from
+**Which version this document was last verified against:** **5.1.43**, read from
 that package's own `package.json`. This number is a *record of a past
 verification*, not an install instruction, and the two must not be confused —
 that confusion is what made the pin unusable before.
@@ -127,8 +127,8 @@ that confusion is what made the pin unusable before.
 
 | installed in `@latest` | `omo.verifiedAgainst` | result |
 |---|---|---|
-| 5.1.42 | 5.1.42 | clean |
-| 5.1.43 | 5.1.42 | `PIN_DRIFT`, naming both |
+| 5.1.43 | 5.1.43 | clean |
+| 5.1.44 | 5.1.43 | `PIN_DRIFT`, naming both |
 
 **A `PIN_DRIFT` on the OmO side is routine, not an incident.** OmO ships with the
 agent and moves to a new version often, so `@latest` will outrun this document
@@ -2519,7 +2519,7 @@ placeholder shell is switched to `pwsh`, that input is lossy on Windows PowerShe
 ## 14. Maintenance
 
 This document is only true of the oh-my-openagent recorded as
-`omo.verifiedAgainst` in `scripts/contract/pins.json` (**5.1.42** at this
+`omo.verifiedAgainst` in `scripts/contract/pins.json` (**5.1.43** at this
 revision) and of psmux **v3.3.8**. When either is upgraded:
 
 1. Run `bun run contract:fetch && bun run contract:verify`. This step used to be
