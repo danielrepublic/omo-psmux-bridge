@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -24,9 +24,10 @@ nativeTest("legacy installation migration preserves PATH ownership and state on 
       "-WorkDir", work,
     ], { encoding: "utf8", timeout: 60_000, windowsHide: true });
 
+    const reportPath = join(work, "install-migration-report.txt");
+    const report = existsSync(reportPath) ? readFileSync(reportPath, "utf8") : "<probe report missing>";
     expect(result.error).toBeUndefined();
-    expect({ status: result.status, stdout: result.stdout, stderr: result.stderr }).toMatchObject({ status: 0 });
-    const report = readFileSync(join(work, "install-migration-report.txt"), "utf8");
+    expect({ status: result.status, stdout: result.stdout, stderr: result.stderr, report }).toMatchObject({ status: 0 });
     const totals = /ASSERT TOTALS: pass=(\d+) fail=(\d+)/.exec(report);
     expect(totals).not.toBeNull();
     expect(Number(totals?.[1])).toBeGreaterThanOrEqual(30);

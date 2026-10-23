@@ -221,6 +221,15 @@ New-Item -ItemType Directory -Force -Path $emptyOld, $emptyNew | Out-Null
 $none = Copy-LegacyState -LegacyRoot $emptyOld -NewRoot $emptyNew
 Assert -Ok ($none.Copied -eq 0 -and $none.Skipped -eq 0 -and $none.Failed -eq 0) -Name 'state: a legacy root with no state directories is harmless'
 
+$aliasParent = Join-Path $stateRoot 'alias-parent'
+New-Item -ItemType Directory -Force -Path $aliasParent | Out-Null
+$aliasOld = Join-Path $aliasParent '..\opencode-psmux-bridge'
+$aliasNew = Join-Path $stateRoot 'alias-new'
+$alias = Copy-LegacyState -LegacyRoot $aliasOld -NewRoot $aliasNew
+Assert -Ok ($alias.Copied -eq 3 -and $alias.Failed -eq 0) -Name 'state: source aliases do not corrupt destination paths'
+Assert -Ok ((Get-Content -LiteralPath (Join-Path $aliasNew 'state\pane-legacy-only.jsonl') -Raw) -eq "old-legacy-only`n") -Name 'state: aliased source preserves the relative filename'
+Assert -Ok ((Get-Content -LiteralPath (Join-Path $aliasNew 'bin\state\shim-calls.jsonl') -Raw) -eq "old-call-log`n") -Name 'state: aliased source preserves bin state'
+
 Remove-Item -LiteralPath $stateRoot -Recurse -Force
 
 # =========================================================================== totals

@@ -235,11 +235,19 @@ function Copy-LegacyState {
         [pscustomobject]@{ From = (Join-Path $LegacyRoot 'state'); To = (Join-Path $NewRoot 'state') }
         [pscustomobject]@{ From = (Join-Path (Join-Path $LegacyRoot 'bin') 'state'); To = (Join-Path (Join-Path $NewRoot 'bin') 'state') }
     )
-    foreach ($pair in $pairs) {
+    $pending = New-Object 'System.Collections.Generic.Queue[object]'
+    foreach ($pair in $pairs) { $pending.Enqueue($pair) }
+    while ($pending.Count -gt 0) {
+        $pair = $pending.Dequeue()
         if (-not (Test-Path -LiteralPath $pair.From -PathType Container)) { continue }
-        foreach ($file in @(Get-ChildItem -LiteralPath $pair.From -Recurse -Force -File -ErrorAction SilentlyContinue)) {
-            $relative = $file.FullName.Substring($pair.From.Length).TrimStart('\', '/')
-            $dest = Join-Path $pair.To $relative
+        foreach ($file in @(Get-ChildItem -LiteralPath $pair.From -Force -ErrorAction Stop)) {
+            # Enumeration expands 8.3 aliases; source-prefix lengths need not
+            # match FullName. Build destinations from entry names instead.
+            $dest = Join-Path $pair.To $file.Name
+            if ($file.PSIsContainer) {
+                $pending.Enqueue([pscustomobject]@{ From = $file.FullName; To = $dest })
+                continue
+            }
             if (Test-Path -LiteralPath $dest) {
                 $skipped++
                 continue
