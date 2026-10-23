@@ -17,7 +17,7 @@ if ([string]::IsNullOrEmpty($HarnessDir)) {
 }
 if ([string]::IsNullOrEmpty($BridgeBin)) {
     $cand = @()
-    if (-not [string]::IsNullOrEmpty($env:LOCALAPPDATA)) { $cand += (Join-Path $env:LOCALAPPDATA 'opencode-psmux-bridge\bin') }
+    if (-not [string]::IsNullOrEmpty($env:LOCALAPPDATA)) { $cand += (Join-Path $env:LOCALAPPDATA 'omo-psmux-bridge\bin') }
     $repoBin = Join-Path (Split-Path $HarnessDir -Parent) 'bin'
     if (Test-Path -LiteralPath (Join-Path $repoBin 'bridge-doctor.ps1')) { $cand += $repoBin }
     foreach ($c in $cand) {
@@ -266,9 +266,10 @@ $shimStub = Write-File (Join-Path $fixtureBin 'tmux.exe') "bridge-doctor-harness
 $shimHash = (Get-FileHash -LiteralPath $shimStub -Algorithm SHA256).Hash
 $shimBytes = (Get-Item -LiteralPath $shimStub).Length
 
-# A genuinely DIFFERENT bridge bin dir, named so that the doctor's
-# `Test-BridgeBinEntry` regex matches it. Used to prove the shadow WARN still
-# fires once the self-match is gone.
+# A genuinely DIFFERENT bridge bin dir, named with the LEGACY project name so
+# that this case proves the doctor still recognizes a pre-rename directory as a
+# second owner. The doctor's `Test-BridgeBinEntry` must match both names, and
+# the self-match skip must not swallow this one.
 $shadowBin = New-Dir (Join-Path $work 'shadow\opencode-psmux-bridge\bin')
 Write-File (Join-Path $shadowBin 'tmux.exe') 'shadow bin stub' | Out-Null
 
@@ -594,7 +595,7 @@ Assert -Ok ($ca.Text -match ('contract_frozen_version=' + $contractVersion)) -Na
 Assert -Ok ($ca.Text -match ('installed_version=' + $contractVersion)) -Name 'A: check 5 read the installed version from the fixture package.json'
 Assert -Ok ($ca.Text -match 'verdict=PASS') -Name 'A: machine-readable verdict=PASS'
 Assert -Ok (-not ($ca.Text -match '\[FAIL \]')) -Name 'A: no FAIL marker anywhere in the output'
-Assert -Ok (-not ($ca.Text -match 'another opencode-psmux-bridge')) -Name 'A: the doctor does NOT warn about a bridge bin dir when only its own bin dir is on PATH'
+Assert -Ok (-not ($ca.Text -match 'another bridge bin directory')) -Name 'A: the doctor does NOT warn about a bridge bin dir when only its own bin dir is on PATH'
 Assert -Ok (@(Get-WarnLines -Text $ca.Text).Count -eq 0) -Name 'A: a healthy host produces ZERO WARN lines'
 Assert -Ok ($ca.Text -match 'false_negative=\(heuristic\) a server started after the install but before a PATH change will NOT be detected\.') -Name 'A: stale-server false-negative stated in ONE line, verbatim'
 Assert -Ok ($ca.Text -match '\[PASS \] 2 STALE-SERVER \(heuristic\)') -Name 'A: check 2 PASS verdict is labelled (heuristic)'
@@ -690,7 +691,8 @@ Assert -Ok ($ch.Text -match 'never run this doctor from a shell started before t
 # ------------------------------------------------- I: a genuine shadow bin
 if ($byName.ContainsKey('I-shadowbin')) {
 $ci = $byName['I-shadowbin']
-Assert -Ok ($ci.Text -match 'another opencode-psmux-bridge\\bin is on the PATH') -Name 'I: a SECOND, DIFFERENT bridge bin dir still raises the shadow WARN'
+Assert -Ok ($ci.Text -match 'another bridge bin directory is on the PATH') -Name 'I: a SECOND, DIFFERENT bridge bin dir still raises the shadow WARN'
+Assert -Ok ($ci.Text -match 'opencode-psmux-bridge') -Name 'I: the legacy-named shadow is recognized as bridge-owned, not as an unrelated directory'
 Assert -Ok ($ci.Text -match ([regex]::Escape($shadowBin))) -Name 'I: the WARN names the offending directory'
 Assert -Ok (-not ($ci.Text -match ([regex]::Escape('on the PATH: ' + $fixtureBin)))) -Name 'I: the WARN does not name the doctor own bin dir'
 Assert -Ok ($ci.Text -match '\[PASS \] 1 PATH ownership') -Name 'I: a shadowed-but-correctly-ordered PATH still PASSes check 1'

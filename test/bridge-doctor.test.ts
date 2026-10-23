@@ -387,9 +387,9 @@ describe("Write-* calls parenthesise every concatenation", () => {
 
 describe("bridge-doctor PATH shadow detection excludes its own bin dir", () => {
   // Measured in the native baseline on a correctly installed host:
-  //   bin_dir=C:\Users\Daniel\AppData\Local\opencode-psmux-bridge\bin
-  //   WARN  another opencode-psmux-bridge\bin is on the PATH:
-  //         C:\Users\Daniel\AppData\Local\opencode-psmux-bridge\bin
+  //   bin_dir=C:\Users\Daniel\AppData\Local\omo-psmux-bridge\bin
+  //   WARN  another bridge bin directory is on the PATH:
+  //         C:\Users\Daniel\AppData\Local\omo-psmux-bridge\bin
   // The warning named the doctor's own directory. A false WARN on a healthy
   // machine teaches the reader to ignore WARNs.
   test("the loop skips an entry that IS $BinDir", () => {

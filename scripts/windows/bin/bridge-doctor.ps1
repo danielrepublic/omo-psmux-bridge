@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    opencode-psmux bridge doctor -- read-only preflight that names WHICH silent
+    omo-psmux-bridge doctor -- read-only preflight that names WHICH silent
     failure is responsible for a subagent pane that never appears.
 
 .DESCRIPTION
@@ -202,9 +202,13 @@ function Get-PathEntries {
     return @($Raw -split ';' | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' })
 }
 
+# Both the current name and the pre-rename one are bridge-owned. Recognizing
+# both is what makes the shadow check truthful during the upgrade window: the
+# legacy directory is still a second owner even though it is no longer the
+# default install root.
 function Test-BridgeBinEntry {
     param([string] $Entry)
-    return [bool] ((Get-NormalizedPath $Entry) -imatch '(?i)[\\/](opencode-psmux-bridge)[\\/]bin$')
+    return [bool] ((Get-NormalizedPath $Entry) -imatch '(?i)[\\/](?:omo-psmux-bridge|opencode-psmux-bridge)[\\/]bin$')
 }
 
 function Get-Sha256 {
@@ -313,7 +317,7 @@ function Invoke-RawHttpGet {
                'Host: ' + $Host_ + ':' + $Port + "`r`n" +
                "Accept: */*`r`n" +
                "Connection: close`r`n" +
-               "User-Agent: opencode-psmux-bridge-doctor`r`n`r`n"
+               "User-Agent: omo-psmux-bridge-doctor`r`n`r`n"
         $bytes = [System.Text.Encoding]::ASCII.GetBytes($req)
         $stream.Write($bytes, 0, $bytes.Length)
         $stream.Flush()
@@ -485,7 +489,7 @@ if ([string]::IsNullOrEmpty($BinDir)) { $BinDir = $PSScriptRoot }
 if ([string]::IsNullOrEmpty($BinDir) -and -not [string]::IsNullOrEmpty($MyInvocation.MyCommand.Path)) {
     $BinDir = [System.IO.Path]::GetDirectoryName($MyInvocation.MyCommand.Path)
 }
-if ([string]::IsNullOrEmpty($BinDir)) { $BinDir = Join-Path $env:LOCALAPPDATA 'opencode-psmux-bridge\bin' }
+if ([string]::IsNullOrEmpty($BinDir)) { $BinDir = Join-Path $env:LOCALAPPDATA 'omo-psmux-bridge\bin' }
 $BinDir = Get-NormalizedPath $BinDir
 $ShimPath = Join-Path $BinDir 'tmux.exe'
 
@@ -516,7 +520,7 @@ function Add-Failure {
 # --------------------------------------------------------------------------- banner
 
 Write-Rule
-Write-Line -Text (' opencode-psmux bridge doctor  --  read-only preflight') -Prefix ''
+Write-Line -Text (' omo-psmux-bridge doctor  --  read-only preflight') -Prefix ''
 Write-Line -Text (' run_at_utc=' + (Get-IsoUtc (Get-Date)) + '  run_at_local=' + (Get-Date).ToString("yyyy-MM-dd'T'HH:mm:sszzz") + '  host=' + $env:COMPUTERNAME + '  powershell=' + $PSVersionTable.PSVersion.ToString())
 Write-Line -Text ' READ-ONLY: writes nothing, kills nothing, fixes nothing, starts nothing.'
 Write-Line -Text ' No credential is printed: 3 named variables are read, none is enumerated.'
@@ -557,9 +561,10 @@ for ($i = 0; $i -lt $processEntries.Count; $i++) {
     $isOwnBinDir = Get-SamePath $e $BinDir
     if ($isOwnBinDir) { if ($binIndexEffective -lt 0) { $binIndexEffective = $i } }
     # SHADOW DETECTION SKIPS THE DOCTOR'S OWN BIN DIRECTORY. `Test-BridgeBinEntry`
-    # matches any `...\opencode-psmux-bridge\bin`, and the standard install IS such a
-    # path -- so on a correctly installed host the check warned
-    #   WARN another opencode-psmux-bridge\bin is on the PATH: C:\...\opencode-psmux-bridge\bin
+    # matches any `...\omo-psmux-bridge\bin` or legacy `...\opencode-psmux-bridge\bin`,
+    # and the standard install IS such a path -- so on a correctly installed host the
+    # check warned
+    #   WARN another bridge bin directory is on the PATH: C:\...\omo-psmux-bridge\bin
     # naming the very directory printed as bin_dir two lines earlier. A false WARN on a
     # healthy machine trains the reader to ignore WARNs, which is worse than not
     # warning at all. Only a genuinely DIFFERENT directory qualifies, and each one is
@@ -603,7 +608,7 @@ if ($shimExists) {
 }
 
 if ($shadowsTmux.Count -gt 0) {
-    Write-Warn  -Text ('another opencode-psmux-bridge\bin is on the PATH: ' + ($shadowsTmux -join ' | '))
+    Write-Warn  -Text ('another bridge bin directory is on the PATH: ' + ($shadowsTmux -join ' | '))
     Write-Cause -Text 'two directories owning the tmux/psmux names is a silent-failure factory'
 }
 
