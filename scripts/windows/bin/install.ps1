@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Put the opencode-psmux-bridge bin directory FIRST on the USER PATH.
+    Put the omo-psmux-bridge bin directory FIRST on the USER PATH.
 
 .DESCRIPTION
     One reversible machine change: exactly one entry prepended to the *user* PATH.
@@ -12,10 +12,15 @@
         rewrites REG_SZ over REG_EXPAND_SZ.
       * The registry value kind is preserved, so a REG_EXPAND_SZ PATH stays one.
       * Idempotent: running it twice leaves exactly one entry, first.
-      * It REFUSES (exit 2, writes nothing) if a *different*
-        opencode-psmux-bridge\bin directory is already on the PATH, because
-        owning the `psmux`/`tmux`/`opencode` names from two directories at once
-        is a silent-failure factory.
+      * It REFUSES (exit 2, writes nothing to PATH) if a *different* bridge bin
+        directory is already on the PATH, because owning the
+        `psmux`/`tmux`/`opencode` names from two directories at once is a
+        silent-failure factory.
+      * It upgrades an installation made before the project rename: a legacy
+        opencode-psmux-bridge\bin user PATH entry is replaced by the new entry
+        (never duplicated), and legacy state files are copied into the new root
+        without overwriting anything already there. The legacy directory is
+        retained; a running psmux server is never stopped or otherwise touched.
       * `setx`-free, no `~/.psmux.conf` touch, no machine PATH touch.
 
 .PARAMETER SourceRoot
@@ -24,7 +29,7 @@
     already-installed tree alike.
 
 .PARAMETER InstallRoot
-    Directory to install into. Defaults to %LOCALAPPDATA%\opencode-psmux-bridge,
+    Directory to install into. Defaults to %LOCALAPPDATA%\omo-psmux-bridge,
     which is also the path the shim derives its own state directory from.
 
 .OUTPUTS
@@ -37,8 +42,8 @@
 param(
     # Where the payload currently is: the directory holding bin\ and runtime\.
     # Defaults to the parent of this script's own directory, which is correct both
-    # for an extracted release zip (opencode-psmux-bridge\bin\install.ps1) and for
-    # an already-installed tree (%LOCALAPPDATA%\opencode-psmux-bridge\bin\...).
+    # for an extracted release zip (omo-psmux-bridge\bin\install.ps1) and for
+    # an already-installed tree (%LOCALAPPDATA%\omo-psmux-bridge\bin\...).
     [string] $SourceRoot,
 
     # Where the payload is going. Defaults to the documented install location,
@@ -134,11 +139,14 @@ function Split-PathEntries {
 }
 
 # A bridge bin entry is anything whose last two segments are
-# `opencode-psmux-bridge\bin`, regardless of which user profile it lives in.
+# `omo-psmux-bridge\bin` or the pre-rename `opencode-psmux-bridge\bin`,
+# regardless of which user profile it lives in. Recognizing BOTH names is what
+# lets an in-place upgrade identify the old owner instead of refusing it as a
+# foreign install; every other bridge bin directory is still foreign.
 function Test-BridgeBinEntry {
     param([string] $Entry)
     $norm = $Entry.Trim().TrimEnd('\', '/')
-    return [bool] ($norm -imatch '(?i)[\\/](opencode-psmux-bridge)[\\/]bin$')
+    return [bool] ($norm -imatch '(?i)[\\/](?:omo-psmux-bridge|opencode-psmux-bridge)[\\/]bin$')
 }
 
 function Get-SamePath {
@@ -146,6 +154,107 @@ function Get-SamePath {
     $na = $A.Trim().TrimEnd('\', '/').Replace('/', '\')
     $nb = $B.Trim().TrimEnd('\', '/').Replace('/', '\')
     return [string]::Equals($na, $nb, [System.StringComparison]::OrdinalIgnoreCase)
+}
+
+# A bridge bin entry is foreign when it is neither the target this run is
+# installing into nor the exact legacy default that a default-root upgrade is
+# replacing. Keeping this as a named function makes the refusal rule testable
+# without a registry: the native harness feeds it lists and asserts the answer.
+function Get-ForeignBridgeBinEntries {
+    param(
+        [string[]] $Entries,
+        [string] $Target,
+        [string] $LegacyTarget = ''
+    )
+    return @($Entries | Where-Object {
+        (Test-BridgeBinEntry $_) -and
+        -not (Get-SamePath $_ $Target) -and
+        -not ((-not [string]::IsNullOrEmpty($LegacyTarget)) -and (Get-SamePath $_ $LegacyTarget))
+    })
+}
+
+# Build the new user PATH list, keeping the invariants that make the bridge
+# own its command names:
+#   * the new target is FIRST, exactly as every earlier installer left it;
+#   * every occurrence of the target is removed before it is prepended, so an
+#     idempotent re-run cannot create duplicates;
+#   * every occurrence of the legacy target is removed too, so an upgrade from
+#     opencode-psmux-bridge leaves ONE owner, not two;
+#   * every other entry keeps its relative order.
+# This is a pure function so the native harness can exercise the upgrade shape
+# without writing a registry value.
+function Get-MigratedUserPath {
+    param(
+        [string[]] $Entries,
+        [string] $Target,
+        [string] $LegacyTarget = ''
+    )
+    $kept = New-Object System.Collections.ArrayList
+    $targetDuplicates = 0
+    $legacyReplaced = 0
+    foreach ($entry in @($Entries)) {
+        if (Get-SamePath $entry $Target) {
+            $targetDuplicates++
+            continue
+        }
+        if ((-not [string]::IsNullOrEmpty($LegacyTarget)) -and (Get-SamePath $entry $LegacyTarget)) {
+            $legacyReplaced++
+            continue
+        }
+        [void]$kept.Add($entry)
+    }
+    return [pscustomobject]@{
+        Entries                 = @($Target) + $kept.ToArray()
+        TargetDuplicatesRemoved = $targetDuplicates
+        LegacyReplaced          = $legacyReplaced
+    }
+}
+
+# Copy the pre-rename installation's state into the new root.
+#
+# State is the one thing an upgrade must not lose: `state\` holds the per-pane
+# helper traces and `bin\state\shim-calls.jsonl` is the shim's call log. Both
+# live under the installation root, so they move with it.
+#
+# Copy-if-absent, recursively:
+#   * a file already present in the new root is NEVER overwritten, so an
+#     interrupted run, a re-run, or state created by the new install wins;
+#   * nothing under the old root is moved or deleted. A psmux server started
+#     before the upgrade may still hold files there, and this installer never
+#     stops a psmux session. The old directory is left for the user to remove
+#     after those sessions are closed.
+function Copy-LegacyState {
+    param(
+        [string] $LegacyRoot,
+        [string] $NewRoot
+    )
+    $copied = 0
+    $skipped = 0
+    $failed = 0
+    $pairs = @(
+        [pscustomobject]@{ From = (Join-Path $LegacyRoot 'state'); To = (Join-Path $NewRoot 'state') }
+        [pscustomobject]@{ From = (Join-Path (Join-Path $LegacyRoot 'bin') 'state'); To = (Join-Path (Join-Path $NewRoot 'bin') 'state') }
+    )
+    foreach ($pair in $pairs) {
+        if (-not (Test-Path -LiteralPath $pair.From -PathType Container)) { continue }
+        foreach ($file in @(Get-ChildItem -LiteralPath $pair.From -Recurse -Force -File -ErrorAction SilentlyContinue)) {
+            $relative = $file.FullName.Substring($pair.From.Length).TrimStart('\', '/')
+            $dest = Join-Path $pair.To $relative
+            if (Test-Path -LiteralPath $dest) {
+                $skipped++
+                continue
+            }
+            try {
+                New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dest) | Out-Null
+                Copy-Item -LiteralPath $file.FullName -Destination $dest -ErrorAction Stop
+                $copied++
+            } catch {
+                $failed++
+                Write-Line ('[install] legacy_state_failed=' + $file.FullName + ' reason=' + $_.Exception.Message)
+            }
+        }
+    }
+    return [pscustomobject]@{ Copied = $copied; Skipped = $skipped; Failed = $failed }
 }
 
 # --------------------------------------------------------------------------- prerequisites
@@ -423,13 +532,19 @@ function Read-OmoTmuxEnabled {
 #
 #   $SourceRoot   where the payload is right now. The parent of this script's own
 #                 directory, which is correct for all three shapes this script runs
-#                 in -- a release zip (opencode-psmux-bridge\bin\install.ps1), the
+#                 in -- a release zip (omo-psmux-bridge\bin\install.ps1), the
 #                 repository (scripts\windows\bin\install.ps1), and an
 #                 already-installed tree.
 #   $InstallRoot  where the payload is going, and the only directory that goes on
-#                 PATH. %LOCALAPPDATA%\opencode-psmux-bridge, which is also the
+#                 PATH. %LOCALAPPDATA%\omo-psmux-bridge, which is also the
 #                 path the shim derives its own state\ directory from, so the two
 #                 must agree or the call log lands somewhere nobody looks.
+#
+# The pre-rename root, %LOCALAPPDATA%\opencode-psmux-bridge, is a REAL shipped
+# contract: every release through v5.1.43-1 installed there. It is not a guess
+# and it is not optional. It is read only when this is a default-root install, so
+# an explicit -InstallRoot keeps the old "refuse a different bridge on PATH"
+# behaviour instead of silently rewriting a custom layout.
 if ([string]::IsNullOrEmpty($SourceRoot)) {
     $SourceRoot = $PSScriptRoot
 }
@@ -444,14 +559,18 @@ if ([string]::IsNullOrEmpty($SourceRoot)) {
     Write-Line '[install] reason=sourceroot_unavailable'
     exit 1
 }
+$defaultInstallRoot = ''
+if (-not [string]::IsNullOrEmpty($env:LOCALAPPDATA)) {
+    $defaultInstallRoot = Join-Path $env:LOCALAPPDATA 'omo-psmux-bridge'
+}
 if ([string]::IsNullOrEmpty($InstallRoot)) {
-    if ([string]::IsNullOrEmpty($env:LOCALAPPDATA)) {
+    if ([string]::IsNullOrEmpty($defaultInstallRoot)) {
         Write-Line '[install] RESULT=FAILED'
         Write-Line '[install] reason=localappdata_unavailable'
         Write-Line '[install] detail=neither -InstallRoot nor %LOCALAPPDATA% is set, so the install location is undetermined. Pass -InstallRoot explicitly.'
         exit 1
     }
-    $InstallRoot = Join-Path $env:LOCALAPPDATA 'opencode-psmux-bridge'
+    $InstallRoot = $defaultInstallRoot
 }
 
 try {
@@ -460,6 +579,17 @@ try {
     $installRuntime = Join-Path $installRootFull 'runtime'
     $sourceBinFull = [System.IO.Path]::GetFullPath((Join-Path $SourceRoot 'bin')).TrimEnd('\')
     $sourceRuntimeFull = [System.IO.Path]::GetFullPath((Join-Path $SourceRoot 'runtime')).TrimEnd('\')
+
+    $isDefaultInstallRoot = $false
+    if (-not [string]::IsNullOrEmpty($defaultInstallRoot)) {
+        $isDefaultInstallRoot = Get-SamePath $installRootFull ([System.IO.Path]::GetFullPath($defaultInstallRoot).TrimEnd('\'))
+    }
+    $legacyInstallRoot = ''
+    $legacyTarget = ''
+    if ($isDefaultInstallRoot -and -not [string]::IsNullOrEmpty($env:LOCALAPPDATA)) {
+        $legacyInstallRoot = Join-Path $env:LOCALAPPDATA 'opencode-psmux-bridge'
+        $legacyTarget = [System.IO.Path]::GetFullPath((Join-Path $legacyInstallRoot 'bin')).TrimEnd('\')
+    }
 } catch {
     Write-Line '[install] RESULT=FAILED'
     Write-Line ('[install] reason=path_invalid: ' + $_.Exception.Message)
@@ -469,6 +599,13 @@ try {
 Write-Line ('[install] source_root=' + $SourceRoot)
 Write-Line ('[install] install_root=' + $installRootFull)
 Write-Line ('[install] bin_dir=' + $target)
+if (-not [string]::IsNullOrEmpty($legacyInstallRoot)) {
+    Write-Line ('[install] legacy_root=' + $legacyInstallRoot)
+    Write-Line ('[install] legacy_root_exists=' + (Test-Path -LiteralPath $legacyInstallRoot -PathType Container))
+    Write-Line ('[install] legacy_bin_dir=' + $legacyTarget)
+} else {
+    Write-Line '[install] legacy_migration=not_applicable'
+}
 
 # --- the payload must be complete before anything is written ------------------
 # Checked as a manifest rather than by copying and hoping: a zip extracted one
@@ -608,6 +745,24 @@ if ($isSelfCopy) {
     }
 }
 
+# --- migrate state from the pre-rename installation ----------------------------
+# Runs after the payload is in place and before the PATH change. State is only
+# copied, never moved or deleted, so a psmux server that is still running from
+# the old tree keeps every file it holds. If one copy fails, the install still
+# proceeds: the old root retains the original, and the failure is named above.
+if (-not [string]::IsNullOrEmpty($legacyInstallRoot) -and (Test-Path -LiteralPath $legacyInstallRoot -PathType Container)) {
+    Write-Line '[install] step=legacy_migration'
+    $legacyState = Copy-LegacyState -LegacyRoot $legacyInstallRoot -NewRoot $installRootFull
+    Write-Line ('[install] legacy_state_copied=' + $legacyState.Copied)
+    Write-Line ('[install] legacy_state_skipped_existing=' + $legacyState.Skipped)
+    Write-Line ('[install] legacy_state_failed=' + $legacyState.Failed)
+    Write-Line '[install] legacy_state_policy=copy_if_absent_never_overwrite'
+    Write-Line '[install] legacy_root_retained=yes'
+    Write-Line '[install] legacy_root_delete_hint=close any psmux sessions still using it, then delete manually; this installer never stops a session'
+} elseif (-not [string]::IsNullOrEmpty($legacyInstallRoot)) {
+    Write-Line '[install] legacy_migration=no_legacy_install'
+}
+
 # --- smoke test the staged shim -------------------------------------------------
 # The staged binary answering -V proves two things at once: the file is a runnable
 # Windows executable and not a truncated download, and the shim can find its
@@ -652,7 +807,17 @@ Write-Line ('[install] user_path_entries_before=' + @(Split-PathEntries $before.
 $entries = @(Split-PathEntries $before.Raw)
 
 # --- refusal: a DIFFERENT bridge bin directory is already on the PATH ----------
-$foreign = @($entries | Where-Object { (Test-BridgeBinEntry $_) -and -not (Get-SamePath $_ $target) })
+# Exactly ONE exception is allowed: the legacy bin directory that this default
+# root install is replacing. Anything else -- a second profile's bridge, a
+# hand-made copy, or a legacy entry when a custom -InstallRoot was requested --
+# is still refused, unchanged from the pre-rename contract.
+$legacyEntries = @()
+if (-not [string]::IsNullOrEmpty($legacyTarget)) {
+    $legacyEntries = @($entries | Where-Object { Get-SamePath $_ $legacyTarget })
+}
+Write-Line ('[install] existing_legacy_entries=' + $legacyEntries.Count)
+
+$foreign = @(Get-ForeignBridgeBinEntries -Entries $entries -Target $target -LegacyTarget $legacyTarget)
 if ($foreign.Count -gt 0) {
     Write-Line ('[install] RESULT=REFUSED')
     Write-Line '[install] reason=foreign_bridge_bin_on_path'
@@ -665,11 +830,18 @@ if ($foreign.Count -gt 0) {
 $mine = @($entries | Where-Object { Get-SamePath $_ $target })
 Write-Line ('[install] existing_matching_entries=' + $mine.Count)
 
-# --- build the new list: every occurrence of our entry removed, ours at index 0 -
-$kept = @($entries | Where-Object { -not (Get-SamePath $_ $target) })
-$newList = @($target) + $kept
+# --- build the new list: target first; old target and legacy target removed ----
+# The target goes at index 0, which is where every previous installer put its
+# own bin directory. On the shipped upgrade path the legacy entry was also at
+# index 0, so this replaces it in place; if a user had moved it, the new entry
+# still becomes first (the shadowing contract) and every other entry keeps its
+# relative order.
+$pathPlan = Get-MigratedUserPath -Entries $entries -Target $target -LegacyTarget $legacyTarget
+$newList = @($pathPlan.Entries)
 $newRaw = ($newList -join ';')
 
+Write-Line ('[install] legacy_path_entries_replaced=' + $pathPlan.LegacyReplaced)
+Write-Line ('[install] duplicate_target_entries_removed=' + $pathPlan.TargetDuplicatesRemoved)
 Write-Line ('[install] user_path_entries_after=' + $newList.Count)
 Write-Line ('[install] user_path_sha256_computed=' + (Get-StringSha256 $newRaw))
 
@@ -686,12 +858,17 @@ if ($newRaw -ceq $before.Raw) {
 $after = Read-UserEnvRaw 'Path'
 $afterEntries = @(Split-PathEntries $after.Raw)
 $matching = @($afterEntries | Where-Object { Get-SamePath $_ $target })
+$legacyRemaining = @()
+if (-not [string]::IsNullOrEmpty($legacyTarget)) {
+    $legacyRemaining = @($afterEntries | Where-Object { Get-SamePath $_ $legacyTarget })
+}
 $first = if ($afterEntries.Count -gt 0) { $afterEntries[0] } else { '' }
 
 Write-Line ('[install] verify_kind=' + $after.Kind)
 Write-Line ('[install] verify_kind_preserved=' + [bool]($after.Kind -eq $before.Kind))
 Write-Line ('[install] verify_entries=' + $afterEntries.Count)
 Write-Line ('[install] verify_matching_entries=' + $matching.Count)
+Write-Line ('[install] verify_legacy_entries_remaining=' + $legacyRemaining.Count)
 Write-Line ('[install] verify_first_entry=' + $first)
 Write-Line ('[install] verify_first_is_bin_dir=' + (Get-SamePath $first $target))
 Write-Line ('[install] user_path_sha256_after=' + (Get-StringSha256 $after.Raw))
@@ -706,7 +883,7 @@ Write-Line ('[install] machine_path_unchanged=' + ($machineAfter -eq $machineBef
 Write-Line ('[install] ' + (Get-BroadcastResult))
 Write-Line '[install] note=a_new_shell_is_required_for_the_change_to_be_visible'
 
-if (($matching.Count -ne 1) -or -not (Get-SamePath $first $target) -or ($machineAfter -ne $machineBefore)) {
+if (($matching.Count -ne 1) -or ($legacyRemaining.Count -ne 0) -or -not (Get-SamePath $first $target) -or ($machineAfter -ne $machineBefore)) {
     Write-Line '[install] RESULT=FAILED'
     Write-Line '[install] reason=post_write_verification_failed'
     exit 1
