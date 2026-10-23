@@ -1,9 +1,10 @@
 # Windows OmO 5.1.43 + bridge v5.1.43-1 — execution evidence
 
 Date: 2026-10-23. Host: `WINDOWS-DANIEL` (Windows 11, build 26300), user `daniel`,
-Windows PowerShell 5.1.26100.9711, node v24.19.0. Linux build host: bun 1.4.4.
+Windows PowerShell 5.1.26100.9711, node v24.19.0. Local build host: bun 1.4.4;
+release CI: bun 1.4.2.
 Machine-readable report: `.omo/evidence/omo5143-1-windows-smoke-report-20261023.json`
-(sha256 `e4a490e443b5176248a50002e2ec57b6c329c1503d29574b6a7ccf80de392009`).
+(sha256 `0afdc3497c215ef3804c9778c92c8c2cb9bc8447d6e0d50a3f3291203cb7d267`).
 
 This record covers the bridge-side release. The OmO plugin was already at 5.1.43
 before this run; the bridge pin was the drifted half.
@@ -17,10 +18,10 @@ before this run; the bridge pin was the drifted half.
 | OmO contract retargeted 5.1.42 → **5.1.43** | **yes** — `contract:verify` 180 citations / 0 problems; 11/11 doctor anchors at identical lines; no `src/*.ts` change |
 | Bridge version | **5.1.43-1** (`package.json`), release tag `v5.1.43-1` |
 | Source gates (Linux) | **yes** — `bun test` 432 pass / 34 skip / 0 fail (2,273 expects); `bunx tsc --noEmit` exit 0; `contract:fetch` psmux at `66cf613` |
-| Deployed to Windows | **yes** — local bun-1.4.4 build installed; all payload hashes recorded below |
+| Deployed to Windows | **yes** — local bun-1.4.4 build installed first, then replaced by the published bun-1.4.2 artifact (see §5) |
 | Installed doctor | **4/5, exit 30** with no OpenCode server (check 3 PORT only); check 5 PASS, `version-equality`, anchors 11/11 |
-| Protocol smoke | **yes** — 35/35 assertions, 0 fail; `doctor-exit-0`, `doctor-anchors-11/11`, scoped cleanup |
-| Published artifact equals deployed shim | **pending** — CI builds with bun 1.4.2; this section is updated after the release |
+| Protocol smoke | **yes** — 35/35 assertions, 0 fail, against the published artifact; `doctor-exit-0`, `doctor-anchors-11/11`, scoped cleanup |
+| Published artifact equals deployed shim | **yes** — `tmux.exe` `994875A9…`, 86,135,808 B, deployed and re-verified; identical to the v5.1.42 asset because no `src/*.ts` changed |
 
 ---
 
@@ -95,7 +96,8 @@ failure.
 
 `omo5143-1-windows-smoke-20261023.cjs`, one ssh lifetime, private
 `-L omo-v5143-1-<rand>` namespace, its own `opencode serve` child. The committed
-report is this run, against the **local bun-1.4.4 build**.
+report is the re-run against the **published bun-1.4.2 artifact**; the same 35
+assertions also passed against the local bun-1.4.4 build before it was replaced.
 
 | Group | Checks |
 | --- | --- |
@@ -124,13 +126,32 @@ double quotes from the placeholder description).
 
 ---
 
-## 5. Published-artifact replacement (pending)
+## 5. Published-artifact replacement
 
-CI builds the release with the pinned bun 1.4.2, so its `tmux.exe` will not be
-byte-identical to the local 1.4.4 build above. After `v5.1.43-1` is published,
-the host is switched to the binary inside
-`opencode-psmux-bridge-v5.1.43-1-win-x64.zip`, the doctor and smoke are re-run,
-and this section is replaced with the published hash and result.
+CI built the release with the pinned bun 1.4.2 (`release.yml` run
+`39897588409`, 24 s, every gate green). The published asset is byte-identical to
+the v5.1.42 shim because no `src/*.ts` changed.
+
+| Item | Value |
+| --- | --- |
+| Release | `v5.1.43-1`, not prerelease, published 2026-10-23T03:56Z |
+| Zip | `opencode-psmux-bridge-v5.1.43-1-win-x64.zip`, 39,752,483 B, sha256 `4FD3A8647CB88BA2900A16923F60895490A348EF538DF86F0ACC16219A531FCC` |
+| Published `bin\tmux.exe` | 86,135,808 B, sha256 `994875A97663AC4FE8A26A0BAE11FA904B3ED16BED580929AEBCBD92FCD8B513` |
+| v5.1.42 asset | same hash and size (source unchanged; deterministic bun-1.4.2 build) |
+| Bootstrap | `install-bootstrap.ps1`, 10,904 B, sha256 `3C80DE8C57D89A506D2B282DB7587B43F26EC3A987F073B93D2E9481947E3A5C` |
+
+The host was switched from the local 115,320,320-byte bun-1.4.4 build to this
+86,135,808-byte published artifact. The deployed `INSTALL.md` was also refreshed
+from the zip (9,335 B), removing the stale-document drift recorded in
+`windows-opencode-integrity-20261023.md` §3 item 1.
+
+Re-run on the published shim:
+
+- Doctor: 4/5, exit 30 (check 3 PORT only, no server), check 5 PASS,
+  `version-equality`, `frozen_line_anchors_resolved=11/11`; the shim-hash NOTE
+  still fires against the historical default and remains a NOTE.
+- Smoke: 35/35, 0 fail, `doctor-exit-0`, `doctor-anchors-11/11`, scoped cleanup;
+  report sha256 `0afdc3497c215ef3804c9778c92c8c2cb9bc8447d6e0d50a3f3291203cb7d267`.
 
 ---
 

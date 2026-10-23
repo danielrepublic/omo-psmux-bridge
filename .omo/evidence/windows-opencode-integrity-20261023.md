@@ -215,3 +215,5 @@ Recorded after the inspection; the inspection itself wrote nothing to the host.
   execution record is `.omo/evidence/windows-omo5143-1-execution-20261023.md`.
 - `ExpectedShimSha256` was left unchanged: the shim is rebuilt for every release, and the
   doctor defines a mismatch there as a NOTE, never a failure. It is not a correctness gate.
+- The deployed `INSTALL.md` was refreshed from the v5.1.43-1 zip (9,335 B), closing §3
+  item 1; the host now also carries the published shim and the published `INSTALL.md`.

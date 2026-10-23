@@ -9,8 +9,8 @@
     "mux": "tmux 3.4.0\npsmux 3.4.0 (20aa1d7 2026-10-13)",
     "doctor": "(see report)"
   },
-  "namespace": "omo-v5143-1-34012727209",
-  "port": 57776,
+  "namespace": "omo-v5143-1-34872759969",
+  "port": 50605,
   "assertions": [
     {
       "name": "bridge-tmux-exe-present",
@@ -125,7 +125,7 @@
     {
       "name": "pane-no-side-effect",
       "pass": true,
-      "detail": "canary absent: C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-smoke-sidefx-34012727209.marker"
+      "detail": "canary absent: C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-smoke-sidefx-34872759969.marker"
     },
     {
       "name": "mux-respawn-placeholder-5143-1",
@@ -185,7 +185,7 @@
     {
       "name": "cleanup-namespace-only",
       "pass": true,
-      "detail": "kill-server -L omo-v5143-1-34012727209 exit=0; ns gone=true"
+      "detail": "kill-server -L omo-v5143-1-34872759969 exit=0; ns gone=true"
     }
   ],
   "observations": [
@@ -240,7 +240,7 @@
     "created": true,
     "deleted": true
   },
-  "paneSample": "┃\n  ┃  BRIDGE_ATTACH_34012727209\n  ┃\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n  ┃\n  ┃\n  ┃\n  ┃  Sisyphus - Ultraworker · GPT-6.1 Sol OpenAI · high\n  ╹▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀\n   C:\\Users\\Daniel                                                     tab agents  ctrl+p commands",
+  "paneSample": "┃\n  ┃  BRIDGE_ATTACH_34872759969\n  ┃\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n  ┃\n  ┃\n  ┃\n  ┃  Sisyphus - Ultraworker · GPT-6.1 Sol OpenAI · high\n  ╹▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀\n   C:\\Users\\Daniel                                                     tab agents  ctrl+p commands",
   "cleanup": {
     "sessionDelete": "HTTP 200",
     "killServerScopedOnly": "exit=0",
@@ -253,17 +253,17 @@
     {
       "route": "direct-exe",
       "exit": 0,
-      "stdout": "omo-v5143-1-34012727209\n",
+      "stdout": "omo-v5143-1-34872759969\n",
       "stderr": "",
       "wrapperStderr": ""
     },
     {
       "route": "cmd-launcher",
       "exit": 0,
-      "stdout": "omo-v5143-1-34012727209\n",
+      "stdout": "omo-v5143-1-34872759969\n",
       "stderr": "",
       "wrapperStderr": ""
     }
   ],
-  "attachPaneSample": "┃\n  ┃  BRIDGE_ATTACH_34012727209\n  ┃\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n  ┃\n  ┃\n  ┃\n  ┃  Sisyphus - Ultraworker · GPT-6.1 Sol OpenAI · high\n  ╹▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀\n   C:\\Users\\Daniel                                                     tab agents  ctrl+p commands"
+  "attachPaneSample": "┃\n  ┃  BRIDGE_ATTACH_34872759969\n  ┃\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n  ┃\n  ┃\n  ┃\n  ┃  Sisyphus - Ultraworker · GPT-6.1 Sol OpenAI · high\n  ╹▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀\n   C:\\Users\\Daniel                                                     tab agents  ctrl+p commands"
 }
