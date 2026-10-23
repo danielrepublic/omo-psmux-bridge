@@ -75,7 +75,7 @@ const AUTH_ARGS = ["-e", `OPENCODE_SERVER_PASSWORD=${SENTINEL}`, "-e", "OPENCODE
 // A space in the user name, so the helper path genuinely needs quoting.
 const PSMUX_PATH = "C:\\Users\\Test User\\AppData\\Local\\psmux\\tmux.exe";
 const HELPER_PATH =
-  "C:\\Users\\Test User\\AppData\\Local\\opencode-psmux-bridge\\runtime\\Start-PaneFromDescriptor.ps1";
+  "C:\\Users\\Test User\\AppData\\Local\\omo-psmux-bridge\\runtime\\Start-PaneFromDescriptor.ps1";
 
 const OPTS = { psmuxPath: PSMUX_PATH, helperPath: HELPER_PATH } as const;
 
