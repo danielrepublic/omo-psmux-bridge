@@ -80,13 +80,106 @@ const FIXTURE_DIR = join(SANDBOX, "bin");
 const FIXTURE_EXE = join(FIXTURE_DIR, "opencode.exe");
 const COUNTERS = join(SANDBOX, "counters");
 
+/** The report shape opencode 1.19.4 / Bun 1.4.4 prints to stderr when the TUI
+ *  aborts its external HTTP transport on a clean exit, captured on Linux
+ *  against opencode 1.19.4 with `--port`. The 25-entry legacy constant table is
+ *  abbreviated to its first and last entries because the filter matches the
+ *  object boundary, never its contents; the full table was used to verify the
+ *  regex separately. The fixture emits this so the native Windows suite can
+ *  prove the wrapper removes it and nothing else. */
+const BUN_ABORT_REPORT = [
+  "AbortError: The operation was aborted.",
+  "DOMException {",
+  "  line: 2,",
+  "  column: 10262,",
+  '  sourceURL: "B:/~BUN/root/chunk-2nvkam47.js",',
+  '  stack: "abort@[native code]\\n@B:/~BUN/root/chunk-2nvkam47.js:2:10262",',
+  "  code: 20,",
+  '  name: "AbortError",',
+  '  message: "The operation was aborted.",',
+  "  INDEX_SIZE_ERR: 1,",
+  "  ABORT_ERR: 20,",
+  "  toString: [Function: toString],",
+  "}",
+  "      at B:/~BUN/root/chunk-2nvkam47.js:2",
+  "",
+].join("\n");
+
+/** Stderr the filter must NOT touch. The two sentinels bracket the report so a
+ *  filter that drops the whole stream (instead of just the block) fails here,
+ *  and the UTF-8 line proves replay is not re-encoded through the console code
+ *  page. */
+const SENTINEL_BEFORE = "SENTINEL-BEFORE-DUMP";
+const SENTINEL_UTF8 = "SENTINEL-UTF8-中文-🚀";
+const SENTINEL_AFTER = "SENTINEL-AFTER-DUMP";
+
+/** Every marker is a line the report cannot survive. `at B:/~BUN` is the one
+ *  trailing line Bun appends, which a filter that only drops the object would
+ *  leave behind. */
+const DUMP_MARKERS = [
+  "AbortError: The operation was aborted.",
+  "DOMException {",
+  "INDEX_SIZE_ERR: 1",
+  "ABORT_ERR: 20",
+  "at B:/~BUN/root/chunk-2nvkam47.js:2",
+] as const;
+
 /** Records that it ran, then fails on purpose. The counter path and the exit
- *  code come from the environment so ONE compiled binary serves every case. */
+ *  code come from the environment so ONE compiled binary serves every case.
+ *  `OMO_QA_STDERR_NOISE=dump|line` additionally emits the abort report (or
+ *  only its first line) surrounded by sentinels; writeSync(2, ...) is used
+ *  rather than process.stderr.write because the fixture exits immediately
+ *  afterwards and a synchronous fd write cannot be dropped by that exit. */
 const FIXTURE_SOURCE = [
-  'import { appendFileSync } from "node:fs";',
+  'import { appendFileSync, writeSync } from "node:fs";',
   'const counter = process.env["OMO_QA_COUNTER"];',
   "if (counter) appendFileSync(counter, JSON.stringify(process.argv.slice(2)) + \"\\n\");",
+  'const noise = process.env["OMO_QA_STDERR_NOISE"];',
+  'if (noise === "dump") {',
+  `  writeSync(2, ${JSON.stringify(`${SENTINEL_BEFORE}\n`)});`,
+  `  writeSync(2, ${JSON.stringify(`${SENTINEL_UTF8}\n`)});`,
+  `  writeSync(2, ${JSON.stringify(BUN_ABORT_REPORT)});`,
+  `  writeSync(2, ${JSON.stringify(`${SENTINEL_AFTER}\n`)});`,
+  "}",
+  'if (noise === "line") {',
+  `  writeSync(2, ${JSON.stringify(`${DUMP_MARKERS[0]}\n`)});`,
+  `  writeSync(2, ${JSON.stringify("SENTINEL-LINE-ONLY\n")});`,
+  "}",
   'process.exit(Number.parseInt(process.env["OMO_QA_EXIT"] ?? "7", 10));',
+  "",
+].join("\n");
+
+/** Runs Update-StderrCapture against a reader whose SECOND ReadAsync throws, with
+ *  a Pending task that is already completed and returns 4. Before the fix the
+ *  catch only set Open=$false and the while re-tested the OLD completed Pending,
+ *  re-appended the same 4 chars and called the throwing ReadAsync again: an
+ *  unbounded spin. The process is killed by the spawn timeout in that case, so
+ *  the test fails by status instead of hanging the suite. The function is
+ *  extracted from the SHIPPED script's AST, so this is the real code, not a copy.
+ *  Output is one marker plus the final Text length, and exit codes name the
+ *  violated assertion. */
+const CAPTURE_SPIN_PROBE = [
+  "param([string]$Wrapper)",
+  "$ErrorActionPreference = 'Stop'",
+  "$tokens = $null; $errors = $null",
+  "$ast = [System.Management.Automation.Language.Parser]::ParseFile($Wrapper, [ref]$tokens, [ref]$errors)",
+  "if ($errors.Count -gt 0) { exit 90 }",
+  "$fn = $ast.Find({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Update-StderrCapture' }, $true)",
+  "if (-not $fn) { exit 91 }",
+  "Invoke-Expression $fn.Extent.Text",
+  "$pending = [System.Threading.Tasks.Task[int]]::FromResult(4)",
+  "$buffer = [char[]]@('x', 'x', 'x', 'x')",
+  "$text = New-Object System.Text.StringBuilder",
+  "$reader = [pscustomobject]@{}",
+  "$reader | Add-Member -MemberType ScriptMethod -Name ReadAsync -Value { throw 'pipe closed' }",
+  "$capture = @{ Reader = $reader; Buffer = $buffer; Pending = $pending; Text = $text; Open = $true; Written = $false }",
+  "$sw = [System.Diagnostics.Stopwatch]::StartNew()",
+  "Update-StderrCapture $capture",
+  "$sw.Stop()",
+  "if ($capture.Open) { exit 92 }",
+  "if ($text.ToString() -ne 'xxxx') { exit 93 }",
+  "if ($sw.ElapsedMilliseconds -gt 5000) { exit 94 }",
+  "Write-Output 'SPIN_PROBE_OK'",
   "",
 ].join("\n");
 
@@ -97,6 +190,9 @@ interface Route {
   readonly argv: readonly string[];
   readonly tmux: string | undefined;
   readonly opencodePort: string | undefined;
+  /** `dump` emits the whole report surrounded by sentinels; `line` emits only
+   *  its first line, which the filter must leave alone. */
+  readonly stderrNoise?: "dump" | "line";
 }
 
 const TMUX_VALUE = "/tmp/tmux-0/default,1234,0";
@@ -127,7 +223,7 @@ beforeAll(() => {
   mkdirSync(FIXTURE_DIR, { recursive: true });
   mkdirSync(COUNTERS, { recursive: true });
   const source = join(SANDBOX, "fixture.ts");
-  writeFileSync(source, FIXTURE_SOURCE, "ascii");
+  writeFileSync(source, FIXTURE_SOURCE, "utf8");
 
   // A REAL .exe, because Resolve-RealOpencode prefers opencode.exe over
   // opencode.cmd, and because New-OpencodeProcess then launches it directly with
@@ -169,6 +265,8 @@ function runWrapper(route: Route, counter: string): RunResult {
   else env["TMUX"] = route.tmux;
   if (route.opencodePort === undefined) delete env["OPENCODE_PORT"];
   else env["OPENCODE_PORT"] = route.opencodePort;
+  if (route.stderrNoise) env["OMO_QA_STDERR_NOISE"] = route.stderrNoise;
+  else delete env["OMO_QA_STDERR_NOISE"];
 
   const result = spawnSync(
     POWERSHELL_51,
@@ -267,5 +365,254 @@ describeWin("omo-opencode-port.ps1 propagates the real opencode's exit code", ()
     expect(counterLines(counter)).toHaveLength(1);
     expect(result.status).not.toBe(0);
     expect(result.status).toBe(other);
+  });
+});
+
+function invocationArgv(counter: string): readonly string[][] {
+  return counterLines(counter).map((line) => JSON.parse(line) as string[]);
+}
+
+/** The whole point of the capture is "remove the report, keep everything else".
+ *  All three sentinels must survive, including the UTF-8 one, and no marker of
+ *  the report may remain. Asserting only the absence would also pass for a
+ *  wrapper that dropped stderr entirely. */
+function expectAbortReportSuppressed(result: RunResult): void {
+  expect(result.stderr).toContain(SENTINEL_BEFORE);
+  expect(result.stderr).toContain(SENTINEL_UTF8);
+  expect(result.stderr).toContain(SENTINEL_AFTER);
+  for (const marker of DUMP_MARKERS) {
+    expect(result.stderr).not.toContain(marker);
+  }
+}
+
+describeWin("omo-opencode-port.ps1 removes the Bun abort report its port launches provoke", () => {
+  test("the auto-port TUI launch filters the report and preserves the rest of stderr", () => {
+    const counter = counterPath("noise-auto-port");
+    const result = runWrapper(
+      {
+        name: "auto-port TUI",
+        argv: ["tui", "probe"],
+        tmux: TMUX_VALUE,
+        opencodePort: undefined,
+        stderrNoise: "dump",
+      },
+      counter,
+    );
+
+    const invocations = invocationArgv(counter);
+    expect(invocations).toHaveLength(1);
+    expect(invocations[0]![0]).toBe("--port");
+    const port = Number.parseInt(invocations[0]![1]!, 10);
+    expect(port).toBeGreaterThanOrEqual(7801);
+    expect(port).toBeLessThanOrEqual(7901);
+    expect(invocations[0]!.slice(2)).toEqual(["tui", "probe"]);
+
+    expect(result.status).toBe(FIXTURE_EXIT);
+    expectAbortReportSuppressed(result);
+    // The wrapper's own diagnostic shares stderr with the capture; filtering
+    // the child must not touch it.
+    expect(result.stderr).toContain("[opencode-wrapper] tmux detected");
+  });
+
+  test("the explicit OPENCODE_PORT launch also filters the report", () => {
+    const counter = counterPath("noise-explicit-port");
+    const result = runWrapper(
+      {
+        name: "explicit-port TUI",
+        argv: ["tui", "probe"],
+        tmux: TMUX_VALUE,
+        opencodePort: EXPLICIT_PORT,
+        stderrNoise: "dump",
+      },
+      counter,
+    );
+
+    expect(invocationArgv(counter)).toEqual([["--port", EXPLICIT_PORT, "tui", "probe"]]);
+    expect(result.status).toBe(FIXTURE_EXIT);
+    expectAbortReportSuppressed(result);
+  });
+
+  test("a caller-supplied --port TUI launch also filters the report", () => {
+    const counter = counterPath("noise-caller-port");
+    const port = "41235";
+    const result = runWrapper(
+      {
+        name: "caller-port TUI",
+        argv: ["--port", port, "tui"],
+        tmux: TMUX_VALUE,
+        opencodePort: undefined,
+        stderrNoise: "dump",
+      },
+      counter,
+    );
+
+    expect(invocationArgv(counter)).toEqual([["--port", port, "tui"]]);
+    expect(result.status).toBe(FIXTURE_EXIT);
+    expectAbortReportSuppressed(result);
+  });
+
+  test("a passthrough subcommand keeps its stderr live", () => {
+    const counter = counterPath("noise-serve");
+    const result = runWrapper(
+      {
+        name: "serve passthrough",
+        argv: ["serve", "--port", "41236"],
+        tmux: TMUX_VALUE,
+        opencodePort: undefined,
+        stderrNoise: "dump",
+      },
+      counter,
+    );
+
+    expect(invocationArgv(counter)).toEqual([["serve", "--port", "41236"]]);
+    expect(result.status).toBe(FIXTURE_EXIT);
+    // serve is an operator surface: buffering it would hide live logs, so the
+    // report is deliberately not filtered here.
+    expect(result.stderr).toContain(SENTINEL_BEFORE);
+    expect(result.stderr).toContain("AbortError: The operation was aborted.");
+    expect(result.stderr).toContain("DOMException {");
+  });
+
+  test("outside tmux without a port, stderr stays untouched", () => {
+    const counter = counterPath("noise-no-tmux");
+    const result = runWrapper(
+      {
+        name: "no tmux",
+        argv: ["tui"],
+        tmux: undefined,
+        opencodePort: undefined,
+        stderrNoise: "dump",
+      },
+      counter,
+    );
+
+    expect(result.status).toBe(FIXTURE_EXIT);
+    expect(result.stderr).toContain(SENTINEL_BEFORE);
+    expect(result.stderr).toContain("AbortError: The operation was aborted.");
+  });
+
+  test("a bare AbortError line without the DOMException object survives", () => {
+    const counter = counterPath("noise-line-only");
+    const result = runWrapper(
+      {
+        name: "line-only",
+        argv: ["tui"],
+        tmux: TMUX_VALUE,
+        opencodePort: undefined,
+        stderrNoise: "line",
+      },
+      counter,
+    );
+
+    expect(result.status).toBe(FIXTURE_EXIT);
+    // The filter is anchored to the two-line report; a diagnostic that only
+    // shares the first line is not the report and must reach the operator.
+    expect(result.stderr).toContain("AbortError: The operation was aborted.");
+    expect(result.stderr).toContain("SENTINEL-LINE-ONLY");
+  });
+
+  test("outside tmux, a --hostname TUI launch is captured too", () => {
+    const counter = counterPath("noise-hostname");
+    const result = runWrapper(
+      {
+        name: "hostname TUI",
+        argv: ["--hostname", "0.0.0.0", "tui"],
+        tmux: undefined,
+        opencodePort: undefined,
+        stderrNoise: "dump",
+      },
+      counter,
+    );
+
+    expect(invocationArgv(counter)).toEqual([["--hostname", "0.0.0.0", "tui"]]);
+    expect(result.status).toBe(FIXTURE_EXIT);
+    expectAbortReportSuppressed(result);
+  });
+
+  test("a global option before a subcommand does not turn a server into a captured TUI", () => {
+    const counter = counterPath("noise-global-before-serve");
+    const result = runWrapper(
+      {
+        name: "global-before-serve",
+        argv: ["--log-level", "debug", "serve", "--port", "41237"],
+        tmux: TMUX_VALUE,
+        opencodePort: undefined,
+        stderrNoise: "dump",
+      },
+      counter,
+    );
+
+    expect(invocationArgv(counter)).toEqual([["--log-level", "debug", "serve", "--port", "41237"]]);
+    expect(result.status).toBe(FIXTURE_EXIT);
+    // opencode's global options may precede the subcommand. The server's stderr
+    // must stay live, so the report is not filtered on this route.
+    expect(result.stderr).toContain("AbortError: The operation was aborted.");
+  });
+
+  test("an option VALUE equal to a subcommand name does not disable capture", () => {
+    const counter = counterPath("noise-log-level-value");
+    const result = runWrapper(
+      {
+        name: "log-level value",
+        // `debug` is a PASSTHROUGH SUBCOMMAND NAME but here it is the value of
+        // --log-level. The old any-element scan returned false and leaked the
+        // report. This is still the default TUI command, so it must be filtered.
+        argv: ["--log-level", "debug", "--port", "41238"],
+        tmux: undefined,
+        opencodePort: undefined,
+        stderrNoise: "dump",
+      },
+      counter,
+    );
+
+    expect(invocationArgv(counter)).toEqual([["--log-level", "debug", "--port", "41238"]]);
+    expect(result.status).toBe(FIXTURE_EXIT);
+    expectAbortReportSuppressed(result);
+  });
+
+  test("a --prompt value equal to a subcommand name does not disable capture", () => {
+    const counter = counterPath("noise-prompt-value");
+    const result = runWrapper(
+      {
+        name: "prompt value",
+        // `run` is the PROMPT, not the subcommand; --prompt consumes it.
+        argv: ["--port", "41239", "--prompt", "run"],
+        tmux: undefined,
+        opencodePort: undefined,
+        stderrNoise: "dump",
+      },
+      counter,
+    );
+
+    expect(invocationArgv(counter)).toEqual([["--port", "41239", "--prompt", "run"]]);
+    expect(result.status).toBe(FIXTURE_EXIT);
+    expectAbortReportSuppressed(result);
+  });
+});
+
+describeWin("Update-StderrCapture does not spin when the stderr pipe breaks", () => {
+  test("a throwing ReadAsync stops the drain after one append", () => {
+    const script = join(SANDBOX, "spin-probe.ps1");
+    writeFileSync(script, CAPTURE_SPIN_PROBE, "ascii");
+
+    const result = spawnSync(
+      POWERSHELL_51,
+      [
+        "-NoProfile",
+        "-NonInteractive",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        script,
+        "-Wrapper",
+        WRAPPER,
+      ],
+      // Before the fix this spins forever; the timeout turns that into a
+      // failing status instead of a hung suite.
+      { encoding: "utf8", timeout: 15_000, windowsHide: true },
+    );
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("SPIN_PROBE_OK");
   });
 });

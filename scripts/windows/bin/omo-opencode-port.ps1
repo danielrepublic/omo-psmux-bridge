@@ -69,6 +69,43 @@
         opencode looks exactly like that - so the wrapper keeps waiting instead
         of killing a healthy session.
 
+    Exit-noise suppression
+    ----------------------
+    opencode's TUI switches to the EXTERNAL HTTP transport whenever --port,
+    --hostname or mdns is active (packages/opencode/src/cli/cmd/tui.ts:
+    `const external = hasArg("--port") || hasArg("--hostname") ||
+    network.mdns === true`). Every launch this wrapper controls adds --port, so
+    it creates that condition by design. On a clean TUI exit, opencode 1.19.4
+    aborts the in-flight HTTP/SSE work and Bun's default unhandled-rejection
+    reporter prints a DOMException dump on stderr:
+
+        AbortError: The operation was aborted.
+        DOMException { ...all 25 legacy error constants... }
+              at B:/~BUN/root/chunk-*.js:2
+
+    That report is a normal exit, not a failure, and it lands on the console
+    AFTER the TUI has handed the screen back, so it is the first thing the user
+    sees at the shell prompt. `BUN_OPTIONS=--unhandled-rejections=none` does NOT
+    suppress it: opencode's build bakes execArgv through --compile-exec-argv,
+    and a standalone binary built that way ignores BUN_OPTIONS. Measured, not
+    assumed: the same flag DOES suppress a Bun fixture built with
+    `bun build --compile` (no execArgv) and DOES NOT suppress that fixture once
+    it is rebuilt with `--compile-exec-argv='--use-system-ca --'`, which is the
+    shape opencode ships. NODE_OPTIONS, --preload and a bare argv flag are
+    ignored for the same reason.
+
+    Therefore the external-transport launches (where THIS WRAPPER adds --port,
+    or the caller supplied --port, --hostname or --mdns) capture the child's
+    stderr with RedirectStandardError and replay it after the child exits, with
+    exactly that report removed. stdout, stdin and the console stay inherited,
+    so the TUI still renders normally. Passthrough subcommands (serve, run,
+    attach, ...) are NOT captured: their stderr is a live operator surface, and
+    buffering it would be worse than the noise this workaround removes.
+
+    Retirement condition: drop the capture when the upstream TUI registers a
+    process-level unhandledRejection handler (or stops aborting HTTP on a clean
+    exit), verified in a release. Do not infer it from a version number.
+
 .NOTES
     All wrapper diagnostics go to STDERR so that stdout stays byte-identical to
     the real opencode in every case (the bash reference writes them to stdout;
@@ -104,10 +141,288 @@ $PassthroughSubcommands = @(
 # Exact short-circuit flag list from ~/.bashrc (case "$a" in --port|--port=*|-h|--help|-v|--version).
 $PassthroughFlags = @('--port', '-h', '--help', '-v', '--version')
 
+# opencode options that consume the NEXT argv element as their value. Needed only
+# to find the first POSITIONAL argument without mistaking an option value for a
+# subcommand. Drawn from `opencode --help` (1.19.4); `--opt=value` forms are
+# detected by the '=' and never consume the next element.
+$ArgumentValueOptions = @(
+    '--log-level', '--port', '--hostname', '--mdns-domain', '--cors',
+    '--model', '-m', '--session', '-s', '--prompt', '--agent', '--replay-limit'
+)
+
 $MsgExhausted = '[opencode-wrapper] no free port in 7801-7901; refusing to start'
 
 function Write-Err([string]$message) {
     [Console]::Error.WriteLine($message)
+}
+
+<#
+.SYNOPSIS
+    Remove Bun's unhandled-DOMException report from captured stderr.
+
+.DESCRIPTION
+    The report has exactly one shape in opencode 1.19.4 / Bun 1.4.4:
+
+        AbortError: The operation was aborted.
+        DOMException {
+          ...fields...
+        }
+              at <bunfs>/chunk-*.js:2
+
+    The object body is the part that makes it unreadable (25 legacy constants),
+    so the whole block, plus the one location line Bun appends, is dropped. The
+    match is anchored to a line start and requires the `DOMException {` second
+    line, so ordinary stderr that merely mentions "AbortError" is preserved.
+    `[regex]::Replace` replaces every occurrence, which matters if more than one
+    request aborts during shutdown.
+
+    An unterminated report (the child died mid-write) is left alone rather than
+    guessed at: a partial block is indistinguishable from a log line that starts
+    with the same text, and keeping it is visible while swallowing a real log is
+    not.
+#>
+function Remove-BunAbortReport {
+    param([AllowNull()][string]$Text)
+
+    if ([string]::IsNullOrEmpty($Text)) { return $Text }
+    $pattern = '(?ms)^AbortError: The operation was aborted\.?[ \t]*\r?\nDOMException \{[ \t]*\r?\n.*?^\}[ \t]*(?:\r?\n|$)(?:^[ \t]+at [^\r\n]*(?:\r?\n|$))?'
+    return [regex]::Replace($Text, $pattern, '')
+}
+
+<#
+.SYNOPSIS
+    Start draining a redirected stderr pipe without blocking the caller.
+
+.DESCRIPTION
+    `ReadAsync` is started immediately and advanced only when the pending task
+    has already completed. Nothing in this file ever blocks on a read: the port
+    watch loop and the exit path call Update-StderrCapture and move on. That is
+    what keeps a child that writes more than the pipe buffer (4 KiB) from
+    deadlocking while this wrapper is waiting for it.
+
+    stderr is decoded as UTF-8 because every launch form ends in a Bun
+    executable, and Bun writes UTF-8 bytes. Replay re-encodes the same way, so a
+    UTF-8 diagnostic that is not part of the abort report survives byte-for-byte
+    (see Write-CapturedStderr).
+#>
+function New-StderrCapture {
+    param($Proc)
+
+    $reader = $Proc.StandardError
+    $buffer = New-Object char[] 4096
+    return @{
+        Reader = $reader
+        Buffer = $buffer
+        Pending = $reader.ReadAsync($buffer, 0, $buffer.Length)
+        Text = New-Object System.Text.StringBuilder
+        Open = $true
+        Written = $false
+    }
+}
+
+<#
+.SYNOPSIS
+    Append every already-completed read to the capture. Never waits.
+#>
+function Update-StderrCapture {
+    param($Capture)
+
+    if (-not $Capture -or -not $Capture.Open) { return }
+    while ($Capture.Pending.IsCompleted) {
+        $read = 0
+        try {
+            $read = [int]$Capture.Pending.Result
+        } catch {
+            # A disposed or broken pipe is the normal end of the capture.
+            $Capture.Open = $false
+            return
+        }
+        if ($read -le 0) {
+            $Capture.Open = $false
+            return
+        }
+        [void]$Capture.Text.Append($Capture.Buffer, 0, $read)
+        try {
+            $Capture.Pending = $Capture.Reader.ReadAsync($Capture.Buffer, 0, $Capture.Buffer.Length)
+        } catch {
+            # MUST leave the loop here. $Capture.Pending still holds the PREVIOUS,
+            # already-completed read, so without this return the while condition
+            # is immediately true again, the same bytes are appended again, and
+            # the next ReadAsync throws again: an unbounded spin that grows Text
+            # forever.
+            $Capture.Open = $false
+            return
+        }
+    }
+}
+
+<#
+.SYNOPSIS
+    Drain what is left and return the captured text.
+
+.DESCRIPTION
+    $GraceMs bounds how long a pipe held open by a grandchild can delay the
+    wrapper after the child itself has exited. It is reached only when no EOF
+    arrives; the common case returns as soon as the child's handle closes.
+#>
+function Complete-StderrCapture {
+    param($Capture, [int]$GraceMs = 1000)
+
+    if (-not $Capture) { return '' }
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
+    while ($Capture.Open -and $sw.ElapsedMilliseconds -lt $GraceMs) {
+        Update-StderrCapture $Capture
+        if ($Capture.Open) { Start-Sleep -Milliseconds 20 }
+    }
+    Update-StderrCapture $Capture
+    try { $Capture.Reader.Dispose() } catch { }
+    return $Capture.Text.ToString()
+}
+
+<#
+.SYNOPSIS
+    Wait for a child to exit while keeping its captured stderr drained.
+
+.DESCRIPTION
+    A blocking WaitForExit() would stop draining the pipe, so a child that logs
+    more than the pipe buffer during the session would block forever. When there
+    is no capture, the blocking wait is kept exactly as before.
+#>
+function Wait-ProcessWithCapture {
+    param($Proc, $Capture)
+
+    if (-not $Capture) {
+        $Proc.WaitForExit()
+        return
+    }
+    while (-not $Proc.HasExited) {
+        Start-SleepDraining $Capture 100
+    }
+    Update-StderrCapture $Capture
+}
+
+<#
+.SYNOPSIS
+    Sleep in short slices, draining the capture between them.
+
+.DESCRIPTION
+    A single Start-Sleep would let a chatty child fill the 4 KiB pipe buffer and
+    block before the next drain, which looks exactly like the silent hang this
+    wrapper's port watch exists to avoid. Slicing at 25 ms keeps the pipe moving
+    while preserving the caller's total wait.
+#>
+function Start-SleepDraining {
+    param($Capture, [int]$Milliseconds)
+
+    if (-not $Capture) {
+        Start-Sleep -Milliseconds $Milliseconds
+        return
+    }
+    $remaining = $Milliseconds
+    while ($remaining -gt 0) {
+        Update-StderrCapture $Capture
+        $slice = [Math]::Min(25, $remaining)
+        Start-Sleep -Milliseconds $slice
+        $remaining -= $slice
+    }
+    Update-StderrCapture $Capture
+}
+
+<#
+.SYNOPSIS
+    Replay captured stderr, minus Bun's abort report, exactly once.
+#>
+function Write-CapturedStderr {
+    param($Capture)
+
+    if (-not $Capture -or $Capture.Written) { return }
+    $Capture.Written = $true
+    $text = Remove-BunAbortReport (Complete-StderrCapture $Capture)
+    if ([string]::IsNullOrEmpty($text)) { return }
+    # Write raw UTF-8 bytes to fd 2 instead of [Console]::Error.Write: the latter
+    # re-encodes through the console code page, which can turn a UTF-8 diagnostic
+    # into the exact mojibake this wrapper is supposed to avoid.
+    $bytes = [System.Text.UTF8Encoding]::new($false).GetBytes($text)
+    $stderr = [Console]::OpenStandardError()
+    try {
+        $stderr.Write($bytes, 0, $bytes.Length)
+        $stderr.Flush()
+    } catch {
+        # Nothing left to write to (the console or pipe is gone). The child has
+        # already exited and its exit code is the contract, not this replay.
+    }
+}
+
+<#
+.SYNOPSIS
+    Return the first POSITIONAL argv element, skipping options and their values.
+
+.DESCRIPTION
+    `--log-level debug` and `--prompt run` put a word on the command line that
+    also happens to be a passthrough subcommand name. A raw scan for
+    $PassthroughSubcommands therefore classified a perfectly ordinary TUI launch
+    as a server/run process and left the abort report unfiltered:
+
+        opencode --log-level debug --port 41235      # 'debug' is NOT the subcommand
+        opencode --port 41239 --prompt run           # 'run' is the PROMPT
+
+    Option arity is the missing information: the word after --log-level/--prompt
+    (and the other value-taking options) is a value, not a positional. `--opt=value`
+    is one element and consumes nothing. `--` ends option parsing, so the next
+    element is positional even when it starts with '-'.
+
+    Returns $null when argv has no positional (opencode's default TUI command).
+#>
+function Get-FirstPositionalArgument {
+    param([string[]]$ArgumentList)
+
+    for ($i = 0; $i -lt $ArgumentList.Count; $i++) {
+        $a = $ArgumentList[$i]
+        if ($a -ceq '--') {
+            if ($i + 1 -lt $ArgumentList.Count) { return $ArgumentList[$i + 1] }
+            return $null
+        }
+        if ($a.Length -gt 0 -and $a[0] -eq '-') {
+            # --opt=value is a single element; --opt VALUE consumes the next one.
+            if ($a.Contains('=')) { continue }
+            if ($ArgumentValueOptions -ccontains $a) { $i++ }
+            continue
+        }
+        return $a
+    }
+    return $null
+}
+
+<#
+.SYNOPSIS
+    Does this argv put the TUI on the external HTTP transport that produces the
+    Bun abort report on exit?
+
+.DESCRIPTION
+    `--port`, `--hostname` and `--mdns` are the triggers the TUI itself uses to
+    choose its external transport.
+
+    A passthrough subcommand as the FIRST POSITIONAL means the process is not the
+    interactive TUI (serve/run/attach/...), so its stderr must stay live and is
+    never captured. The positional is resolved with option arity
+    (Get-FirstPositionalArgument), not by scanning every element:
+    `--log-level debug` supplies the VALUE `debug`, and `--prompt run` supplies
+    the VALUE `run`; neither is a subcommand. The first positional is also not
+    required to be argv[0], so global options before a real subcommand are
+    handled, e.g. `opencode --log-level debug serve --port 1234` still resolves
+    to `serve` and keeps the server's logs live.
+#>
+function Test-ExternalTuiLaunch {
+    param([string[]]$ArgumentList)
+
+    $first = Get-FirstPositionalArgument $ArgumentList
+    if ($first -and ($PassthroughSubcommands -ccontains $first)) { return $false }
+    foreach ($a in $ArgumentList) {
+        if ($a -ceq '--port' -or $a.StartsWith('--port=')) { return $true }
+        if ($a -ceq '--hostname' -or $a.StartsWith('--hostname=')) { return $true }
+        if ($a -ceq '--mdns') { return $true }
+    }
+    return $false
 }
 
 <#
@@ -440,16 +755,24 @@ function Stop-OwnedProcessTree {
 
 <#
 .SYNOPSIS
-    Launch the real opencode, inheriting stdin/stdout/stderr so the TUI keeps
-    its console, and return its exit code. Unconditional wait: used by every
+    Launch the real opencode, inheriting stdin/stdout so the TUI keeps its
+    console, and return its exit code. Unconditional wait: used by every
     passthrough path, where no port was reserved and nothing is watched.
+
+.DESCRIPTION
+    $CaptureStderr selects the exit-noise workaround: stderr is redirected and
+    replayed after the child exits, minus Bun's abort report. It is set only
+    when the launch uses opencode's external HTTP transport (see
+    Test-ExternalTuiLaunch). When it is false, stderr is inherited exactly as
+    before.
 #>
 function Start-RealOpencode {
-    param($Real, [string[]]$ArgumentList, [AllowNull()][string]$PortEnv)
+    param($Real, [string[]]$ArgumentList, [AllowNull()][string]$PortEnv, [bool]$CaptureStderr = $false)
 
-    $launch = New-OpencodeProcess $Real $ArgumentList $PortEnv
+    $launch = New-OpencodeProcess $Real $ArgumentList $PortEnv $CaptureStderr
     if (-not $launch.Ok) { return $launch.ExitCode }
-    $launch.Proc.WaitForExit()
+    Wait-ProcessWithCapture $launch.Proc $launch.StderrCapture
+    Write-CapturedStderr $launch.StderrCapture
     # Read the exit code off the PROCESS, not off $launch: the success shape of
     # New-OpencodeProcess is @{ Ok = $true; Proc = ... } and carries no
     # ExitCode key. This script does not run under Set-StrictMode, so reading
@@ -465,18 +788,26 @@ function Start-RealOpencode {
 .DESCRIPTION
     The launch half of Start-RealOpencode, factored out so the reserved-port path
     can watch the child instead of blocking on it. The launch form itself is
-    unchanged: same ProcessStartInfo, same inherited handles, same OPENCODE_PORT.
+    unchanged except for the opt-in stderr capture: same ProcessStartInfo, same
+    inherited stdin/stdout, same OPENCODE_PORT.
 
-    Returns @{ Ok = $true; Proc = <Process> } or @{ Ok = $false; ExitCode = n }.
+    Returns @{ Ok = $true; Proc = <Process>; StderrCapture = <capture or $null> }
+    or @{ Ok = $false; ExitCode = n }.
 #>
 function New-OpencodeProcess {
-    param($Real, [string[]]$ArgumentList, [AllowNull()][string]$PortEnv)
+    param($Real, [string[]]$ArgumentList, [AllowNull()][string]$PortEnv, [bool]$CaptureStderr = $false)
 
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.UseShellExecute = $false
     $psi.RedirectStandardInput = $false
     $psi.RedirectStandardOutput = $false
-    $psi.RedirectStandardError = $false
+    $psi.RedirectStandardError = $CaptureStderr
+    if ($CaptureStderr) {
+        # Every launch form ends in a Bun executable, and Bun writes UTF-8 to a
+        # redirected stderr. Decoding with the console code page would turn a
+        # non-ASCII diagnostic into mojibake on replay.
+        $psi.StandardErrorEncoding = [System.Text.UTF8Encoding]::new($false)
+    }
 
     switch ($Real.Kind) {
         'exe' {
@@ -519,7 +850,9 @@ function New-OpencodeProcess {
         Write-Err ("[opencode-wrapper] failed to start " + $Real.Path)
         return @{ Ok = $false; ExitCode = 126 }
     }
-    return @{ Ok = $true; Proc = $proc }
+    $capture = $null
+    if ($CaptureStderr) { $capture = New-StderrCapture $proc }
+    return @{ Ok = $true; Proc = $proc; StderrCapture = $capture }
 }
 
 <#
@@ -546,12 +879,16 @@ function New-OpencodeProcess {
     decision, so the single retry stays in one place.
 #>
 function Wait-ChildPortOutcome {
-    param($Proc, [int]$Port, [bool]$NeedTree = $true)
+    param($Proc, [int]$Port, [bool]$NeedTree = $true, $Capture = $null)
 
     $ourPid = $Proc.Id
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
     $lastOwner = -1
     while ($true) {
+        # Keep the redirected stderr pipe drained for the whole session. Doing
+        # this here, and in Wait-ProcessWithCapture below, is what makes the
+        # capture safe for a child that logs more than the pipe buffer.
+        Update-StderrCapture $Capture
         if ($Proc.HasExited) {
             return @{ State = 'Exited'; ExitCode = $Proc.ExitCode; Owner = 0 }
         }
@@ -566,7 +903,7 @@ function Wait-ChildPortOutcome {
                 if ($ours -eq 1) {
                     # PROVEN healthy: our own child owns the reserved port. Stop
                     # watching and behave exactly as the pre-fix wrapper did.
-                    $Proc.WaitForExit()
+                    Wait-ProcessWithCapture $Proc $Capture
                     return @{ State = 'Settled'; ExitCode = $Proc.ExitCode; Owner = $owner }
                 }
                 if ($ours -eq 0) {
@@ -591,14 +928,14 @@ function Wait-ChildPortOutcome {
             # exec the child has either bound long ago or is never going to, so
             # there is no bind race left to lose.
             if (Test-PortBindable $Port) {
-                $Proc.WaitForExit()
+                Wait-ProcessWithCapture $Proc $Capture
                 return @{ State = 'Settled'; ExitCode = $Proc.ExitCode; Owner = 0 }
             }
             # Held by somebody, and never proven to be our child. Bounded
             # recovery beats an unbounded silent hang: spend the one retry.
             return @{ State = 'Stolen'; ExitCode = $null; Owner = $lastOwner }
         }
-        Start-Sleep -Milliseconds $BindPollMs
+        Start-SleepDraining $Capture $BindPollMs
     }
 }
 
@@ -620,7 +957,11 @@ $Tmux = ''
 if ($null -ne $env:TMUX) { $Tmux = [string]$env:TMUX }
 
 function Invoke-Passthrough {
-    return (Start-RealOpencode $Real $Argv $null)
+    # A caller-supplied --port puts the TUI on the same external HTTP transport
+    # that the auto-port path uses, so it produces the same abort report on
+    # exit. A passthrough subcommand (serve/run/attach/...) keeps its live
+    # stderr: Test-ExternalTuiLaunch returns false for those.
+    return (Start-RealOpencode $Real $Argv $null (Test-ExternalTuiLaunch $Argv))
 }
 
 # 1. outside tmux -> unchanged
@@ -691,15 +1032,17 @@ for ($attempt = 1; $attempt -le 2; $attempt++) {
     if (-not $Reserved) {
         # No reservation was made, so there is nothing to watch and nothing to
         # recover: identical to the pre-fix behaviour, down to not polling.
-        $ExitCode = Start-RealOpencode $Real (@('--port', [string]$Port) + $Argv) ([string]$Port)
+        # The launch still adds --port, so it still needs the abort-report
+        # filter ($true).
+        $ExitCode = Start-RealOpencode $Real (@('--port', [string]$Port) + $Argv) ([string]$Port) $true
         break
     }
 
-    $launch = New-OpencodeProcess $Real (@('--port', [string]$Port) + $Argv) ([string]$Port)
+    $launch = New-OpencodeProcess $Real (@('--port', [string]$Port) + $Argv) ([string]$Port) $true
     if (-not $launch.Ok) { exit $launch.ExitCode }
 
     $NeedTree = ($Real.Kind -ne 'exe')
-    $outcome = Wait-ChildPortOutcome $launch.Proc ([int]$Port) $NeedTree
+    $outcome = Wait-ChildPortOutcome $launch.Proc ([int]$Port) $NeedTree $launch.StderrCapture
     if ($outcome.State -eq 'Stolen') {
         if ($outcome.Owner -gt 0) {
             Write-Err ("[opencode-wrapper] port " + $Port + " is held by pid " + $outcome.Owner + ", not by the child it was reserved for -> child terminated")
@@ -707,6 +1050,7 @@ for ($attempt = 1; $attempt -le 2; $attempt++) {
             Write-Err ("[opencode-wrapper] port " + $Port + " is held but its owner could not be identified within " + $BindWaitMs + " ms -> child terminated")
         }
         Stop-OwnedProcessTree $launch.Proc $NeedTree
+        Write-CapturedStderr $launch.StderrCapture
         if ($attempt -ge 2) {
             Write-Err $MsgExhausted
             exit 1
@@ -714,6 +1058,7 @@ for ($attempt = 1; $attempt -le 2; $attempt++) {
         continue
     }
 
+    Write-CapturedStderr $launch.StderrCapture
     $ExitCode = $outcome.ExitCode
     if ($ExitCode -eq 0) { break }
     if (-not $Reserved) { break }
