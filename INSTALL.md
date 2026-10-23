@@ -1,4 +1,4 @@
-# Installing opencode-psmux-bridge on Windows
+# Installing omo-psmux-bridge on Windows
 
 A `tmux` shim, so that opencode's `oh-my-openagent` (OmO) plugin can open subagent
 panes under [psmux](https://github.com/psmux/psmux) instead of real tmux. No WSL,
@@ -68,7 +68,7 @@ is a setting you never learn exists.
 
 ### Option A: one line, nothing downloaded by hand
 
-Open a terminal (PowerShell or cmd) and paste this single line:
+Open **PowerShell** and paste this single line:
 
 ```
 iwr -useb https://github.com/danielrepublic/omo-psmux-bridge/releases/latest/download/install-bootstrap.ps1 -OutFile "$env:TEMP\omo-bridge-install.ps1"; powershell -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\omo-bridge-install.ps1"
@@ -78,17 +78,25 @@ That fetches a small bootstrap script, which downloads the newest release, print
 its size and sha256, unpacks it somewhere disposable, runs the installer, and
 cleans up after itself. No git, no bun, no admin rights.
 
+> This line is PowerShell, **not cmd.exe**. `iwr` is a PowerShell alias and
+> `$env:TEMP` is PowerShell syntax, so pasting it into `cmd` fails before it
+> downloads anything. If you are in cmd, run `powershell` first and paste the
+> line at the new prompt.
+
 ### Option B: download the zip
 
-1. Download `opencode-psmux-bridge-<version>-win-x64.zip` from the
+1. Download `omo-psmux-bridge-<version>-win-x64.zip` from the
    [releases page](https://github.com/danielrepublic/omo-psmux-bridge/releases).
 2. Extract it.
-3. Double-click `opencode-psmux-bridge\bin\install.cmd` — or run it from a
-   terminal:
+3. Double-click `omo-psmux-bridge\bin\install.cmd`. From a **PowerShell**
+   prompt you can also run:
 
    ```
-   & .\opencode-psmux-bridge\bin\install.cmd
+   & .\omo-psmux-bridge\bin\install.cmd
    ```
+
+   In `cmd.exe` the equivalent is `.\omo-psmux-bridge\bin\install.cmd`; the `&`
+   call operator is PowerShell syntax and is a parse error in cmd.
 
 > `install.cmd` exists because a `.ps1` unpacked from a downloaded zip carries a
 > Mark-of-the-Web mark, and PowerShell's default policy refuses to run those. The
@@ -121,6 +129,30 @@ opencode
 ```
 
 Now subagent panes should open.
+
+---
+
+## Upgrading from `opencode-psmux-bridge`
+
+Releases up to and including `v5.1.43-1` installed into
+`%LOCALAPPDATA%\opencode-psmux-bridge` and put that `bin` directory first on the
+user PATH. Installing this release upgrades that installation in place:
+
+- the old user PATH entry is **replaced** by
+  `%LOCALAPPDATA%\omo-psmux-bridge\bin`, which becomes the first entry. There is
+  still exactly one bridge entry, never two;
+- the old `state\` and `bin\state\` files (per-pane helper traces and the shim
+  call log) are copied into the new root. A file that already exists in the new
+  root is never overwritten;
+- the old `%LOCALAPPDATA%\opencode-psmux-bridge` directory is **left in place**.
+  A psmux server that was running before the upgrade may still hold files under
+  it: the installer never stops or otherwise touches a psmux session. Close those
+  sessions yourself, then delete the old folder manually once the new install
+  works.
+
+A competing bridge `bin` directory other than that exact legacy default is still
+refused (exit 2), exactly as before. Only the one old default directory this
+project shipped is treated as an upgrade source.
 
 ---
 
@@ -171,10 +203,15 @@ Exactly one persistent thing:
 
 | | |
 | --- | --- |
-| **What** | one entry prepended to your **user** `PATH`: `%LOCALAPPDATA%\opencode-psmux-bridge\bin` |
+| **What** | one entry prepended to your **user** `PATH`: `%LOCALAPPDATA%\omo-psmux-bridge\bin` |
 | **What was NOT touched** | the machine (`HKLM`) `PATH`, any other `PATH` entry or its order, the registry value kind, `setx`, any psmux or opencode file |
 
-Plus the files themselves, under `%LOCALAPPDATA%\opencode-psmux-bridge`:
+On an upgrade from the pre-rename installation, the only PATH change is that the
+legacy `opencode-psmux-bridge\bin` entry is replaced by the new one in the same
+place. Every other entry keeps its order, and the registry value kind is
+preserved.
+
+Plus the files themselves, under `%LOCALAPPDATA%\omo-psmux-bridge`:
 
 ```
 bin\tmux.exe                       the shim
@@ -201,7 +238,7 @@ Run the doctor. It is **read-only** — it starts nothing, kills nothing, writes
 nothing — and it names which of its four gates is responsible in one screen:
 
 ```
-& "$env:LOCALAPPDATA\opencode-psmux-bridge\bin\bridge-doctor.cmd"
+& "$env:LOCALAPPDATA\omo-psmux-bridge\bin\bridge-doctor.cmd"
 ```
 
 The four gates it checks:
@@ -218,7 +255,7 @@ psmux that was already running, every pane that server opens will keep resolving
 the old `tmux`. Quit psmux entirely and start it again.
 
 Every invocation is also logged to
-`%LOCALAPPDATA%\opencode-psmux-bridge\bin\state\shim-calls.jsonl`, one line per
+`%LOCALAPPDATA%\omo-psmux-bridge\bin\state\shim-calls.jsonl`, one line per
 call, with credential values redacted.
 
 ---
@@ -226,13 +263,13 @@ call, with credential values redacted.
 ## Uninstall
 
 ```
-powershell -NoProfile -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\opencode-psmux-bridge\bin\uninstall.ps1"
+powershell -NoProfile -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\omo-psmux-bridge\bin\uninstall.ps1"
 ```
 
 It removes only that one `PATH` entry, leaves every other entry in its original
 order, never touches the machine `PATH`, and reports whether the directory itself
 could be deleted right now. Deleting
-`%LOCALAPPDATA%\opencode-psmux-bridge` afterwards leaves nothing behind.
+`%LOCALAPPDATA%\omo-psmux-bridge` afterwards leaves nothing behind.
 
 Remember to also set `"tmux": { "enabled": false }` or remove the key in the
 OmO `[opencode]` block from Step 0,

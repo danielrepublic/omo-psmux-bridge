@@ -1,5 +1,5 @@
 # Windows-side bridge scripts are byte artifacts: they are deployed to
-%LOCALAPPDATA%\opencode-psmux-bridge and must stay byte-identical to the
+%LOCALAPPDATA%\omo-psmux-bridge and must stay byte-identical to the
 # installed copy, or the repo stops being a faithful mirror of what runs.
 #
 # Without this, git will normalise CRLF to LF on commit on some machines and
