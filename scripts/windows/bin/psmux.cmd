@@ -1,8 +1,8 @@
 @echo off
 rem ============================================================================
-rem  psmux.cmd -- the opencode-psmux-bridge launcher for the `psmux` command.
+rem  psmux.cmd -- the omo-psmux-bridge launcher for the `psmux` command.
 rem
-rem  Installed at %LOCALAPPDATA%\opencode-psmux-bridge\bin\psmux.cmd
+rem  Installed at %LOCALAPPDATA%\omo-psmux-bridge\bin\psmux.cmd
 rem  Contract: .omo/plans/omo-psmux-windows-parity.md, todo 8.
 rem
 rem  1. The real psmux EXE is resolved BY ABSOLUTE PATH from the registry value

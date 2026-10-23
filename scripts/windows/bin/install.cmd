@@ -1,6 +1,6 @@
 @echo off
 rem ============================================================================
-rem  install.cmd -- the opencode-psmux-bridge one-step installer entry point.
+rem  install.cmd -- the omo-psmux-bridge one-step installer entry point.
 rem
 rem  This file exists for ONE reason: to be double-clickable.
 rem
@@ -72,7 +72,7 @@ if not exist "%OMO_INSTALL_PS1%" (
     >&2 echo [install]   The zip was most likely extracted one directory too
     >&2 echo [install]   deep, so that bin\ and runtime\ are siblings of where
     >&2 echo [install]   you are now. Unzip it again so the tree looks like:
-    >&2 echo [install]     opencode-psmux-bridge\bin\install.cmd
+    >&2 echo [install]     omo-psmux-bridge\bin\install.cmd
     endlocal & exit /b 127
 )
 

@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Remove exactly one opencode-psmux-bridge bin directory entry from the USER PATH.
+    Remove exactly one omo-psmux-bridge bin directory entry from the USER PATH.
 
 .DESCRIPTION
     The exact inverse of install.ps1. It removes ONLY the bridge bin entry, in

@@ -1,6 +1,6 @@
 @echo off
 rem ---------------------------------------------------------------------------
-rem bridge-doctor -- read-only preflight for the opencode-psmux bridge.
+rem bridge-doctor -- read-only preflight for the omo-psmux-bridge.
 rem
 rem This launcher exists so the doctor is invocable by bare name from the bridge
 rem bin directory (Windows does not put .ps1 in PATHEXT, so the .ps1 alone is not
