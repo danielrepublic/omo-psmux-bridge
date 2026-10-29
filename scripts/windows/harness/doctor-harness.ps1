@@ -499,7 +499,7 @@ $healthyArgs = @('-Namespace', 'fxlive', '-Session', 'fresh', '-DataDir', $liveF
 # --- config-resolution fixtures ------------------------------------------------
 # The doctor's default -ConfigPath used to be a hardcoded
 # %USERPROFILE%\.omo\omo.jsonc. OmO resolves it as HOME ?? USERPROFILE ?? cwd and
-# then omo.jsonc, else omo.json (index.js:86113-86129), so the old default could
+# then omo.jsonc, else omo.json (index.js:87886-87902), so the old default could
 # point at a file OmO never opens. These two sandboxes drive the DEFAULT end to
 # end, through the real doctor, with no -ConfigPath at all.
 $cfgHomeJsonRoot = New-Dir (Join-Path $work 'cfg-home-json')

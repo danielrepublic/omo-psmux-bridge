@@ -10,8 +10,8 @@
 //
 //   * Wrong FILE. `tmux.enabled` is read by
 //       isTmuxIntegrationEnabled(pluginConfig) -> pluginConfig.tmux?.enabled ?? false
-//     (index.js:141385-141386), and pluginConfig is the `[opencode]` block of the
-//     OMO config chain (index.js:26355-26369). It is never a top-level `tmux` key
+//     (index.js:144880-144881), and pluginConfig is the `[opencode]` block of the
+//     OMO config chain (index.js:91076-91090). It is never a top-level `tmux` key
 //     in opencode.jsonc.
 //   * Wrong METHOD. A raw regex answers TRUE for a config whose only match is a
 //     comment:
@@ -21,24 +21,24 @@
 //     this file guards is demonstrably real rather than hypothetical.
 //
 // The resolution rules the installer must mirror, verified against the real
-// 5.1.35 bundle:
-//   21414  resolveHomeDir: env.HOME ?? env.USERPROFILE ?? process.cwd()
-//   21424  detectUserOmoJsonPath: <home>/.omo/omo.jsonc if it exists,
+// 5.1.51 bundle:
+//   87886  resolveHomeDir: env.HOME ?? env.USERPROFILE ?? process.cwd()
+//   87896  detectUserOmoJsonPath: <home>/.omo/omo.jsonc if it exists,
 //          else <home>/.omo/omo.json if it exists, else <home>/.omo/omo.jsonc
-//   21485  resolveOmoConfigPaths is the LOADER and calls detectUserOmoJsonPath.
-//          resolveUserOmoConfigPath (21418) is only the WRITE path, so it
+//   87957  resolveOmoConfigPaths is the LOADER and calls detectUserOmoJsonPath.
+//          resolveUserOmoConfigPath (87890) is only the WRITE path, so it
 //          must not be used to model loading.
 //
 // The SHIPPED citations are the CURRENT ones, verified against the installed
-// oh-my-openagent@5.1.43 bundle (dist/index.js):
-//   86113-86129   resolveHomeDir / detectUserOmoJsonPath -- the user file rules
-//   86184         resolveOmoConfigPaths, the LOADER (86187 calls
-//                 detectUserOmoJsonPath); resolveUserOmoConfigPath (86117) is
+// oh-my-openagent@5.1.51 bundle (dist/index.js):
+//   87886-87902   resolveHomeDir / detectUserOmoJsonPath -- the user file rules
+//   87957         resolveOmoConfigPaths, the LOADER (87960 calls
+//                 detectUserOmoJsonPath); resolveUserOmoConfigPath (87890) is
 //                 still only the WRITE path
-//   88391-88405   loadOmoOpenCodeConfigChain -- the config chain
-//   88402-88405   its appendViews block: baseView, the "[opencode]." prefix,
+//   91076-91090   loadOmoOpenCodeConfigChain -- the config chain
+//   91087-91090   its appendViews block: baseView, the "[opencode]." prefix,
 //                 the profile block, and the profile+[opencode] combination
-//   141385-141386 isTmuxIntegrationEnabled: pluginConfig.tmux?.enabled ?? false
+//   144880-144881 isTmuxIntegrationEnabled: pluginConfig.tmux?.enabled ?? false
 //
 // The 5.1.35 spelling of that appendViews block was 26366-26369. In 5.1.40 that
 // range is a model catalogue entry, so a live citation of it names nothing.
@@ -186,7 +186,7 @@ describe("install.ps1 advice names the file OmO actually reads", () => {
 
   test("it states the real resolution rules instead of asserting omo.jsonc", () => {
     expect(install).toContain("omo.jsonc when it exists, else omo.json");
-    expect(install).toContain("index.js:86113-86129");
+    expect(install).toContain("index.js:87886-87902");
     // The merged-layer caveat: a project config can enable tmux while the user
     // file says false, so a FAIL here is not proof about the effective config.
     expect(install).toContain("merges");
@@ -199,7 +199,7 @@ describe("install.ps1 advice names the file OmO actually reads", () => {
     const advice = install
       .split(/\r?\n/)
       .find((line) => line.includes("project layers and a profile block")) ?? "";
-    expect(advice).toContain("88402-88405");
+    expect(advice).toContain("91087-91090");
     expect(install).not.toContain("26366-26369");
     expect(install).not.toContain("index.js:86054,21430");
   });
