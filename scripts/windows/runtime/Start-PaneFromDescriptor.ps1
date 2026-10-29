@@ -94,6 +94,10 @@ $script:AttachReadyWaitMs = 5000
 $script:AttachPollIntervalMs = 250
 $script:AttachRetryWaitMs = 2000
 
+$script:PaneAuthFileVariable = 'OPENCODE_SERVER_PASSWORD_FILE'
+$script:PaneAuthPasswordVariable = 'OPENCODE_SERVER_PASSWORD'
+$script:PaneAuthFileMaxBytes = 65536
+
 function Write-BridgeError {
     param([string] $Message)
     [Console]::Error.WriteLine("omo-psmux-bridge: $Message")
@@ -290,6 +294,77 @@ function Split-EnvAssignment {
         name = $Assignment.Substring(0, $separator)
         value = $Assignment.Substring($separator + 1)
     }
+}
+
+function ConvertFrom-PaneAuthFile {
+    <#
+        Parse OmO 5.1.51's one-use credential file without executing it.
+
+        The file is exactly one POSIX line:
+            export OPENCODE_SERVER_PASSWORD='<value>'
+        with every apostrophe in the value encoded as the four characters '\''.
+        Returns @{ ok = $true; password = ... } or @{ ok = $false; reason = ... }.
+        Never dot-sources the file: a swapped file would otherwise become code
+        execution in the pane, while this parser turns a swap into a visible
+        authentication failure.
+    #>
+    param([string] $Path)
+    try {
+        $item = Get-Item -LiteralPath $Path -Force -ErrorAction Stop
+        if ($item.Length -gt $script:PaneAuthFileMaxBytes) {
+            return @{ ok = $false; reason = 'oversized' }
+        }
+        $text = [System.IO.File]::ReadAllText($Path, [System.Text.Encoding]::UTF8)
+    }
+    catch {
+        return @{ ok = $false; reason = 'unreadable' }
+    }
+    if ($text.Length -gt 0 -and [int][char]$text[0] -eq 0xFEFF) {
+        $text = $text.Substring(1)
+    }
+    $prefix = 'export ' + $script:PaneAuthPasswordVariable + '='
+    if (-not $text.StartsWith($prefix, [System.StringComparison]::Ordinal)) {
+        return @{ ok = $false; reason = 'missing-export' }
+    }
+    $rest = $text.Substring($prefix.Length)
+    if ($rest.Length -lt 2 -or $rest[0] -ne "'") {
+        return @{ ok = $false; reason = 'missing-quote' }
+    }
+    $end = $rest.Length - 1
+    while ($end -gt 0 -and ($rest[$end] -eq "`n" -or $rest[$end] -eq "`r")) {
+        $end -= 1
+    }
+    if ($end -lt 1 -or $rest[$end] -ne "'") {
+        return @{ ok = $false; reason = 'unterminated' }
+    }
+    $inner = $rest.Substring(1, $end - 1)
+    $password = $inner.Replace("'\''", "'")
+    if ($password.Length -eq 0) {
+        return @{ ok = $false; reason = 'empty' }
+    }
+    return @{ ok = $true; password = $password }
+}
+
+function Resolve-PaneAuthEnvironment {
+    <#
+        Consume the one-use file named by OPENCODE_SERVER_PASSWORD_FILE. The
+        file is read, parsed, deleted, and the deletion is verified before the
+        password is applied to this process. Returns a status string:
+        none, absent, consumed, delete-unverified, or a parser reason.
+    #>
+    param([string] $Path)
+    if ([string]::IsNullOrEmpty($Path)) { return 'none' }
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return 'absent' }
+    $parsed = ConvertFrom-PaneAuthFile -Path $Path
+    if (-not $parsed.ok) { return [string]$parsed.reason }
+    try {
+        Remove-Item -LiteralPath $Path -Force -ErrorAction Stop
+    }
+    catch {
+    }
+    if (Test-Path -LiteralPath $Path) { return 'delete-unverified' }
+    [System.Environment]::SetEnvironmentVariable($script:PaneAuthPasswordVariable, [string]$parsed.password, [System.EnvironmentVariableTarget]::Process)
+    return 'consumed'
 }
 
 function Set-PaneProcessEnvironment {
@@ -574,6 +649,7 @@ $opening = [ordered]@{
     attachRetryApplies = [bool]$isAttach
     attachWaitMs = 0
     attachRetries = 0
+    authFileOutcome = 'pending'
     exitCode = 0
     outcome = 'opened'
 }
@@ -620,7 +696,8 @@ function Exit-WithTrace {
         [bool] $DescriptorFileUsed,
         [bool] $DeleteVerified,
         [int] $AttachWaitMs,
-        [int] $AttachRetries
+        [int] $AttachRetries,
+        [string] $AuthFileOutcome = 'none'
     )
     if ($traceAvailable -and -not [string]::IsNullOrEmpty($tracePath)) {
         $record = [ordered]@{
@@ -638,6 +715,7 @@ function Exit-WithTrace {
             attachRetryApplies = [bool]$isAttach
             attachWaitMs = $AttachWaitMs
             attachRetries = $AttachRetries
+            authFileOutcome = $AuthFileOutcome
             exitCode = $Code
             outcome = $Outcome
         }
@@ -775,6 +853,39 @@ else {
 }
 
 # ---------------------------------------------------------------------------
+# Consume OmO 5.1.51's one-use pane auth file, if this pane has one.
+#
+# The path arrives as an ordinary environment assignment (a slot on subagent
+# panes, the pane environment on team panes). The file is consumed HERE, at pane
+# start, rather than by the shim: OmO retries the same argv after a transient
+# psmux failure, and a shim-time delete would make the retry undeliverable.
+#
+# An attach without a usable credential must fail closed. A placeholder keeps
+# running without it, because its job is to keep the pane alive until the
+# attach respawn, which carries its own file.
+# ---------------------------------------------------------------------------
+
+$authFileOutcome = 'none'
+$authFilePath = [System.Environment]::GetEnvironmentVariable($script:PaneAuthFileVariable, [System.EnvironmentVariableTarget]::Process)
+if (-not [string]::IsNullOrEmpty($authFilePath)) {
+    $authFileOutcome = Resolve-PaneAuthEnvironment -Path $authFilePath
+    if ($authFileOutcome -eq 'delete-unverified') {
+        Exit-WithTrace -Outcome 'delete-unverified' -Mechanism $mechanism -Code $script:ExitDeleteUnverified -Message 'EX_OSERR: the pane auth file could not be removed; refusing to run with a credential that may outlive the read' -SlotNames $slotNames -DescriptorFileUsed $descriptorFileUsed -DeleteVerified $false -AttachWaitMs 0 -AttachRetries 0 -AuthFileOutcome $authFileOutcome
+    }
+    if ($isAttach -and $authFileOutcome -ne 'consumed') {
+        $authCode = $script:ExitMalformed
+        $authOutcome = 'malformed'
+        $authMessage = 'EX_DATAERR: the pane auth file is not a valid one-use credential file'
+        if ($authFileOutcome -eq 'absent') {
+            $authCode = $script:ExitAbsent
+            $authOutcome = 'absent'
+            $authMessage = 'EX_NOINPUT: the pane auth file is unavailable; refusing to attach without it'
+        }
+        Exit-WithTrace -Outcome $authOutcome -Mechanism $mechanism -Code $authCode -Message $authMessage -SlotNames $slotNames -DescriptorFileUsed $descriptorFileUsed -DeleteVerified $true -AttachWaitMs 0 -AttachRetries 0 -AuthFileOutcome $authFileOutcome
+    }
+}
+
+# ---------------------------------------------------------------------------
 # Run the command, with the attach readiness wait and the single retry.
 # ---------------------------------------------------------------------------
 
@@ -802,4 +913,4 @@ if ($exitCode -ne 0) {
     else { $outcome = 'delivered' }
 }
 
-Exit-WithTrace -Outcome $outcome -Mechanism $mechanism -Code $exitCode -Message '' -SlotNames $slotNames -DescriptorFileUsed $descriptorFileUsed -DeleteVerified $deleteVerified -AttachWaitMs $attachWaitMs -AttachRetries $attachRetries
+Exit-WithTrace -Outcome $outcome -Mechanism $mechanism -Code $exitCode -Message '' -SlotNames $slotNames -DescriptorFileUsed $descriptorFileUsed -DeleteVerified $deleteVerified -AttachWaitMs $attachWaitMs -AttachRetries $attachRetries -AuthFileOutcome $authFileOutcome

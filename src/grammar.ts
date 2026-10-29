@@ -66,6 +66,11 @@ interface RecognisedBase {
   readonly payload: string;
   /** Zero or more `-e` pairs. Empty is the NORMAL case (index.js:8334). */
   readonly envArgs: readonly AuthEnvArg[];
+  /** True iff OmO 5.1.51 prepended its file-backed auth fragment. The fragment
+   *  is stripped only for template parsing; `payload` keeps the original bytes
+   *  as provenance. A pane marked true needs `OPENCODE_SERVER_PASSWORD_FILE`
+   *  delivered or it must fail closed rather than run unauthenticated. */
+  readonly authFileBacked: boolean;
 }
 
 export interface PlaceholderSplit extends RecognisedBase {
@@ -152,6 +157,18 @@ const ATTACH_HEAD = "opencode attach ";
 const ATTACH_SESSION_SEP = " --session ";
 const ATTACH_DIR_SEP = " --dir ";
 
+/**
+ * The constant body prefix OmO 5.1.51 prepends when
+ * `OPENCODE_SERVER_PASSWORD` is set (index.js:8285-8289, escaped by
+ * buildTmuxAttachCommand/buildTmuxPlaceholderCommand at :8391/:8409).
+ *
+ * It contains no interpolated value, so it is matched byte-exactly. The
+ * fragment sources a one-use credential file and deletes it. It is stripped
+ * before template parsing; `payload` keeps the original bytes.
+ */
+const AUTH_FILE_PREFIX_551 =
+  '. \\"\\$OPENCODE_SERVER_PASSWORD_FILE\\" && rm -f -- \\"\\$OPENCODE_SERVER_PASSWORD_FILE\\" && ';
+
 // ---------------------------------------------------------------------------
 // Public entry point
 // ---------------------------------------------------------------------------
@@ -234,10 +251,11 @@ export function classifyArgv(argv: readonly string[]): Classified {
     const base = {
       argv: [...argv],
       flags,
-      payload: payload.body,
+      payload: payload.payload,
       envArgs,
       description: payload.description,
       descriptionEncoding: payload.descriptionEncoding,
+      authFileBacked: payload.authFileBacked,
     };
     switch (verb) {
       case "split-window":
@@ -261,8 +279,9 @@ export function classifyArgv(argv: readonly string[]): Classified {
       argv: [...argv],
       kind: "attach-respawn",
       flags,
-      payload: payload.body,
+      payload: payload.payload,
       envArgs,
+      authFileBacked: payload.authFileBacked,
       serverUrlQuoted: payload.serverUrlQuoted,
       sessionIdQuoted: payload.sessionIdQuoted,
       directoryQuoted: payload.directoryQuoted,
@@ -337,16 +356,18 @@ function scanAuthEnvArgs(head: readonly string[]): ScannedHead | undefined {
 type ParsedPayload =
   | {
       readonly kind: "placeholder";
-      readonly body: string;
+      readonly payload: string;
       readonly description: string;
       readonly descriptionEncoding: PlaceholderEncoding;
+      readonly authFileBacked: boolean;
     }
   | {
       readonly kind: "attach";
-      readonly body: string;
+      readonly payload: string;
       readonly serverUrlQuoted: string;
       readonly sessionIdQuoted: string;
       readonly directoryQuoted: string;
+      readonly authFileBacked: boolean;
     };
 
 /**
@@ -361,7 +382,11 @@ function parsePayloadElement(element: string): ParsedPayload | undefined {
   if (!element.startsWith(SHELL_PREFIX)) return undefined;
   if (!element.endsWith('"')) return undefined;
 
-  const body = element.slice(SHELL_PREFIX.length, element.length - 1);
+  const payload = element.slice(SHELL_PREFIX.length, element.length - 1);
+  if (payload.length === 0) return undefined;
+
+  const authFileBacked = payload.startsWith(AUTH_FILE_PREFIX_551);
+  const body = authFileBacked ? payload.slice(AUTH_FILE_PREFIX_551.length) : payload;
   if (body.length === 0) return undefined;
 
   if (body.startsWith(PLACEHOLDER_HEAD) && body.endsWith(PLACEHOLDER_TAIL)) {
@@ -369,14 +394,24 @@ function parsePayloadElement(element: string): ParsedPayload | undefined {
       PLACEHOLDER_HEAD.length,
       body.length - PLACEHOLDER_TAIL.length,
     );
-    return { kind: "placeholder", body, description, descriptionEncoding: "escaped-doublequote" };
+    return {
+      kind: "placeholder",
+      payload,
+      description,
+      descriptionEncoding: "escaped-doublequote",
+      authFileBacked,
+    };
   }
 
   if (body.startsWith(PLACEHOLDER_PREFIX_535)) {
-    return parsePlaceholder535Body(body);
+    const parsed = parsePlaceholder535Body(body);
+    return parsed === undefined ? undefined : { ...parsed, payload, authFileBacked };
   }
 
-  if (body.startsWith(ATTACH_HEAD)) return parseAttachBody(body);
+  if (body.startsWith(ATTACH_HEAD)) {
+    const parsed = parseAttachBody(body);
+    return parsed === undefined ? undefined : { ...parsed, payload, authFileBacked };
+  }
 
   return undefined;
 }
@@ -393,7 +428,7 @@ function parsePayloadElement(element: string): ParsedPayload | undefined {
  */
 function parsePlaceholder535Body(
   body: string,
-): Extract<ParsedPayload, { readonly kind: "placeholder" }> | undefined {
+): { readonly kind: "placeholder"; readonly description: string; readonly descriptionEncoding: PlaceholderEncoding } | undefined {
   const banner = readSingleQuotedToken(body, PLACEHOLDER_PREFIX_535.length);
   if (banner === undefined) return undefined;
   if (!banner.token.startsWith(PLACEHOLDER_BANNER_OPEN_535)) return undefined;
@@ -403,7 +438,7 @@ function parsePlaceholder535Body(
 
   const inner = banner.token.slice(1, -1);
   const description = inner.slice(PLACEHOLDER_BANNER_OPEN_535.length - 1);
-  return { kind: "placeholder", body, description, descriptionEncoding: "singlequote" };
+  return { kind: "placeholder", description, descriptionEncoding: "singlequote" };
 }
 
 /**
@@ -417,7 +452,7 @@ function parsePlaceholder535Body(
  */
 function parseAttachBody(
   body: string,
-): Extract<ParsedPayload, { readonly kind: "attach" }> | undefined {
+): { readonly kind: "attach"; readonly serverUrlQuoted: string; readonly sessionIdQuoted: string; readonly directoryQuoted: string } | undefined {
   let cursor = ATTACH_HEAD.length;
 
   const url = readSingleQuotedToken(body, cursor);
@@ -443,7 +478,6 @@ function parseAttachBody(
 
   return {
     kind: "attach",
-    body,
     serverUrlQuoted: url.token,
     sessionIdQuoted: sessionId.token,
     directoryQuoted: directory.token,

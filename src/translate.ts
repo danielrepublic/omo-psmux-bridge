@@ -459,7 +459,9 @@ export type SuppressionReason =
  * removes a whole `-F` element, and the logged argv alone cannot say whether the
  * caller omitted it or the bridge did. This slug is that missing fact.
  */
-export type RewriteReason = "psmux-client-treats-display-F-as-message-text";
+export type RewriteReason =
+  | "psmux-client-treats-display-F-as-message-text"
+  | "omo-551-team-auth-send-keys";
 
 /**
  * One extra psmux invocation, to be run AFTER the primary `argv`.
@@ -735,6 +737,139 @@ function stripDisplayFormatFlag(
   };
 }
 
+/** The raw (unescaped) fragment OmO 5.1.51 prefixes to the authenticated team
+ *  attach text it types with `send-keys` (index.js:21197). Unlike the subagent
+ *  payload, this text is not nested inside a `sh -c "…"`, so the quotes and
+ *  dollars are bare. */
+const TEAM_AUTH_PREFIX_551 =
+  '. "$OPENCODE_SERVER_PASSWORD_FILE" && rm -f -- "$OPENCODE_SERVER_PASSWORD_FILE" && ';
+
+const TEAM_ATTACH_HEAD = "opencode attach ";
+
+/**
+ * Read one POSIX single-quoted token, reversing `shellSingleQuote`
+ * (index.js:21155-21156), which encodes an apostrophe as the four characters
+ * `'\''`. Returns the unescaped value and the index just past the token.
+ */
+function readPosixSingleQuotedToken(
+  text: string,
+  start: number,
+): { readonly value: string; readonly next: number } | undefined {
+  if (text[start] !== "'") return undefined;
+  let index = start + 1;
+  let value = "";
+  while (index < text.length) {
+    if (text[index] === "'") {
+      if (text[index + 1] === "\\" && text[index + 2] === "'" && text[index + 3] === "'") {
+        value += "'";
+        index += 4;
+        continue;
+      }
+      return { value, next: index + 1 };
+    }
+    value += text[index];
+    index += 1;
+  }
+  return undefined;
+}
+
+/**
+ * Parse the authenticated team attach text OmO types into a teammate pane:
+ *
+ *   . "$OPENCODE_SERVER_PASSWORD_FILE" && rm -f -- "$OPENCODE_SERVER_PASSWORD_FILE" && opencode attach '<url>' --session '<sid>' --dir '<dir>'
+ *
+ * Deliberately narrow: the whole string must match, including the auth prefix
+ * and the trailing end of the directory token. Anything else is not this shape
+ * and stays pass-through.
+ */
+function parseTeamAttachText(
+  text: string,
+): { readonly url: string; readonly sessionId: string; readonly directory: string } | undefined {
+  if (!text.startsWith(TEAM_AUTH_PREFIX_551)) return undefined;
+  let cursor = TEAM_AUTH_PREFIX_551.length;
+  if (!text.startsWith(TEAM_ATTACH_HEAD, cursor)) return undefined;
+  cursor += TEAM_ATTACH_HEAD.length;
+
+  const url = readPosixSingleQuotedToken(text, cursor);
+  if (url === undefined) return undefined;
+  cursor = url.next;
+
+  if (!text.startsWith(" --session ", cursor)) return undefined;
+  cursor += " --session ".length;
+
+  const sessionId = readPosixSingleQuotedToken(text, cursor);
+  if (sessionId === undefined) return undefined;
+  cursor = sessionId.next;
+
+  if (!text.startsWith(" --dir ", cursor)) return undefined;
+  cursor += " --dir ".length;
+
+  const directory = readPosixSingleQuotedToken(text, cursor);
+  if (directory === undefined) return undefined;
+  if (directory.next !== text.length) return undefined;
+
+  return { url: url.value, sessionId: sessionId.value, directory: directory.value };
+}
+
+/**
+ * Rule 1f: rewrite OmO 5.1.51's authenticated team attach `send-keys` into the
+ * same pane-start helper invocation the subagent attach path uses.
+ *
+ * On Windows the typed text is POSIX and the teammate pane's shell is
+ * PowerShell, so forwarding it would type an invalid command. The helper reads
+ * `OPENCODE_SERVER_PASSWORD_FILE` from the pane environment (set by the split's
+ * `-e`), consumes the one-use file, and runs `opencode attach` with the
+ * credential applied. The target, the trailing `Enter` and any leading globals
+ * are preserved.
+ */
+function rewriteTeamAttachSendKeys(
+  argv: readonly string[],
+  options: TranslateOptions,
+): Translation | undefined {
+  if (argv.length !== 5) return undefined;
+  if (argv[0] !== "send-keys" || argv[1] !== "-t" || argv[4] !== "Enter") return undefined;
+  const paneId = argv[2];
+  const text = argv[3];
+  if (paneId === undefined || text === undefined) return undefined;
+
+  const attach = parseTeamAttachText(text);
+  if (attach === undefined) return undefined;
+
+  const shellPath = options.shellPath ?? HELPER_CONTRACT.shell;
+  const commandLine = buildHelperCommandLine({
+    shellPath,
+    helperPath: options.helperPath,
+    payload: text,
+    command: [
+      HELPER_CONTRACT.attachProgram,
+      HELPER_CONTRACT.attachVerb,
+      attach.url,
+      "--session",
+      attach.sessionId,
+      "--dir",
+      attach.directory,
+    ],
+    cwd: undefined,
+    envSlotCount: 0,
+    correlationId: options.correlationId,
+  });
+
+  return {
+    argv: [...(options.leadingGlobals ?? []), "send-keys", "-t", paneId, commandLine, "Enter"],
+    kind: "helper",
+    suppressionReason: undefined,
+    rewriteReason: "omo-551-team-auth-send-keys",
+    followUps: [],
+    rewritten: true,
+    dashDashInserted: false,
+    psmuxPath: options.psmuxPath,
+    envSlots: [],
+    envSlotCount: 0,
+    helperCommandLine: commandLine,
+    correlationId: options.correlationId,
+  };
+}
+
 /**
  * The layout and team-mode rules, applied to one pass-through argv.
  *
@@ -745,7 +880,12 @@ function stripDisplayFormatFlag(
  * untouched.
  */
 function translatePassThrough(argv: readonly string[], options: TranslateOptions): Translation {
-  // Rule D0 first: it is keyed on `display` / `display-message`, so it cannot
+  // Rule 1f first: `send-keys` cannot collide with the display, option or resize
+  // verbs below, and handling it before them keeps the authenticated team shape
+  // from ever reaching a rule that was written for a different verb.
+  const teamAttach = rewriteTeamAttachSendKeys(argv, options);
+  if (teamAttach !== undefined) return teamAttach;
+  // Rule D0 next: it is keyed on `display` / `display-message`, so it cannot
   // collide with rules 1a-1e, which are keyed on set-option and resize verbs.
   const displayRewrite = stripDisplayFormatFlag(argv, options);
   if (displayRewrite !== undefined) return displayRewrite;

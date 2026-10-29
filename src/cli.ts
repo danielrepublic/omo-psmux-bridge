@@ -391,8 +391,13 @@ function capElement(element: string): string {
  */
 function loggedArgv(translation: Translation): string[] {
   const safe = sanitisedArgv(translation.argv);
-  if (translation.kind === "helper") {
-    if (safe.length > 0) safe[safe.length - 1] = CLI_CONTRACT.helperInvocationPlaceholder;
+  if (translation.kind === "helper" && translation.helperCommandLine !== undefined) {
+    // Not the last element for a team attach: `send-keys` keeps its trailing
+    // `Enter`, so find the helper by identity rather than by position.
+    const index = translation.argv.indexOf(translation.helperCommandLine);
+    if (index !== -1 && safe[index] !== undefined) {
+      safe[index] = CLI_CONTRACT.helperInvocationPlaceholder;
+    }
   }
   return safe;
 }

@@ -129,6 +129,17 @@ function writeFallback(id: string, body: string): string {
   return path;
 }
 
+/** OmO 5.1.51's one-use credential file, byte-for-byte. */
+function authFileBody(password: string): string {
+  return `export OPENCODE_SERVER_PASSWORD='${password.replaceAll("'", "'\\''")}'\n`;
+}
+
+function writeAuthFile(tag: string, password: string): string {
+  const path = track(join(SANDBOX, `auth-${tag}.sh`));
+  writeFileSync(path, authFileBody(password), "utf8");
+  return path;
+}
+
 /** The helper's trace record. Typed rather than `Record<string, unknown>` on
  *  purpose: tsconfig enables noPropertyAccessFromIndexSignature, so an index
  *  signature would force every field read in this file to be written
@@ -147,6 +158,7 @@ interface TraceRecord {
   readonly attachRetryApplies: boolean;
   readonly attachWaitMs: number;
   readonly attachRetries: number;
+  readonly authFileOutcome: string;
   readonly exitCode: number;
   readonly outcome: string;
 }
@@ -320,7 +332,7 @@ const OBSERVER_SCRIPT = [
   "    args = @($args)",
   "    env = [ordered]@{}",
   "}",
-  `foreach ($n in @(${psQuote(SLOT_USER)}, ${psQuote(SLOT_TOKEN)})) {`,
+  `foreach ($n in @(${psQuote(SLOT_USER)}, ${psQuote(SLOT_TOKEN)}, 'OPENCODE_SERVER_PASSWORD')) {`,
   "    $o.env[$n] = [System.Environment]::GetEnvironmentVariable($n)",
   "}",
   "$json = $o | ConvertTo-Json -Compress -Depth 5",
@@ -672,6 +684,104 @@ function helperSuite({ label, exe, slow, lossyNativeBinding }: SuiteOptions): vo
         const observed = readReport(report).env;
         expect(observed[SLOT_USER]).toBe(SECRET_USER);
         expect(observed[SLOT_TOKEN]).toBe(SECRET_TOKEN);
+      });
+    });
+
+    // -- OmO 5.1.51 one-use pane auth file -----------------------------------
+
+    describe("OmO 5.1.51 pane auth file", () => {
+      qa("a good file is consumed and the password reaches the pane", () => {
+        const id = correlationId("authgood");
+        track(tracePath(id));
+        const report = reportFor("authgood");
+        const password = "p'w=1\nx";
+        const file = writeAuthFile("good", password);
+        const run = runHelper(exe, {
+          commandJson: JSON.stringify([OBSERVER, report, "0"]),
+          envSlots: 1,
+          env: { OMO_PANE_ENV_0: `OPENCODE_SERVER_PASSWORD_FILE=${file}` },
+          correlation: id,
+        });
+        expect(run.status).toBe(0);
+        expect(existsSync(file)).toBe(false);
+        expect(readReport(report).env["OPENCODE_SERVER_PASSWORD"]).toBe(password);
+        expect(readTrace(id).at(-1)?.authFileOutcome).toBe("consumed");
+        expect(readTraceText(id)).not.toContain(password);
+      });
+
+      qa("an attach refuses when the file is absent", () => {
+        const id = correlationId("authabsent");
+        track(tracePath(id));
+        const report = reportFor("authabsent");
+        const missing = join(SANDBOX, "auth-missing.sh");
+        const run = runHelper(exe, {
+          commandJson: JSON.stringify(["opencode", "attach", "http://127.0.0.1:9/", "--session", "qa"]),
+          envSlots: 1,
+          env: { OMO_PANE_ENV_0: `OPENCODE_SERVER_PASSWORD_FILE=${missing}` },
+          correlation: id,
+        });
+        expect(run.status).toBe(66);
+        expect(existsSync(report)).toBe(false);
+        expect(readTrace(id).at(-1)?.outcome).toBe("absent");
+        expect(readTrace(id).at(-1)?.authFileOutcome).toBe("absent");
+      });
+
+      qa("an attach refuses a malformed file", () => {
+        const id = correlationId("authbad");
+        track(tracePath(id));
+        const file = track(join(SANDBOX, "auth-bad.sh"));
+        writeFileSync(file, "export OPENCODE_SERVER_PASSWORD=notquoted\n", "utf8");
+        const run = runHelper(exe, {
+          commandJson: JSON.stringify(["opencode", "attach", "http://127.0.0.1:9/", "--session", "qa"]),
+          envSlots: 1,
+          env: { OMO_PANE_ENV_0: `OPENCODE_SERVER_PASSWORD_FILE=${file}` },
+          correlation: id,
+        });
+        expect(run.status).toBe(65);
+        expect(existsSync(file)).toBe(true);
+        expect(readTrace(id).at(-1)?.outcome).toBe("malformed");
+        expect(readTrace(id).at(-1)?.authFileOutcome).toBe("missing-quote");
+      });
+
+      qa("a placeholder keeps running when the file is absent", () => {
+        const id = correlationId("authplaceholder");
+        track(tracePath(id));
+        const report = reportFor("authplaceholder");
+        const missing = join(SANDBOX, "auth-placeholder-missing.sh");
+        const script = `[System.IO.File]::WriteAllText('${report.replaceAll("'", "''")}', 'ran')`;
+        const run = runHelper(exe, {
+          commandJson: JSON.stringify([POWERSHELL_51, "-NoProfile", "-NonInteractive", "-Command", script]),
+          envSlots: 1,
+          env: { OMO_PANE_ENV_0: `OPENCODE_SERVER_PASSWORD_FILE=${missing}` },
+          correlation: id,
+        });
+        expect(run.status).toBe(0);
+        expect(existsSync(report)).toBe(true);
+        expect(readTrace(id).at(-1)?.authFileOutcome).toBe("absent");
+      });
+
+      qa("a consumed file cannot be reused by a second attach", () => {
+        const id = correlationId("authonce");
+        track(tracePath(id));
+        const file = writeAuthFile("once", "sentinel");
+        const report = reportFor("authonce-placeholder");
+        const script = `[System.IO.File]::WriteAllText('${report.replaceAll("'", "''")}', 'ran')`;
+        const first = runHelper(exe, {
+          commandJson: JSON.stringify([POWERSHELL_51, "-NoProfile", "-NonInteractive", "-Command", script]),
+          envSlots: 1,
+          env: { OMO_PANE_ENV_0: `OPENCODE_SERVER_PASSWORD_FILE=${file}` },
+          correlation: id,
+        });
+        expect(first.status).toBe(0);
+        expect(existsSync(file)).toBe(false);
+
+        const second = runHelper(exe, {
+          commandJson: JSON.stringify(["opencode", "attach", "http://127.0.0.1:9/", "--session", "qa"]),
+          envSlots: 1,
+          env: { OMO_PANE_ENV_0: `OPENCODE_SERVER_PASSWORD_FILE=${file}` },
+          correlation: correlationId("authonce2"),
+        });
+        expect(second.status).toBe(66);
       });
     });
 
