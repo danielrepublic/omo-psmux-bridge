@@ -4,10 +4,11 @@ A `tmux` shim, so that opencode's `oh-my-openagent` (OmO) plugin can open subage
 panes under [psmux](https://github.com/psmux/psmux) instead of real tmux. No WSL,
 no Git Bash, no Cygwin.
 
-Windows protocol smoke tested with **OpenCode v1 1.19.4**, **OmO 5.1.43**,
-and **psmux 3.4.0**. See the [runtime evidence](.omo/evidence/omo5143-1-windows-smoke-report-20261023.json)
-for split, placeholder, respawn, real OpenCode attach, close, plugin loading,
-and doctor checks.
+Windows protocol smoke tested with **OpenCode v1 1.19.5**, **OmO 5.1.51**,
+and **psmux 3.4.0**. See the [auth smoke driver](.omo/evidence/omo5151-windows-auth-smoke-20261029.cjs)
+and its report for authenticated and unauthenticated split, placeholder,
+respawn, real OpenCode attach, team attach, close, plugin loading, and doctor
+checks.
 This is not a full interactive-parity claim. The detailed source contract still
 pins **psmux 3.3.8**; the newer runtime smoke does not retire its workarounds.
 
@@ -155,6 +156,17 @@ refused (exit 2), exactly as before. Only the one old default directory this
 project shipped is treated as an upgrade source.
 
 ---
+
+## OmO 5.1.51 authenticated panes
+
+OmO 5.1.51 no longer puts `OPENCODE_SERVER_PASSWORD` in argv. It writes a
+one-use file under `%TEMP%\omo-run-auth-*\` and passes
+`-e OPENCODE_SERVER_PASSWORD_FILE=<path>`; the pane command sources and deletes
+that file. On Windows the bridge's helper consumes the file at pane start,
+applies `OPENCODE_SERVER_PASSWORD`, and verifies the deletion. If an attach
+cannot consume the file it fails closed; a placeholder keeps the pane alive.
+Team mode's `send-keys` attach is rewritten to the same helper. No credential
+value is written to the bridge's call log, pane trace, or descriptor.
 
 ## Team mode
 

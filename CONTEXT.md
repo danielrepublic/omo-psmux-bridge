@@ -62,6 +62,16 @@ Its value is sensitive even when its name does not look like a credential.
 A consume-once carrier used when the pane cannot inherit all of its environment slots.
 _Avoid_: log, credential cache.
 
+**Pane Auth File**:
+The one-use POSIX export file OmO 5.1.51 names in
+`OPENCODE_SERVER_PASSWORD_FILE`; the pane helper consumes it at pane start.
+_Avoid_: password file (the name is the contract).
+
+**File-Backed Auth**:
+A payload carrying OmO 5.1.51's constant source-and-delete prefix, distinct
+from an unauthenticated payload and from legacy `-e NAME=VALUE` delivery.
+_Avoid_: authenticated payload (the credential is in the file, not the payload).
+
 **Correlation ID**:
 The identity connecting one pane invocation, its descriptor, and its credential-free trace.
 _Avoid_: pane ID, OpenCode session ID.
