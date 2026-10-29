@@ -1,0 +1,104 @@
+======================================================================
+ omo-psmux-bridge doctor  --  read-only preflight
+        run_at_utc=2026-10-29T03:57:47Z  run_at_local=2026-10-29T11:57:47+08:00  host=WINDOWS-DANIEL  powershell=5.1.26100.9711
+        READ-ONLY: writes nothing, kills nothing, fixes nothing, starts nothing.
+        No credential is printed: 3 named variables are read, none is enumerated.
+        Exit map: 0=all-pass 10=PATH 20=STALE-SERVER(heuristic) 30=PORT 40=CONFIG 50=VERSION
+======================================================================
+[....] 1 PATH ownership of the literal name `tmux`
+       bin_dir=C:\Users\Daniel\AppData\Local\omo-psmux-bridge\bin
+       bin_dir_exists=True
+       process_path_entries=32  user_path_entries=15
+       bin_dir_index_in_effective_path=17  bin_dir_index_in_user_path=0
+       first_path_entry_resolving_tmux=C:\Users\Daniel\AppData\Local\omo-psmux-bridge\bin\tmux.exe
+       tmux.exe_present=yes  bytes=86139392  mtime_utc=2026-10-28T19:55:40Z
+       tmux.exe_sha256=8246C4C31B4884C43695F692BCFE3FED0A6AFB9B89C579D02222C533A6335C47
+       tmux.exe_expected_sha256=9EA5E733FD78F4EA966A85A5CF062D1113C644FEFF80AD3B3084574c2BA2A858
+  NOTE  tmux.exe_sha256_match=NO -- the shim is rebuilt during development, so its hash is
+  NOTE  expected to move. This is reported, never treated as a fault.
+[PASS ] 1 PATH ownership of the literal name `tmux`
+              OmO finds `tmux` at the bridge, not at the real psmux.
+[....] 2 STALE-SERVER (heuristic)
+       data_dir=C:\Users\Daniel\.psmux  exists=True
+       namespace=default  session=0
+       A psmux server keeps its own environment for its whole life and its panes
+       inherit THAT environment; a client attach never transmits one. A server
+       started before the bridge existed therefore cannot have the bridge on its
+       PATH, whatever the shell has. That is not observable directly, so the
+       only non-connecting lever is file modification time:
+         (heuristic) .port file OLDER than bin\tmux.exe => the server predates the bridge.
+       Every line of this check is HEURISTIC and is never reported as proof.
+       registry_entry=NONE -- no live session for this namespace/session, so there is
+       no running server that could be stale. The check does not apply.
+[PASS ] 2 STALE-SERVER (heuristic) -- no live session to be stale
+              (heuristic) (absence of a fault is not proof that a server is healthy)
+       false_negative=(heuristic) a server started after the install but before a PATH change will NOT be detected.
+       false_positive=(heuristic) if the shim is REBUILT while a healthy server runs, the shim
+                       (heuristic) mtime moves forward and that server looks stale. Re-check with a
+                       (heuristic) fresh server before acting on a FAIL.
+       psmux residue present (EXPECTED, not a fault): instances\=2 entries  servers\=3 entries
+         psmux reaps it from inside a running server, every 300 s; nothing reaps it
+         once every server is dead. kill-session removes <ns>__<n>.{key,pid,port,sid}
+         and deliberately leaves instances\ and servers\ behind.
+[....] 3 OpenCode port resolution (GET /global/health)
+       OPENCODE_PORT=63469
+       OPENCODE_SERVER=<unset>  (query/fragment/userinfo withheld)
+       fallback_port_used_by_omo=4096 (index.js:161007, when OPENCODE_PORT is unset)
+       loopback_listeners=21  listener_table_read_ms=1242
+       probed http://127.0.0.1:63469/global/health  (OPENCODE_PORT)
+         http_status=200  transport=ok
+         body=[{"healthy":true,"version":"1.19.5"}]
+       opencode listener: 127.0.0.1:63469 pid=27700 name=opencode
+[PASS ] 3 OpenCode port resolution
+       a listening OpenCode health endpoint answers HTTP 200 on port 63469.
+              verdict = port RESOLUTION is not your silent cause (see any WARN above)
+[....] 4 OmO config [opencode].tmux.enabled
+       config=C:\Users\Daniel\.omo\omo.jsonc  exists=True
+       config_path_rule=omo.jsonc exists (index.js:87899)
+       config_home=C:\Users\Daniel  config_dir=C:\Users\Daniel\.omo  (index.js:87886-87902)
+  NOTE  this is the ONE SELECTED user file. OmO also merges project layers and a
+  NOTE  profile block (index.js:91076-91090), so a project .omo\omo.jsonc can set
+  NOTE  tmux.enabled true while this file says false. PASS/FAIL here is about
+  NOTE  this file only.
+       bytes=4351  mtime_utc=2026-10-29T03:10:40Z
+       jsonc_parse=OK  stripped_bytes=4346 of 4351  (comment+trailing-comma aware and string-aware; a `https://` in $schema and a `,}` inside a string both survive)
+       tmux keys as configured:
+         [opencode].tmux.enabled = True
+         [opencode].tmux.layout = "main-vertical"
+         [opencode].tmux.main_pane_size = 50
+         [opencode].tmux.main_pane_min_width = 40
+         [opencode].tmux.agent_pane_min_width = 40
+       [opencode].tmux.enabled = true   (observed literally in the parsed document)
+[PASS ] 4 OmO config [opencode].tmux.enabled
+              gate one is open: OmO will attempt to spawn panes.
+[....] 5 OmO package version drift
+       contract_frozen_version=5.1.51  (CONTRACT.md section 0.1)
+       known_equivalent_versions=  (same line numbers verified)
+       candidate=C:\Users\Daniel\.cache\opencode\packages\oh-my-openagent@latest\node_modules\oh-my-openagent\package.json  version=5.1.51
+       bundle=C:\Users\Daniel\.cache\opencode\packages\oh-my-openagent@latest\node_modules\oh-my-openagent\dist\index.js
+       anchors_requested=11  anchors_returned=11
+         anchor_ok  L8293: function isInsideTmuxEnvironment(environment) {
+         anchor_ok  L8333: async function isServerRunning(serverUrl, options = {}) {
+         anchor_ok  L8345: const healthUrl = new URL("/global/health", serverUrl).toString();
+         anchor_ok  L8455: const serverRunning = await deps.isServerRunning(serverUrl);
+         anchor_ok  L8460: const tmux = await deps.getTmuxPath();
+         anchor_ok  L9138: async function findVerifiedTmuxPath() {
+         anchor_ok  L9144: const verifyProc = spawn([path, "-V"], {
+         anchor_ok  L9150: if (verifyExitCode !== 0) {
+         anchor_ok  L91794: enabled: z50.boolean().default(false),
+         anchor_ok  L161005: function resolveServerUrl(rawServerUrl, env, log) {
+         anchor_ok  L161015: log("[tmux-session-manager] ctx.serverUrl has port 0; falling back. "
+       frozen_line_anchors_resolved=11/11
+       installed_version=5.1.51
+       verdict_basis=version-equality (equals the frozen version exactly)
+[PASS ] 5 OmO package version drift
+              the installed bundle still answers to every contract citation (version-equality (equals the frozen version exactly)).
+======================================================================
+       RESULT: 5/5 checks PASS   failures=0
+       passed=5  failed=0
+       verdict=PASS
+       elapsed_ms=1936
+       exit=0
+======================================================================
+
+DOCTOR_EXIT=0

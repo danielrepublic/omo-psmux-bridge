@@ -1,0 +1,135 @@
+{
+  "tool": "omo5151-windows-auth-smoke-20261029.cjs",
+  "ok": true,
+  "namespace": "omo-auth-35416650871",
+  "candidateRoot": "C:/Users/Daniel/AppData/Local/omo-psmux-bridge",
+  "versions": {
+    "opencode": "1.19.5"
+  },
+  "assertions": [
+    {
+      "name": "candidate-tmux-exe-present",
+      "pass": true,
+      "detail": "C:\\Users\\Daniel\\AppData\\Local\\omo-psmux-bridge\\bin\\tmux.exe"
+    },
+    {
+      "name": "opencode-1.19.5",
+      "pass": true,
+      "detail": "1.19.5"
+    },
+    {
+      "name": "serve-health-ok",
+      "pass": true,
+      "detail": "port=54022"
+    },
+    {
+      "name": "session-created",
+      "pass": true,
+      "detail": "HTTP 200"
+    },
+    {
+      "name": "session-id-captured",
+      "pass": true,
+      "detail": "id withheld"
+    },
+    {
+      "name": "session-seeded",
+      "pass": true,
+      "detail": "HTTP 200"
+    },
+    {
+      "name": "mux-new-session",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "auth-placeholder-split",
+      "pass": true,
+      "detail": "pane=%2 %2\n"
+    },
+    {
+      "name": "auth-placeholder-banner",
+      "pass": true,
+      "detail": "banner rendered"
+    },
+    {
+      "name": "auth-placeholder-file-consumed",
+      "pass": true,
+      "detail": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-auth-smoke-35416650871\\35416650871-c0ce8317140e.sh"
+    },
+    {
+      "name": "auth-attach-respawn",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "auth-attach-session",
+      "pass": true,
+      "detail": "session marker rendered"
+    },
+    {
+      "name": "auth-attach-file-consumed",
+      "pass": true,
+      "detail": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-auth-smoke-35416650871\\35416650871-72d0ea2903a17.sh"
+    },
+    {
+      "name": "team-split",
+      "pass": true,
+      "detail": "pane=%3 %3\n"
+    },
+    {
+      "name": "team-send-keys",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "team-attach-session",
+      "pass": true,
+      "detail": "session marker rendered in team pane"
+    },
+    {
+      "name": "team-auth-file-consumed",
+      "pass": true,
+      "detail": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-auth-smoke-35416650871\\35416650871-6d61f1beff832.sh"
+    },
+    {
+      "name": "log-auth-split-classified",
+      "pass": true,
+      "detail": "placeholder-split with env slots"
+    },
+    {
+      "name": "log-auth-attach-classified",
+      "pass": true,
+      "detail": "attach-respawn with env slots"
+    },
+    {
+      "name": "log-team-rewrite-recorded",
+      "pass": true,
+      "detail": "send-keys rewrite reason"
+    },
+    {
+      "name": "sentinel-absent-from-call-log",
+      "pass": true,
+      "detail": "call log"
+    },
+    {
+      "name": "sentinel-absent-from-pane-traces",
+      "pass": true,
+      "detail": "none"
+    },
+    {
+      "name": "sentinel-absent-from-descriptors",
+      "pass": true,
+      "detail": "none"
+    }
+  ],
+  "paneSamples": {
+    "placeholder": "OMO subagent pane ready: auth placeholder 35416650871\nFocus this pane to attach.",
+    "attach": "┃\n  ┃  BRIDGE_AUTH_35416650871\n  ┃\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n  ┃\n  ┃\n  ┃\n  ┃  Sisyphus - Ultraworker · GPT-6.1 Terra OpenAI · max\n  ╹▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀\n   C:\\Users\\Daniel                                                     tab agents  ctrl+p commands",
+    "team": "┃\n  ┃  BRIDGE_AUTH_35416650871\n  ┃\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n  ┃\n  ┃\n  ┃\n  ┃  Sisyphus -        ·GPT-6.1 Terra Ope· ma\n  ┃  Ultraworker                      nAI  x\n  ┃\n  ╹▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀\n   C:\\Users\\Daniel  tab agents  ctrl+p commands"
+  },
+  "cleanup": {
+    "namespaceKill": "exit=0",
+    "serve": "exit=null signal=SIGTERM"
+  }
+}
