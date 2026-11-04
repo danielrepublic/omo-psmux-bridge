@@ -455,17 +455,22 @@ moved on the next.
 
 ### 0.2 psmux
 
-All psmux citations are from **tag v3.3.8**, commit
-`66cf61354c473b35d4f0c06c57384fc46d61ffdb`, checked out at **`.contract/psmux`**
-— inside this repository, git-ignored. psmux's master branch diverges by roughly
-17k lines, so line numbers do not transfer between the two trees. Every psmux
-citation in this document states v3.3.8. Nothing here is cited from master
-except where a master-only fact is explicitly labelled as such, and those are
-cited as commits rather than as line numbers.
+All **current** psmux citations are from **tag v3.4.0**, commit
+`20aa1d7254ee93f64dafa059ef89341d9767470a`, checked out at **`.contract/psmux`**
+— inside this repository, git-ignored. psmux's master branch diverges from any
+tagged tree, so line numbers do not transfer between trees. Every unqualified
+`src/...:LINE` reference in this document states v3.4.0. Facts that are true only
+of the previously pinned **v3.3.8** tree are labelled v3.3.8; historical arrow
+citations use a commit-pinned GitHub permalink, never the v3.4.0 checkout, and
+the remaining historical line numbers are bare and explicitly labelled. The bridge's
+minimum supported psmux is **exactly 3.4.0** (INSTALL.md): v2.0.0 retired the
+compatibility responses whose upstream cause v3.4.0 fixed (rule 1a, the
+respawn `--` insertion, rule 1d), while the env-slot credential delivery is
+kept as the credential boundary rather than as a 3.3.8 shim.
 
 **The checkout path moved, 2026-10-07, and this is a correctness fix rather than
 a preference.** The pin used to be `/tmp/opencode/psmux-src`. That path is under
-`/tmp`, so the checkout evaporated, and with it the only way to re-resolve the 74
+`/tmp`, so the checkout evaporated, and with it the only way to re-resolve the
 psmux citations in this document: on 2026-10-07 both `/tmp/opencode/psmux-src`
 and `/tmp/opencode/psmux` were **absent**, and the document's own validity
 condition (§14) could not be checked at all. A pin that can disappear between
@@ -480,12 +485,14 @@ one checkout path is named, in exactly one place (`pins.json`), and the checker
 verifies `git rev-parse HEAD` against the pinned commit before reading a single
 line. A tree at the wrong commit is `PIN_DRIFT`, not a silently wrong answer.
 
-**Re-verified 2026-10-07 against a fresh clone:** all **84** psmux citations
-resolve on their cited line with their cited text — 84, not the 74 the earlier
-discrepancy counted, for the same reason the bundle count moved. The 2
-citations that failed this audit were `omo-psmux-bridge.md:609` and
-`omo-psmux-bridge.md:610`, which are not psmux citations at all; see §7.1, where
-they are demoted to what the preamble's rules require.
+**Re-verified 2026-11-04 against tag v3.4.0:** every psmux arrow citation
+resolves on its cited line with its cited text, alongside the OmO citations; the
+checker prints the exact total. The previous pin, v3.3.8, was re-verified on
+2026-10-07 against a fresh clone (84 psmux citations at the time). That earlier
+count and the two local-transcript references that failed it are historical;
+see §7.1, where those references remain demoted to what the preamble's rules
+require. Re-anchoring the pin does not prove the conclusions drawn from the
+lines: the source is checked, the behavioural claims are not.
 
 INFERRED: this document goes stale the moment either tool is upgraded. The
 version pins above are the whole of the validity condition, so they are stated
@@ -817,7 +824,7 @@ only when the stderr matches `/can't find pane/i`. If psmux's wording for that
 condition differs, every close reports failure. This makes psmux's exact stderr
 text load-bearing for teardown, and it is why todo 5 probes it.
 
-### 3.9 Everything else is pass-through, except three named layout rules
+### 3.9 Everything else is pass-through, except two live layout rules (plus retired rule 1a)
 
 The bundle emits additional tmux verbs that carry no payload, including
 `select-layout` (section 9), `set-window-option`, `resize-pane`, `has-session`,
@@ -834,21 +841,24 @@ That classification is unchanged. `classifyArgv` still has no verb arm for
 `set-window-option` or `resize-pane`, and no `RecognisedKind` was added, because
 neither verb carries a payload and the payload grammar is not what is wrong with
 them. What is wrong is **what psmux does with them afterwards**, and that is a
-translate-stage concern. Three named rules carve the carve-out, and each one is
-pinned to a named psmux defect. Together they are what makes the main pane occupy
-the LEFT half of the window with the subagent panes stacked in the RIGHT half.
+translate-stage concern. Two live rules carve the carve-out — 1b and 1c — and
+each one is pinned to a named psmux defect still present at v3.4.0. A third
+rule, 1a, used to carve it too; v2.0.0 retired it because v3.4.0 parses the
+`%` form. Together the live rules are what makes the main pane occupy the
+LEFT half of the window with the subagent panes stacked in the RIGHT half.
 
 **What the carve-out costs, stated before the rules.** This section is not
-"pass-through with a footnote". Of the three rules:
+"pass-through with a footnote". Of the live rules:
 
-- 1a rewrites an argument the caller sent (`set-window-option main-pane-width
-  "50%"` → `… "50"`).
 - **1b ADDS a backend invocation the caller never asked for.** For every
   `set-window-option` on a `main-pane-*` option, the bridge issues a second psmux
   command — `select-layout main-vertical` or `select-layout main-horizontal` —
   after the one OmO sent. On the three-command spawn sequence below the caller
   sends three invocations and the backend sees four.
 - 1c drops a command outright and exits 0.
+- Retired in v2.0.0: 1a used to rewrite an argument the caller sent
+  (`set-window-option main-pane-width "50%"` → `… "50"`). The sizing argv is
+  now forwarded byte-identically; only the 1b follow-up is added.
 
 Nothing else in this document adds, drops or rewrites a backend command, and 1b
 is the only place the bridge originates a call. A reader who assumes "the bridge
@@ -867,39 +877,48 @@ close, in this order, as three separate process invocations:
 
 `main-vertical` is the correct layout and the bridge does not change which layout
 is used: in psmux it is the `Horizontal` split whose first child is the main pane
-(`src/layout.rs:1129-1136`), i.e. main on the left and the rest in a right column.
+(`src/layout.rs:1369-1378`), i.e. main on the left and the rest in a right column.
 `main-horizontal` would put the main pane on top.
 
-#### Rule 1a — one trailing `%` is stripped from a main-pane sizing option
+#### Rule 1a — RETIRED in v2.0.0 (was: one trailing `%` stripped from a main-pane sizing option)
 
-When the verb is `set-window-option`, `setw`, `set-option` or `set`, and the
-option being set is `main-pane-width` or `main-pane-height`, and its value ends in
-`%`: forward the command with exactly one trailing `%` removed. Nothing else
-moves — same verb, same flags, same order, same target.
+v2.0.0 forwards the sizing argv byte-identically: when the verb is
+`set-window-option`, `setw`, `set-option` or `set`, and the option being set is
+`main-pane-width` or `main-pane-height`, the value passes through unchanged
+whether or not it ends in `%`. Nothing moves — same verb, same flags, same
+order, same target, same value. The only addition on this path is rule 1b's
+`select-layout` follow-up. What follows is the history of why the strip existed.
 
-- `src/server/options.rs:527` → `"main-pane-width" => {`
-- `src/server/options.rs:528` → `if let Ok(n) = value.parse::<u16>() { app.main_pane_width = n; }`
-- `src/config.rs:1207` → `"main-pane-width" => {`
+**The upstream premise is historical at v3.4.0.** Both setters now route through
+`parse_main_pane_size`, which trims one trailing `%` before parsing:
 
-psmux parses the value as a bare `u16` in both places. `"50%".parse::<u16>()`
-fails, the `if let Ok(n)` arm never fires, and there is no error: the option is
-simply never set. tmux accepts `50%`, so OmO's spelling is correct and psmux's
-parser is the defect.
+- `src/server/options.rs:1022` → `"main-pane-width" => {`
+- `src/server/options.rs:1023` → `if let Some(n) = parse_main_pane_size(value) { app.main_pane_width = n; }`
+- `src/server/options.rs:80` → `pub(crate) fn parse_main_pane_size(value: &str) -> Option<u16> {`
+- `src/server/options.rs:81` → `value.trim().trim_end_matches('%').parse::<u16>().ok()`
+- `src/config.rs:1810` → `"main-pane-width" => {`
+- `src/config.rs:1811` → `if let Some(n) = crate::server::options::parse_main_pane_size(value) {`
 
-**Partly corroborated by psmux's own test suite, 2026-10-07.** Two independent
-supports for the premise, neither of which is a measurement of this bridge:
+At v3.3.8 both setters parsed a bare `u16` instead; the old source is preserved
+as history:
+[`options.rs:527-528`](https://github.com/psmux/psmux/blob/66cf61354c473b35d4f0c06c57384fc46d61ffdb/src/server/options.rs#L527-L528)
+and
+[`config.rs:1207-1209`](https://github.com/psmux/psmux/blob/66cf61354c473b35d4f0c06c57384fc46d61ffdb/src/config.rs#L1207-L1209).
+There, `"50%".parse::<u16>()` failed, the `if let Ok(n)` arm never fired, and
+the option was silently never set. tmux accepted `50%`, so OmO's spelling was
+correct and psmux's parser was the defect.
 
-- `tests-rs/test_config_exhaustive.rs:1467` → `fn cli_set_main_pane_width() {`
-- `tests-rs/test_config_exhaustive.rs:1470` → `assert_eq!(app.main_pane_width, 60);`
+**Partly corroborated by psmux's own test suite.** The integer path is asserted
+at v3.4.0 exactly as it was at v3.3.8:
+
+- `tests-rs/test_config_exhaustive.rs:1545` → `fn cli_set_main_pane_width() {`
+- `tests-rs/test_config_exhaustive.rs:1548` → `assert_eq!(app.main_pane_width, 60);`
 
 That test drives `set-option -g main-pane-width 60` and asserts the option lands,
-so **the integer path is asserted by psmux's authors, not merely read off a
-source line.** The rejection of `"50%"` is then not an empirical claim at all but
-a guarantee of the language: `str::parse::<u16>` accepts only decimal digits, and
-there is no trailing-character allowance, so a `%` cannot survive it. Between the
-two, this rule's premise no longer rests on the author's reading of two lines.
+so the integer path is asserted by psmux's authors, not merely read off a source
+line. It does not assert the `%` path; the v3.4.0 observation below does.
 
-**MEASURED 2026-10-07. This rule is no longer inference.** Evidence
+**MEASURED 2026-10-07 at v3.3.8. This rule's premise held there.** Evidence
 `.omo/evidence/ci-main-pane-width-probe.json`, produced by an automated
 `windows-latest` run of `main-pane-width-probe.cjs` against v3.3.8; provenance
 including run id and commit under test is in `.omo/evidence/README-parity-ci.md`.
@@ -907,8 +926,8 @@ Main-pane share of the window width, read at every step:
 
 | step | share | what it shows |
 |---|---|---|
-| baseline, option never set | **0.5917** | psmux's ~60% default, matching `src/layout.rs:1096` |
-| `set-window-option main-pane-width "50%"` | **0.5917** | the `%` form is stored as nothing — this rule's premise |
+| baseline, option never set | **0.5917** | psmux's ~60% default, matching `src/layout.rs:1338` |
+| `set-window-option main-pane-width "50%"` | **0.5917** | the `%` form was stored as nothing — the v3.3.8 premise |
 | then an untargeted `select-layout main-vertical` | 0.5917 | nothing to apply, because nothing was stored |
 | `set-window-option main-pane-width "50"` | 0.5917 | the bare form stores, but applying it is deferred |
 | then an untargeted `select-layout main-vertical` | **0.4917** | the stored 50 takes effect only once a layout runs |
@@ -919,33 +938,58 @@ bare `pane_width` cannot distinguish "50% of 199" from "50% of 120" — which is
 exactly how the single `119` in `issue-1-team-layout-probe-after.json` came to
 read as proof of this rule when it was the 60% default instead.
 
-**Scope of the measurement.** One session, one window, one client, sequential
+**Scope of that measurement.** One session, one window, one client, sequential
 calls, v3.3.8. It does not cover a multi-window session, nor two clients at
 once, and it does not cover `main-pane-height`.
 
-The arithmetic this section used to carry as INFERRED is now settled: `"50%"`
-leaves the main pane at psmux's default, and `"50"` followed by a layout moves it
-to the stored share. Nothing further is needed from a host run for this rule.
+**MEASURED 2026-11-04 at v3.4.0: the `%` form now stores.** The independent
+runtime artifact `.omo/evidence/psmux340-windows-parity.json` (one session, one
+window, one client, 120-column window) recorded `set-window-option
+main-pane-width "50%"` alone leaving the share at 0.5917, then an untargeted
+`select-layout main-vertical` moving it to 0.4917 with no bare value stored in
+between; on the height axis the same sequence went 0.5667 → 0.3667. Setting the
+option alone is still inert; that is rule 1b's separate claim, not this one. The
+3.4.0 parser and the observation agree that the percentage is stored, so **rule
+1a is no longer needed by a 3.4.0 backend**.
 
-A value with no `%`, or any other option name, is forwarded byte-identically.
+**Retired in v2.0.0: the strip is gone.** The bridge makes no runtime version
+decision and the v2.0.0 support floor is exactly psmux 3.4.0, so there is no
+older backend left for the strip to serve. The paragraph above is retained as
+history; the shipped behaviour is byte-identical forwarding. A value with no
+`%`, or any other option name, was and remains forwarded byte-identically.
 
 #### Rule 1b — the matching layout is re-applied after the option is set
 
-Because of rule 1a, forwarding `set-window-option` alone changes nothing: psmux
-reads the sizing option from **inside** the layout application, so setting it does
-not re-lay-out.
+Independently of the retired rule 1a, forwarding `set-window-option` alone changes nothing:
+psmux reads the sizing option from **inside** the layout application, so setting
+it does not re-lay-out. At v3.4.0 the read is window-local first, with the global
+value as the fallback:
 
-- `src/layout.rs:1094` → `// Determine main-pane percentage`
-- `src/layout.rs:1096` → `let main_v_pct = if app.main_pane_width > 0 { app.main_pane_width.min(95) } else { 60 };`
-- `src/layout.rs:1129` → `"main-vertical" | "main-v" => {`
-- `src/layout.rs:1136` → `sizes: vec![main_v_pct, 100 - main_v_pct],`
-- `src/layout.rs:1144` → `sizes: vec![main_v_pct, 100 - main_v_pct],`
-- `src/layout.rs:1095` → `let main_h_pct = if app.main_pane_height > 0 { app.main_pane_height.min(95) } else { 60 };`
-- `src/layout.rs:1109` → `"main-horizontal" | "main-h" => {`
+- `src/layout.rs:1300` → `pub fn apply_layout(app: &mut AppState, layout: &str) {`
+- `src/layout.rs:1306` → `crate::server::options::window_local_option(app, window_index, name)`
+- `src/layout.rs:1307` → `.and_then(crate::server::options::parse_main_pane_size)`
+- `src/layout.rs:1311` → `let main_pane_width = window_main_size("main-pane-width", app.main_pane_width);`
+- `src/layout.rs:1336` → `// Determine main-pane percentage`
+- `src/layout.rs:1338` → `let main_v_pct = if main_pane_width > 0 { main_pane_width.min(95) } else { 60 };`
+- `src/layout.rs:1371` → `"main-vertical" | "main-v" => {`
+- `src/layout.rs:1378` → `sizes: vec![main_v_pct, 100 - main_v_pct],`
+- `src/layout.rs:1386` → `sizes: vec![main_v_pct, 100 - main_v_pct],`
+- `src/layout.rs:1337` → `let main_h_pct = if main_pane_height > 0 { main_pane_height.min(95) } else { 60 };`
+- `src/layout.rs:1351` → `"main-horizontal" | "main-h" => {`
 
-`1136` is the two-pane shape and `1144` the nested one; both put the main pane
-first in a root `Horizontal` split, which is why the rule's injected command is
-layout-specific rather than layout-agnostic.
+`src/layout.rs:1378` is the two-pane shape and `src/layout.rs:1386` the nested
+one; both put the main pane first in a root `Horizontal` split, which is why the
+rule's injected command is layout-specific rather than layout-agnostic.
+
+**Window-local lookup is new at v3.4.0 (#648), and it narrows what the follow-up
+means.** A `set-window-option` without `-g` now writes the target window's own
+option table (`src/server/connection.rs:3901` through
+`src/server/connection.rs:3921`), and `apply_layout` reads the option from the
+window it is applying the layout to, falling back to the global store. OmO emits
+both calls without `-t` (`index.js:8991-8992`), so the write and the follow-up
+land on the same active window. A caller that targets the write but leaves the
+follow-up untargeted could split the two; the bridge is not such a caller and
+does not invent a `-t` for the follow-up.
 
 So the bridge runs a **second** psmux command after the corrected
 `set-window-option`:
@@ -978,10 +1022,11 @@ discarded: OmO spawns its own layout calls with `stdout: "ignore", stderr:
 a code (`index.js:8989`, `index.js:8993`), and the primary command's exit code is
 the only one OmO branches on (`index.js:8486`).
 
-**MEASURED 2026-10-07, and this rule needed it more than rule 1a did.** The same
-run as rule 1a — `.omo/evidence/ci-main-pane-width-probe.json` — tests both halves
-of this rule directly, and its `verdict` block reads `rule_1b_option_alone_inert:
-true`, `rule_1b_followup_applies: true`, `rule_1b_order_matters: true`.
+**MEASURED 2026-10-07 at v3.3.8, and this rule needed it more than rule 1a did.**
+The same run as rule 1a — `.omo/evidence/ci-main-pane-width-probe.json` — tests
+both halves of this rule directly, and its `verdict` block reads
+`rule_1b_option_alone_inert: true`, `rule_1b_followup_applies: true`,
+`rule_1b_order_matters: true`.
 
 | step | share | what it shows |
 |---|---|---|
@@ -995,16 +1040,26 @@ window, the same layout — the order is the only variable, and only one order
 works. It is why the bridge emits option-then-layout and why the injected
 `select-layout` is load-bearing rather than decorative.
 
+**MEASURED 2026-11-04 at v3.4.0: the follow-up is still required.** The same
+`.omo/evidence/psmux340-windows-parity.json` run recorded option-alone inert
+(0.5917 unchanged, and the height axis 0.5667 unchanged), the untargeted
+follow-up applying the stored value (width 0.5917 → 0.4917; height 0.5667 →
+0.3667), and the reverse order — layout first, then set `40` — leaving the share
+at 0.4917. Window-local lookup did not move the read out of `apply_layout`, so
+rule 1b still has a live premise on 3.4.0. This differs from rule 1a: there the
+3.4.0 source and observation removed the premise, and v2.0.0 retired the
+translation.
+
 `apply_layout` still has **no test coverage in psmux** — a search across
-`tests-rs/` at v3.3.8 returns zero hits — so nothing here is asserted upstream.
+`tests-rs/` at v3.4.0 returns zero hits — so nothing here is asserted upstream.
 That is no longer a gap in the evidence, because the behaviour is now observed
 directly rather than inferred from the source.
 
-**The height axis, measured too.** Rules 1a and 1b name `main-pane-height`
-beside `main-pane-width`, and the bridge treats them identically — same
-option-parsing path, same follow-up shape, only the layout name differs — so
-measuring one axis would have left half of each rule unmeasured. Same run, same
-probe, `main-horizontal` instead:
+**The height axis, measured too at v3.3.8.** Rules 1a and 1b name
+`main-pane-height` beside `main-pane-width`, and the bridge treats them
+identically — same option-parsing path, same follow-up shape, only the layout
+name differs — so measuring one axis would have left half of each rule
+unmeasured. Same run, same probe, `main-horizontal` instead:
 
 | step | height share |
 |---|---|
@@ -1013,28 +1068,31 @@ probe, `main-horizontal` instead:
 | `set-window-option main-pane-height "40"`, no layout | **0.5667** |
 | then untargeted `select-layout main-horizontal` | **0.3667** |
 
-Identical behaviour on both axes: the `%` form is dropped, the bare form stores
-and applies nothing on its own, and the follow-up applies it. 0.3667 against a
-30-row window is 11 of 29 available rows after the one-row divider, which is what
-40% of the usable space is. The width-axis rows in the same artifact read 1.0 for
-height share, correctly — `main-vertical` splits side by side, so the pane's height
-is the window's height.
+At v3.3.8 the behaviour was identical on both axes: the `%` form was dropped,
+the bare form stored and applied nothing on its own, and the follow-up applied
+it. 0.3667 against a 30-row window is 11 of 29 available rows after the one-row
+divider, which is what 40% of the usable space is. The width-axis rows in the
+same artifact read 1.0 for height share, correctly — `main-vertical` splits side
+by side, so the pane's height is the window's height. At v3.4.0 the `%` form
+stores (retired rule 1a), but the option-alone/follow-up behaviour on the height axis is
+unchanged, per the same 2026-11-04 artifact.
 
-Scope matches rule 1a's: one session, one window, one client, v3.3.8. Not covered:
-multi-window sessions, or concurrent clients — the latter is measured separately in
-section 9.5, where two clients collide.
+Scope matches rule 1a's: one session, one window, one client. Not covered:
+multi-window sessions, or concurrent clients — the latter is measured separately
+in section 9.5, where two clients collide.
 
-INFERRED: with `main_pane_width = 50`, `src/layout.rs:1144` builds
-`sizes: vec![50, 50]` at the root and `src/layout.rs:1140-1141` gives the
+INFERRED: with `main_pane_width = 50`, `src/layout.rs:1386` builds
+`sizes: vec![50, 50]` at the root and `src/layout.rs:1382-1383` gives the
 right-hand column `equal_sizes` shares, so a 200-column window should show a main
 pane of 99 cells with the remainder in the right column, and a 240-column window
 a main pane of 119.
 
 **Two of the three things this paragraph used to leave open are now measured, and
 the third is corrected above.** The order — option before layout — is no longer
-structural-by-inference: the probe ran both orders and only option-then-layout
-moved the pane (see the table above). The `50%`-vs-`50` storage difference is
-rule 1a's, measured there. The column counts below remain INFERRED arithmetic
+structural-by-inference: the probes ran both orders and only option-then-layout
+moved the pane (see the tables above). The `50%`-vs-`50` storage difference was
+rule 1a's at v3.3.8; at v3.4.0 both forms store, while setting either one alone
+is still inert. The column counts below remain INFERRED arithmetic
 rather than observation, and deliberately so: the probe recorded **shares** of the
 window width (0.5917 and 0.4917), not absolute cells, because the runner's window
 width is psmux's default and is not 200 or 240. The shares are what the rules
@@ -1055,7 +1113,7 @@ it is the single easiest number in this document to misread.** The after-run in
 `.omo/evidence/issue-1-team-layout-probe-after.json` records a 200-column window
 going `%1 0 59` / `%2 60 140` to `%1 0 119` / `%2 120 80`, and 119 is roughly
 200 × 60%. That 60% is **psmux's own default** from
-`src/layout.rs:1096` — the value this whole rule exists to change. If rule 1a
+`src/layout.rs:1338` — the value this whole rule exists to change. If rule 1a
 were working, the main pane would be at 200 × 50% ≈ **99**, which is the number in
 the table above. So that artifact is evidence of the *defect* rule 1a and 1b
 address, not evidence that the fix was applied: the probe exercised a targeted
@@ -1072,12 +1130,12 @@ psmux's absolute resize assigns the caller's value straight into the layout tree
 `sizes` array, but those entries are PERCENTAGES while tmux's `-x` / `-y` is a CELL
 COUNT:
 
-- `src/window_ops.rs:1782` → `let new = target.max(1);`
-- `src/window_ops.rs:1784` → `sizes[idx] = new;`
-- `src/window_ops.rs:1786` → `if idx + 1 < sizes.len() {`
-- `src/window_ops.rs:1787` → `sizes[idx + 1] = (sizes[idx + 1] as i16 - diff).max(1) as u16;`
-- `src/window_ops.rs:1788` → `} else if idx > 0 {`
-- `src/layout.rs:1136` → `sizes: vec![main_v_pct, 100 - main_v_pct],`
+- `src/window_ops.rs:3241` → `let new = target.max(1);`
+- `src/window_ops.rs:3243` → `sizes[idx] = new;`
+- `src/window_ops.rs:3245` → `if idx + 1 < sizes.len() {`
+- `src/window_ops.rs:3246` → `sizes[idx + 1] = (sizes[idx + 1] as i16 - diff).max(1) as u16;`
+- `src/window_ops.rs:3247` → `} else if idx > 0 {`
+- `src/layout.rs:1378` → `sizes: vec![main_v_pct, 100 - main_v_pct],`
 
 Two properties of that code decide what a forwarded `-x` would actually do to a
 `main-vertical` tree, and both are load-bearing for this rule:
@@ -1085,11 +1143,11 @@ Two properties of that code decide what a forwarded `-x` would actually do to a
 1. **The tree is nested, so the root `sizes` array holds two elements, not three.**
    With more than one remaining pane, `main-vertical` builds a right-hand
    `Vertical` split and hangs it off the root `Horizontal` split
-   (`src/layout.rs:1140-1145`), and `equal_sizes` always sums to 100
-   (`src/layout.rs:1085-1092`). A flat three-element `[60, 20, 20]` is not a
+   (`src/layout.rs:1382-1387`), and `equal_sizes` always sums to 100
+   (`src/layout.rs:1327-1334`). A flat three-element `[60, 20, 20]` is not a
    state this layout can be in.
 2. **The difference is absorbed from exactly one neighbour** — the next sibling
-   if there is one, otherwise the previous (`src/window_ops.rs:1786-1790`). No
+   if there is one, otherwise the previous (`src/window_ops.rs:3245-3249`). No
    third element moves, and none is renormalised.
 
 INFERRED: `-x 99` against a `main-vertical` root of `[60, 40]` with the main pane
@@ -1136,14 +1194,19 @@ routed through the bridge, nothing moves at all.
 **Scope.** One session, one window, two panes, one client, v3.3.8. Not covered:
 `resize-pane -y`, the `-l` form, a tree nested more than two deep, or the
 percentage form's conversion back to an absolute count, which remains the
-INFERRED `src/server/mod.rs:5462` arithmetic above.
+INFERRED `src/server/mod.rs:7589` arithmetic above. **Reproduced at v3.4.0 on
+2026-11-04:** the independent artifact `.omo/evidence/psmux340-windows-parity.json`
+recorded `resize-pane -t <pane> -x 99` direct at 117/120 (share 0.975) and the
+identical argv through the bridge as a logged suppression with the geometry
+unchanged. The source cited below is the same code path in both tags; the
+observation is what separates "still defective" from "read off the source".
 
 No argument form rescues it. psmux parses a bare `-x` token as an ABSOLUTE value
 and only treats a `%` suffix as a percentage, so there is no spelling of the cell
 count that means "cell count" to it:
 
-- `src/server/connection.rs:1768` → `if let Some(pct) = xval.strip_suffix('%').and_then(|n| n.parse::<u8>().ok()) {`
-- `src/server/connection.rs:1770` → `} else if let Ok(abs) = xval.parse::<u16>() {`
+- `src/server/connection.rs:3105` → `if let Some(pct) = xval.strip_suffix('%').and_then(|n| n.parse::<u8>().ok()) {`
+- `src/server/connection.rs:3107` → `} else if let Ok(abs) = xval.parse::<u16>() {`
 
 **The parser looks correct, and stopping there concludes this rule is
 unnecessary. That conclusion is wrong, and the mistake is worth naming because it
@@ -1154,8 +1217,8 @@ conclude rule 1c is superfluous.
 
 The defect is one layer down, in what `resize_pane_absolute` does with the number:
 
-- `src/window_ops.rs:1782` → `let new = target.max(1);`
-- `src/window_ops.rs:1784` → `sizes[idx] = new;`
+- `src/window_ops.rs:3241` → `let new = target.max(1);`
+- `src/window_ops.rs:3243` → `sizes[idx] = new;`
 
 `sizes` is a vector of **proportions, not pixels**, and this is settled by the
 consumer rather than by the writer. `split_with_gaps` normalises:
@@ -1171,8 +1234,9 @@ percentage of the window. Worked through, against the `[60, 40]` root below:
 
 **`-x 99` therefore yields 99% of the window's width, not 99 columns.** That is
 the whole defect, and it is invisible at the parse site. Anything that stops at
-`connection.rs:1768`/`1770` will conclude this bridge suppresses a command psmux
-handles correctly, and that conclusion is wrong.
+`src/server/connection.rs:3105` / `src/server/connection.rs:3107` will conclude
+this bridge suppresses a command psmux handles correctly, and that conclusion is
+wrong.
 
 What the cited parser settles without a host run, and what it does not:
 
@@ -1182,15 +1246,17 @@ What the cited parser settles without a host run, and what it does not:
 - `-x 99%`: the percentage arm fires, and psmux converts the percentage straight
   back into an absolute cell count before resizing —
   `let abs_size = ((total as u32) * (pct as u32) / 100).max(1) as u16;`
-  (`src/server/mod.rs:5462`) — which then lands in `resize_pane_absolute` as a
-  cell count. A percentage does not buy a percentage.
+  (`src/server/mod.rs:7589`) — which then lands in `resize_pane_absolute` as a
+  cell count. A percentage does not buy a percentage. This is also why the 3.4.0
+  team shape `-x "30%"` lands at 42/120 rather than a 30% share; rule 1e records
+  that measurement and its unresolved bridge-side comparison.
 - `-l 25`: **not a no-op, and not inert either.** `-l` matches neither the `-x`
   nor the `-y` arm, so control reaches the fallback, which takes the first
   argument that parses as a `u16` — `25` — as the amount, and defaults the
   direction to `"D"`:
-  - `src/server/connection.rs:1780` → `let amount = args.iter().find(|a| a.parse::<u16>().is_ok()).and_then(|s| s.parse::<u16>().ok()).unwrap_or(1);`
-  - `src/server/connection.rs:1785` → `else { "D" };`
-  - `src/server/connection.rs:1786` → `let _ = tx.send(CtrlReq::ResizePane(dir.to_string(), amount));`
+- `src/server/connection.rs:3117` → `let amount = args.iter().find(|a| a.parse::<u16>().is_ok()).and_then(|s| s.parse::<u16>().ok()).unwrap_or(1);`
+- `src/server/connection.rs:3122` → `else { "D" };`
+- `src/server/connection.rs:3123` → `let _ = tx.send(CtrlReq::ResizePane(dir.to_string(), amount));`
   So `resize-pane -l 25` is a **25-cell downward step**, not a request to size to
   25. This paragraph previously listed it beside `-x -20` as a silent no-op; the
   source refutes that, and the fallback path is shared by every `-x`-less,
@@ -1216,13 +1282,13 @@ would need its own decision, which this document does not make.
 `-Z` is **not** affected. Zoom is a different request, checked before the `-x`/`-y`
 arms, and it works:
 
-- `src/server/connection.rs:1236` → `"zoom-pane" | "resize-pane" | "resizep" if args.iter().any(|a| *a == "-Z") => { let _ = tx.send(CtrlReq::ZoomPane); }`
+- `src/server/connection.rs:2488` → `"zoom-pane" | "resize-pane" | "resizep" if args.iter().any(|a| *a == "-Z") => { let _ = tx.send(CtrlReq::ZoomPane); }`
 
 `resize-pane -Z` is forwarded byte-identically.
 
 **The tradeoff, stated plainly.** This is a deliberate, user-approved decision to
-lose a command rather than forward it. It is safe because rules 1a and 1b already
-produce the geometry the command was trying to produce, so `resize-pane -x` is a
+lose a command rather than forward it. It is safe because rule 1b already
+produces the geometry the command was trying to produce, so `resize-pane -x` is a
 no-op in *intent* — and forwarding a no-op that is actively destructive is strictly
 worse than dropping it. The cost is that the bridge is now suppressing a command
 OmO believes it sent, and that suppression has to be visible rather than silent,
@@ -1230,13 +1296,13 @@ which is why it is a distinct translation kind and a distinct outcome in both lo
 (`kind: "suppressed"`, `outcome: "suppressed"`) with the dropped argv still
 recorded. Nothing else in this document suppresses a command.
 
-### 3.10 Team-mode visualization: the `createTeamLayoutInCallerWindow` family, and rules 1d, 1e and D0
+### 3.10 Team-mode visualization: the `createTeamLayoutInCallerWindow` family, and rules 1e and D0 (plus retired rule 1d)
 
 **What is verified here, and what is not — stated before the rules rather than
 after them.** Every psmux line this section cites is now mechanically re-checked
-against the pinned tree: `bun run contract:verify` reads all 180 citations in this
+against the pinned tree: `bun run contract:verify` reads all 200 citations in this
 document and reports 0 problems, including the 90 on the psmux side. So the
-*premises* quoted below are confirmed present-and-unchanged at v3.3.8.
+*premises* quoted below are confirmed present-and-unchanged at v3.4.0.
 
 That is a narrower claim than it looks, and the gap should be named rather than
 assumed away. Verifying a citation proves the quoted text is still on that line.
@@ -1249,12 +1315,15 @@ removes it. Two things do:
 1. **Re-run `scripts/windows/parity/team-layout-probe.cjs` and confirm the
    after-run artifact reproduces** — an independent observation of the behaviour
    rather than of the source. Needs a Windows host.
-2. **A reader who knows psmux 3.3.8 disagrees with any rule here.** The rules
+2. **A reader who knows psmux 3.4.0 disagrees with any rule here.** The rules
    carry file:line citations precisely so that can happen without trusting this
    document's conclusions.
 
-Until at least one of those happens, treat the *shape* of these rules as
-well-corroborated and their *consequences* as argued rather than demonstrated.
+The 2026-11-04 Windows parity probe measured the individual rules, but it did
+not complete a full team-layout replay, and its one rule-1e through-bridge
+observation is inconclusive (section 3.10 rule 1e). Treat the *shape* of these
+rules as well-corroborated and their *consequences* as argued rather than
+demonstrated.
 
 OmO's team-mode visualization is gated separately from the subagent-pane gates
 in section 4. The config key is `team_mode.tmux_visualization`, off by default:
@@ -1318,22 +1387,43 @@ and after all members, a targeted `select-layout` and a caller resize:
 - `index.js:21703` → `const resizeResult = await deps.runTmuxCommand(tmuxPath, ["resize-pane", "-t", callerPaneId, "-x", "30%"]);`
 
 None of these carries a payload, so all classify as `pass-through`, and all
-are handled on the translate stage on the same branch as rules 1a-1c. Three
-further rules carve the carve-out, each pinned to a named psmux defect, plus
-the `display` rewrite that the whole sequence depends on.
+are handled on the translate stage on the same branch as rules 1b-1c. One live
+rule (1e) plus rule D0 carve the carve-out, each pinned to a named psmux defect
+still present at v3.4.0, plus the `display` rewrite that the whole sequence
+depends on. A further rule, 1d, used to carve it too; v2.0.0 retired it, and the
+two `@omo_attach_*` writes are now forwarded like any other `set-option`.
 
-#### Rule 1d: `set-option -p ... @omo_attach_*` is suppressed, not forwarded
+#### Rule 1d — RETIRED in v2.0.0 (was: `set-option -p ... @omo_attach_*` suppressed, not forwarded)
 
-psmux refuses every pane-scoped option except `remain-on-exit`:
+**Retired because the upstream premise is gone at v3.4.0.** psmux 3.3.8 refused
+every pane-scoped option except `remain-on-exit`; v3.4.0 stores any `@name`
+user option (#728), so the v2.0.0 floor removes the reason to suppress. v2.0.0
+forwards both `@omo_attach_*` writes to psmux and reports psmux's own result.
+OmO ignores both results either way.
 
-- `src/server/mod.rs:3862` → `other => format!("ERROR: pane-scoped option '{}' is not supported (supported: remain-on-exit)", other),`
+At v3.4.0 the pane-option writer stores user options:
 
-and the parse arm that gets there reads the option name as the first
-non-flag argument that is not a `-t` value (`src/server/connection.rs:2355-2415`,
-opening at `src/server/connection.rs:2355` →
-`"set-option" | "set" | "set-window-option" | "setw" => {`).
+- `src/server/options.rs:1185` → `pub(crate) fn apply_set_pane_option(`
+- `src/server/options.rs:1200` → `"remain-on-exit" | "@mouse-force" => {`
+- `src/server/options.rs:1225` → `name if name.starts_with('@') && name.len() > 1 => {`
+- `src/server/options.rs:1238` → `store.insert(name.to_string(), stored);`
+- `src/server/mod.rs:5669` → `// #613 \`@mouse-force\`, #580 \`remain-on-exit\` and every`
+- `src/server/mod.rs:5672` → `let reply = crate::server::options::apply_set_pane_option(`
 
-Suppression is safe because OmO ignores both results: the two calls at
+The loud refusal that remains at v3.4.0 is only for non-`@` names:
+
+- `src/server/options.rs:1245` → `"ERROR: pane-scoped option '{}' is not supported (supported: remain-on-exit, @mouse-force, any @user option)",`
+
+At v3.3.8 the refusal covered the `@omo_attach_*` names; the old source is
+preserved as history:
+[`mod.rs:3862`](https://github.com/psmux/psmux/blob/66cf61354c473b35d4f0c06c57384fc46d61ffdb/src/server/mod.rs#L3862).
+The bridge's call log used to record
+`suppressionReason: "psmux-refuses-pane-scoped-options"`; that string named the
+3.3.8 premise, not a current v3.4.0 fact. v2.0.0 removed the suppression and
+the slug with it — `SuppressionReason` in `src/translate.ts` now carries only
+rule 1c's slug — because a forwarded write needs no reason.
+
+Forwarding is safe because OmO ignores both results: the two calls at
 `index.js:21696-21697` are awaited bare, with no success check and no branch
 on the outcome. `@omo_attach_session_id` has no readers anywhere else in the
 bundle (a search for the string finds only its definition at `index.js:21804`
@@ -1346,21 +1436,24 @@ and the write at `index.js:21697`). The only reader of
 
 so absence reads as "unknown", not as failure.
 
-**What the carve-out costs, stated with the rule.** This is the second rule in
-this document (after rule 1c) that performs ZERO backend invocations: no psmux
-command runs at all, and the bridge exits 0. It is recorded as
-`suppressionReason: "psmux-refuses-pane-scoped-options"` in the call log
-(`src/translate.ts` `SuppressionReason`; `src/cli.ts` record key), so the
-dropped argv stays auditable. Measured: through the old shim each of the four
-probe `set-option -p` calls exited 1 with the refusal stderr above
+**What the retirement changed, stated with the rule.** v2.0.0 performs the
+backend invocation the old rule skipped: the two `set-option -p` writes run
+against psmux and the bridge reports psmux's own result. Measured at v3.3.8
+(history): through the old shim each of the four probe `set-option -p` calls
+exited 1 with the refusal stderr above
 (`.omo/evidence/issue-1-team-layout-probe-before.json`, direct and shim arms);
 in the after-run the same four argv exit 0 with no backend call
-(`.omo/evidence/issue-1-team-layout-probe-after.json`, shim arm).
+(`.omo/evidence/issue-1-team-layout-probe-after.json`, shim arm). Measured at
+v3.4.0: the direct writes exit 0 and `show-options -p -t <pane>` reads the
+value back, and the bridge now forwards them the same way
+(`.omo/evidence/psmux340-windows-parity.json`, `rule_1d`). Effects on
+OmO's stale-attach sweep at v3.4.0 were not measured.
 
-The rule is deliberately narrow: verb in the four set-option spellings, a
+The retired rule was deliberately narrow: verb in the four set-option spellings, a
 bare `-p`, and the option name one of exactly the two `@omo_attach_*` names.
 `remain-on-exit` stays pass-through, `set` without `-p` stays pass-through,
-and no other option name is touched.
+and no other option name is touched. v2.0.0 forwards these argv without matching
+them at all.
 
 #### Rule 1e: the team resize becomes `set-option main-pane-width <n>` plus a re-applied layout
 
@@ -1370,18 +1463,18 @@ shape is a PERCENTAGE on `-x` with no `-y` and no `-Z`, and psmux has a sizing
 option that means the same thing: `main-pane-width` is parsed as a bare
 `u16`:
 
-- `src/server/options.rs:527` → `"main-pane-width" => {`
-- `src/server/options.rs:528` → `if let Ok(n) = value.parse::<u16>() { app.main_pane_width = n; }`
+- `src/server/options.rs:1022` → `"main-pane-width" => {`
+- `src/server/options.rs:1023` → `if let Some(n) = parse_main_pane_size(value) { app.main_pane_width = n; }`
 
 read from inside the layout application:
 
-- `src/layout.rs:1094` → `// Determine main-pane percentage`
-- `src/layout.rs:1096` → `let main_v_pct = if app.main_pane_width > 0 { app.main_pane_width.min(95) } else { 60 };`
+- `src/layout.rs:1336` → `// Determine main-pane percentage`
+- `src/layout.rs:1338` → `let main_v_pct = if main_pane_width > 0 { main_pane_width.min(95) } else { 60 };`
 
 and consumed by the `main-vertical` arm:
 
-- `src/layout.rs:1129` → `"main-vertical" | "main-v" => {`
-- `src/layout.rs:1136` → `sizes: vec![main_v_pct, 100 - main_v_pct],`
+- `src/layout.rs:1371` → `"main-vertical" | "main-v" => {`
+- `src/layout.rs:1378` → `sizes: vec![main_v_pct, 100 - main_v_pct],`
 
 So the bridge rewrites the one caller invocation into `set-option
 main-pane-width <n>` (the digits before the `%`) followed by `select-layout
@@ -1407,15 +1500,24 @@ while forwarding the raw resize yields 59% (`.omo/evidence/issue-1-windows-team-
 section 2; GitHub issue #1, D2 comment). INFERRED: the rule therefore assumes
 the caller pane is the window's first (main) pane, so `main-pane-width` sizes
 the caller. The inference is from the team splitting the caller pane first
-and `main-vertical` putting the main pane first (`src/layout.rs:1129-1136`);
+and `main-vertical` putting the main pane first (`src/layout.rs:1371-1378`);
 the measured widths are what keep it honest.
+
+**At v3.4.0 the backend defect is still present.** The 2026-11-04 parity probe
+on a 120-column window measured `resize-pane -t <caller> -x "30%"` direct at
+main width 42 (about 35%), while a direct `set-option main-pane-width 30` plus
+`select-layout main-vertical` pair produced 35 (about 29%). The rewrite's
+premise therefore still holds. The same probe's through-bridge arm recorded the
+rewrite but left geometry at 59; the retained artifact lacks the target-window
+context and the follow-up execution trace, so that outcome is inconclusive, not
+a bridge verdict (`.omo/evidence/psmux340-windows-parity.json`, `rule_1e`).
 
 #### Rule D0: the one non-final `-F` comes off `display` / `display-message`
 
 psmux's client does not recognise `-F` for `display` / `display-message`: the
 client-side match handles `-t`, `-p`, `-d` and `-I` and pushes every other
 element into the message text, which is then joined, quoted and sent as the
-message (`src/main.rs:2799-2865`, opening at `src/main.rs:2799` →
+- `src/main.rs:3928` → `"display-message" | "display" => {`
 `"display-message" | "display" => {`). Measured direct on psmux 3.3.8:
 
 - `display -p -F "#{session_id}" -t %1` prints `-F $1303` (tmux 3.7c prints
@@ -1553,15 +1655,15 @@ research draft rather than cited to a line here.
 psmux sets both variables on every pane it spawns, in the pane's own process
 environment:
 
-- `src/pane.rs:938` → `pub fn set_tmux_env(builder: &mut CommandBuilder, pane_id: usize, control_port: Option<u16>, socket_name: Option<&str>, session_name: &str, fix_tty: bool, _force_interactive: bool) {`
-- `src/pane.rs:944` → `builder.env("TMUX", format!("/tmp/psmux-{}/{},{},0", server_pid, sn, port));`
-- `src/pane.rs:945` → `builder.env("TMUX_PANE", format!("%{}", pane_id));`
-- `src/pane.rs:955` → `builder.env("MSYS2_ENV_CONV_EXCL", "TMUX");`
+- `src/pane.rs:2183` → `pub fn set_tmux_env(builder: &mut CommandBuilder, pane_id: usize, control_port: Option<u16>, socket_name: Option<&str>, session_name: &str, fix_tty: bool, _force_interactive: bool) {`
+- `src/pane.rs:2188` → `builder.env("TMUX", format!("{},{},0", crate::socket_path::server_tmux_env_path(socket_name), port));`
+- `src/pane.rs:2191` → `builder.env("TMUX_PANE", format!("%{}", pane_id));`
+- `src/pane.rs:2201` → `builder.env("MSYS2_ENV_CONV_EXCL", "TMUX");`
 
 This closes gate two from section 4.2 with nothing done by the bridge: psmux
 panes already have a truthy `TMUX`, so `Boolean(environment.TMUX)` is true.
 
-`MSYS2_ENV_CONV_EXCL=TMUX` (`src/pane.rs:955`) exists so that a Git Bash layer
+`MSYS2_ENV_CONV_EXCL=TMUX` (`src/pane.rs:2201`) exists so that a Git Bash layer
 cannot mangle the value on its way in. That is psmux handling its own
 compatibility, not something the bridge must replicate.
 
@@ -1571,32 +1673,41 @@ source of truth for a value psmux already owns. The correct bridge behaviour is
 to pass the environment through untouched on this path. This is a design
 conclusion drawn from the three cited lines, not a claim about code that exists.
 
-### 5.1 What psmux does *not* let you choose
+### 5.1 Why the bridge does not rely on psmux's pane shell
 
-`/bin/sh -c ...` cannot be rescued by changing psmux's notion of the pane
-shell, because a pane that carries a command does not go through the default
-shell at all:
+`/bin/sh -c ...` is translated by psmux before any shell runs, so changing
+psmux's notion of the pane shell does not make POSIX semantics available: the
+wrapper is detected and its payload is rebuilt for the resolved Windows shell.
 
-- `src/pane.rs:1283` → `fn detect_bash_c_wrapper(cmd: &str) -> Option<(&str, &str)> {`
-- `src/pane.rs:1286` → `("/bin/sh -c ", "sh"),`
-- `src/pane.rs:1562` → `if let Some((inner_script, _)) = detect_bash_c_wrapper(trimmed) {`
-- `src/pane.rs:392` → `let mut shell_cmd = if command.is_some() {`
-- `src/pane.rs:100` → `static CACHED_SHELL_PATH: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();`
-- `src/pane.rs:161` → `pub fn cached_shell() -> Option<&'static str> {`
+- `src/pane.rs:2552` → `fn detect_bash_c_wrapper(cmd: &str) -> Option<(&str, &str)> {`
+- `src/pane.rs:2555` → `("/bin/sh -c ", "sh"),`
+- `src/pane.rs:3045` → `if let Some((inner_script, _)) = detect_bash_c_wrapper(trimmed) {`
+- `src/pane.rs:1115` → `let mut shell_cmd = if command.is_some() {`
+- `src/pane.rs:385` → `static CACHED_SHELL_PATH: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();`
+- `src/pane.rs:446` → `pub fn cached_shell() -> Option<&'static str> {`
 
 `detect_bash_c_wrapper` recognises and strips a `/bin/sh -c ` prefix, then hands
 the remainder to `cached_shell()`, which is a `OnceLock` resolved once per
-process (`src/pane.rs:100`) and walks `pwsh`, then `powershell`, then `cmd`
-(`src/pane.rs:163` through `src/pane.rs:165`). The branch at `src/pane.rs:392`
-is on `command.is_some()`, so a command-bearing pane and an interactive pane take
-different paths.
+process (`src/pane.rs:385`). At v3.4.0 it first consults `$SHELL`, then walks
+`pwsh`, then `powershell`, then `cmd` (`src/pane.rs:452` through
+`src/pane.rs:457`). The branch at `src/pane.rs:1115` is on `command.is_some()`,
+so a command-bearing pane and an interactive pane take different paths.
 
-**Correction to the research draft.** The draft states that `cached_shell()`
-"reads `$SHELL`". At v3.3.8 it does not. A search for
-`env::var("SHELL")` and `env::var_os("SHELL")` across `src/*.rs` at this ref
-returns nothing. The conclusion the draft drew, that no `$SHELL` route can fix a
-command-bearing pane, is **stronger** than stated, not weaker: psmux 3.3.8 never
-consults `$SHELL` for this purpose at all.
+**Correction to the research draft, and the v3.4.0 change.** The draft states
+that `cached_shell()` "reads `$SHELL`". At v3.3.8 that was false: a search for
+`env::var("SHELL")` and `env::var_os("SHELL")` across `src/*.rs` returned
+nothing. At v3.4.0 it is true: `cached_shell()` now consults `$SHELL` first and
+accepts it only when it names a spawnable Windows shell (#683):
+
+- `src/pane.rs:452` → `if let Some(from_env) = shell_from_env() {`
+- `src/pane.rs:491` → `shell_from_env_value(std::env::var("SHELL").ok()?.as_str())`
+
+The command-bearing path still runs through `build_command`, so `$SHELL` cannot
+make `/bin/sh` semantics available; it can, however, change which shell runs the
+translated command when the caller sets it to a Windows path. The bridge does
+not set `SHELL` and forwards the environment untouched, so this is a backend
+choice, not a bridge rewrite. The old claim that no `$SHELL` route exists is
+therefore historical at v3.3.8 and no longer accurate at v3.4.0.
 
 ---
 
@@ -1615,39 +1726,45 @@ rather than an error.
 
 ---
 
-## 7. The three known psmux 3.3.8 defects, and the bridge's response to each
+## 7. The three psmux respawn defects, and the bridge's response to each
 
-All three are source-read facts at tag v3.3.8. Todo 5 converts them to runtime
-evidence. Until then they are what the source says, not what a machine was
-observed to do.
+All three were source-read facts at **v3.3.8**, the release the bridge's
+compatibility responses were written for. **v3.4.0 now contains the upstream
+fixes**: both `c20016c` and `4addc0a` are ancestors of the v3.4.0 tag
+(§8.1). v2.0.0 moved the support floor to exactly psmux 3.4.0, so the `--`
+insertion of §7.1 is retired; the env-slot delivery of §7.2 is kept as the
+credential boundary (§8.2).
 
-### 7.1 Defect 1: `respawn-pane` drops a positional command operand
+### 7.1 Defect 1: `respawn-pane` dropped a positional command operand at v3.3.8
 
-At v3.3.8 the command operand is read **only** behind `--`. There is no
-positional fallback:
+At **v3.3.8** the command operand was read **only** behind `--`. There was no
+positional fallback, so OmO's no-`--` argv (`index.js:8572`, `index.js:8620`)
+lost its payload and the pane came back as a default shell.
 
-- `src/server/connection.rs:2093` → `"respawn-pane" | "respawnp" => {`
-- `src/server/connection.rs:2102` → `let command = args.iter().position(|a| *a == "--")`
-- `src/server/connection.rs:2103` → `.map(|i| args[i + 1..].join(" "))`
-- `src/server/connection.rs:2106` → `let _ = tx.send(CtrlReq::RespawnPane(workdir, kill, command, empty));`
+**Fixed at v3.4.0.** The command is now read behind `--` or, when `--` is
+absent, as the first positional operand that is not a flag or a `-c`/`-e`/`-t`
+value:
 
-The four-tuple sent carries `workdir`, `kill`, `command`, `empty`, and `command`
-is `None` whenever `--` is absent:
+- `src/server/connection.rs:528` → `fn respawn_positional_command(args: &[&str]) -> Option<String> {`
+- `src/server/connection.rs:532` → `if a == "-c" || a == "-e" || a == "-t" {`
+- `src/server/connection.rs:3494` → `let command = args.iter().position(|a| *a == "--")`
+- `src/server/connection.rs:3498` → `format!("-- {}", requote_command_tail(tail))`
+- `src/server/connection.rs:3521` → `let _ = tx.send(CtrlReq::RespawnPane(workdir, kill, command, empty, resp_s, env_sets));`
 
-- `src/server/mod.rs:3890` → `CtrlReq::RespawnPane(workdir, kill, command, empty) => {`
+The v3.3.8 source is preserved as history:
+[`connection.rs:2093-2106`](https://github.com/psmux/psmux/blob/66cf61354c473b35d4f0c06c57384fc46d61ffdb/src/server/connection.rs#L2093-L2106)
+and
+[`docs/tmux_args_reference.md:91`](https://github.com/psmux/psmux/blob/66cf61354c473b35d4f0c06c57384fc46d61ffdb/docs/tmux_args_reference.md#L91).
 
-Because OmO emits `respawn-pane` with **no `--`** (`index.js:8572`,
-`index.js:8620`), the payload never arrives. The pane is respawned with the
-default shell instead, and the subagent never starts.
+**Bridge response: none — the `--` insertion is RETIRED in v2.0.0.** The
+`respawn-pane` argv is forwarded without an inserted `--`: 3.4.0 reads the
+first positional command operand (connection.rs 528-532, 3494-3498), so there
+is no older backend left for the insertion to serve. The `--` form is still
+honored by psmux, but the bridge no longer emits it.
 
-The reference documentation documents only the `--` form, so `--` is not an
-invented workaround, it is the documented interface:
-
-- `docs/tmux_args_reference.md:91` → \`| \`respawn-pane\` | \`respawnp\`, \`resp\` | \`kc:t:\` plus \`-- <command>\` |\`
-
-**Bridge response: insert `--` before the payload** on the `respawn-pane`
-path. The basis is the source read above, not a runtime capture: the operand is
-read only behind `--`, and the reference table documents only the `--` form.
+The reference documentation at v3.4.0 still documents the `-- <command>` form
+(`docs/tmux_args_reference.md:93`), so a `--` in argv remains a legitimate
+spelling — it is just no longer one the bridge adds.
 
 **Withdrawn 2026-10-07: the "measured the difference directly" claim.** This
 paragraph previously read "The prior session measured the difference directly"
@@ -1659,24 +1776,22 @@ preamble's third category they are **inadmissible**: a measurement whose run
 left no artifact under version control is never the ground for a conclusion.
 They are removed rather than restated.
 
-The conclusion is unaffected, because it never needed them. `insert --` rests on
-`src/server/connection.rs:2093`/`:2102`/`:2103`/`:2106` — the operand is
-unreachable without `--` — together with `docs/tmux_args_reference.md:91`, which
-documents `-- <command>` as the interface. All five are citations that
-`bun run contract:verify` re-checks. What is withdrawn is the *strength* of the
-claim, not its direction: this was verified by reading psmux, and no artifact
-here records anyone watching the pane fail to start.
+The conclusion is unaffected, because it never needed them. At v3.3.8 it rested
+on the source linked above: the operand was unreachable without `--`, and the
+reference table documented only the `--` form. What is withdrawn is the
+*strength* of the claim, not its direction: this was verified by reading psmux,
+and no artifact here records anyone watching the pane fail to start.
 
-INFERRED: inserting `--` changes the meaning of argv OmO emitted, so it is a
-translation and not a passthrough, and it is confined to the `respawn-pane`
-path. No other verb needs it, because no other verb has this defect.
+INFERRED: the retired `--` insertion changed the meaning of argv OmO emitted,
+so it was a translation and not a passthrough, and it was confined to the
+`respawn-pane` path. No other verb needs it, because no other verb had this defect.
 
-### 7.2 Defect 2: `respawn-pane` drops `-e NAME=VALUE`
+### 7.2 Defect 2: `respawn-pane` dropped `-e NAME=VALUE` at v3.3.8
 
-At v3.3.8, `-e` support is uneven across the verbs that accept it. Counting
+At **v3.3.8**, `-e` support was uneven across the verbs that accept it. Counting
 `-e` handling inside each verb's parse arm:
 
-| Verb | Parse arm | Handles `-e`? |
+| Verb | v3.3.8 parse arm | Handles `-e`? |
 |---|---|---|
 | `split-window` | `src/server/connection.rs:1092` | yes |
 | `new-window` | `src/server/connection.rs:1062` | yes |
@@ -1684,29 +1799,42 @@ At v3.3.8, `-e` support is uneven across the verbs that accept it. Counting
 | `respawn-pane` | `src/server/connection.rs:2093` | **no** |
 | `respawn-window` | `src/server/connection.rs:3580` | **no** |
 
-The `respawn-pane` arm (`src/server/connection.rs:2093` through
-`src/server/connection.rs:2106`) reads `-c`, `-E`, `-k` and `--`, and nothing
-else.
+Those v3.3.8 line numbers are historical. **Fixed at v3.4.0.** Both respawn arms
+now read every `-e KEY=VALUE` through `env_flag_values` and send the pairs with
+the respawn request:
 
-**Bridge response: apply `-e NAME=VALUE` itself on the respawn path.** The bridge
-sets the variable in the pane's environment by whatever mechanism it has
-available on its side of the spawn, rather than relying on psmux to forward it.
-Without this, `OPENCODE_SERVER_PASSWORD` (`index.js:8280`) never reaches the
-attach pane.
+- `src/server/connection.rs:549` → `pub(crate) fn env_flag_values(args: &[&str]) -> Vec<(String, String)> {`
+- `src/server/connection.rs:3520` → `let env_sets = env_flag_values(&args);`
+- `src/server/connection.rs:3521` → `let _ = tx.send(CtrlReq::RespawnPane(workdir, kill, command, empty, resp_s, env_sets));`
+- `src/server/connection.rs:5482` → `let env_sets = env_flag_values(&args);`
+- `src/server/connection.rs:5483` → `let _ = tx.send(CtrlReq::RespawnWindow(workdir, command, resp_s, env_sets));`
 
-INFERRED: because the credential is dropped by psmux on this path, the bridge
-must both apply the variable itself **and** redact it from its own logs
-(section 2.2). Applying it is not optional and dropping it is not an acceptable
-simplification.
+The helper's own comment records that `split-window` and `new-window` collect
+their `-e` values inline, and that `new-session` did too at v3.3.8; the v3.4.0
+change adds the two respawn verbs rather than replacing the other three paths.
 
-### 7.3 Defect 3: `respawn-window` drops every argument
+**Bridge response: strip `-e` on all five payload forms and deliver the
+assignments through the pane helper's environment slots.** This was introduced
+for the 3.3.8 drop, but it is retained deliberately at v3.4.0: it is the one
+credential-delivery mechanism, it keeps values out of the psmux argv, and it
+preserves the helper's consume-once and verified-delete behavior (§2.2).
+Forwarding `-e` through psmux instead would put the values back in argv and
+bypass that boundary. The `OPENCODE_SERVER_PASSWORD_FILE` path
+(`index.js:8280`) is delivered by the same mechanism.
 
-Worse than defect 1, and in a different way. The whole arm is three lines and
-sends a request with no arguments whatsoever:
+INFERRED: the credential must still be redacted from the bridge's own logs
+(section 2.2), and the env-slot/file delivery remains the shipped path at
+v3.4.0: it is the credential boundary, kept deliberately rather than as a
+3.3.8 shim.
 
-- `src/server/connection.rs:3580` → `"respawn-window" | "respawnw" => {`
-- `src/server/connection.rs:3581` → `let _ = tx.send(CtrlReq::RespawnWindow);`
-- `docs/tmux_args_reference.md:92` → \`| \`respawn-window\` | \`respawnw\` | none |\`
+### 7.3 Defect 3: `respawn-window` dropped every argument at v3.3.8
+
+At **v3.3.8** the whole arm sent a request with no arguments at all. **Fixed at
+v3.4.0** by the same `c20016c` helper:
+
+- `src/server/connection.rs:5463` → `"respawn-window" | "respawnw" => {`
+- `src/server/connection.rs:5483` → `let _ = tx.send(CtrlReq::RespawnWindow(workdir, command, resp_s, env_sets));`
+- `docs/tmux_args_reference.md:94` → \`| \`respawn-window\` | \`respawnw\` | \`kc:e:t:\` plus a command | CLI, SRV, CFG |\`
 
 **Bridge response: none, and deliberately so. This is off-path.** A search for
 the string `respawn-window` in the installed OmO bundle returns **zero
@@ -1722,91 +1850,107 @@ does emit it is a visible contract change rather than a silent breakage.
 
 ## 8. Retirement conditions
 
-Each workaround in section 7 exists because of a specific upstream defect, and
-each must be removed when a specific upstream commit ships **in a release**.
-
-The distinction between "on master" and "in a release" is load-bearing and is
-stated here as a rule, not as a convenience.
+Each workaround in section 7 exists because of a specific upstream defect. A
+workaround is removed when its fix ships in a release **and** the minimum
+supported psmux version moves past the release that still needs it. v2.0.0
+moved that floor to exactly psmux 3.4.0, so the second clause now fires: the
+responses whose upstream cause v3.4.0 fixed are retired in the table below.
 
 ### 8.1 Why a version string cannot settle this
 
-Both upstream fixes exist on psmux master. Neither is in any tagged release.
-Verified in this session at the pinned v3.3.8 checkout:
+A semver string in a config file cannot prove ancestry. `3.4.0` might contain
+`c20016c` or might not, and nothing in the string says which. The ancestry check
+is what settles it:
 
 ```bash
-$ for t in $(git tag); do git merge-base --is-ancestor <commit> $t && echo "$t"; done
-   (no output, for either commit)
+$ for c in c20016c1ebd8557748ca3c4a7e7f99f5d872aa90 4addc0a730e57f827c286c76eec24489a5667200; do
+    git merge-base --is-ancestor "$c" v3.4.0; echo "$c => $?";
+  done
+c20016c1ebd8557748ca3c4a7e7f99f5d872aa90 => 0
+4addc0a730e57f827c286c76eec24489a5667200 => 0
+$ git tag --contains c20016c1ebd8557748ca3c4a7e7f99f5d872aa90
+v3.4.0
+$ git tag --contains 4addc0a730e57f827c286c76eec24489a5667200
+v3.4.0
 ```
 
-A semver string in a config file cannot prove ancestry. `3.3.9` might contain
-`c20016c` or might not, and nothing in the string says which. Therefore the
-retirement thresholds below are a **maintained table seeded `null`**, to be
-filled in by a human or an agent who has actually run the ancestry check against
-a named tag. It is never computed by comparing version numbers.
+Both fixes are therefore in v3.4.0, and v3.4.0 is the first tagged release that
+contains both. The retirement actions below were gated on the minimum
+supported version, not on the tag name alone — and v2.0.0 moved that floor to
+exactly v3.4.0, so the gate is now open.
 
 ### 8.2 The table
 
 | Workaround | Defect | Upstream commit | Commit subject | Commit date | In a release? | First release containing it | Action when filled |
 |---|---|---|---|---|---|---|---|
-| Insert `--` before the payload on `respawn-pane` | 7.1, `respawn-pane` positional operand drop | `c20016c` | `fix(#580): accept the documented respawn shell-command operand and forward it whole` | 2026-09-03 | **no** | `null` | drop the `--` insertion, keep pass-through |
-| Apply `-e NAME=VALUE` on the respawn path | 7.2, `respawn-pane` `-e` drop | `4addc0a` | `fix(#708): respawn-pane keeps the pane's history and applies -e` | 2026-09-29 | **no** | `null` | drop the self-application, forward `-e` through |
-| Nothing, off-path | 7.3, `respawn-window` argument drop | `c20016c` | same commit as row 1 | 2026-09-03 | **no** | `null` | no change; re-check only if a future bundle emits the verb |
-| Strip the `%` from `main-pane-width` / `main-pane-height` | 3.9 rule 1a, `options.rs:527` `u16` parse of a percentage | `null` | not yet identified | `null` | `null` | `null` | stop stripping; OmO's `50%` will parse on its own |
-| Re-apply the consuming layout after the sizing option | 3.9 rule 1b, `layout.rs:1094-1096` reads the option only inside `apply_layout` | `null` | not yet identified | `null` | `null` | `null` | stop injecting the follow-up |
-| Suppress `resize-pane -x` / `-y` | 3.9 rule 1c, `window_ops.rs:1771-1796` writes a cell count into a percentage array | `null` | not yet identified | `null` | `null` | `null` | forward the command again, and only once 1a and 1b are both retired |
-| Drop the non-final `-F` on `display` / `display-message` | 3.10 rule D0, `main.rs:2799-2865` folds `-F` into the message text | `null` | not yet identified | `null` | `null` | `null` | stop dropping `-F`; forward the argv byte-identically once the psmux client parses `-F` as the format selector for these two verbs |
-| Suppress `set-option -p ... @omo_attach_*` | 3.10 rule 1d, `mod.rs:3862` refuses pane-scoped options | `null` | not yet identified | `null` | `null` | `null` | stop suppressing; forward the options once psmux stores arbitrary pane options |
-| Rewrite the team `resize-pane -t <pane> -x "<n>%"` to `set-option main-pane-width <n>` plus `select-layout main-vertical` | 3.10 rule 1e, `connection.rs:1767-1778` has no percentage spelling that reaches psmux as a cell count | `null` | not yet identified | `null` | `null` | `null` | forward the resize again once psmux's `-x <n>%` sizes the pane correctly |
+| RETIRED in v2.0.0: was inserting `--` before the payload on `respawn-pane` | 7.1, `respawn-pane` positional operand drop | `c20016c` | `fix(#580): accept the documented respawn shell-command operand and forward it whole` | 2026-09-03 | **yes** | **v3.4.0** | retired: the v2.0.0 floor is 3.4.0, which reads the first positional operand, so nothing is inserted. The `--` form is still honored by psmux but no longer emitted |
+| Apply `-e NAME=VALUE` on the respawn path | 7.2, `respawn-pane` `-e` drop | `4addc0a` | `fix(#708): respawn-pane keeps the pane's history and applies -e` | 2026-09-29 | **yes** | **v3.4.0** | **do not retire the env-slot/file delivery when 3.3.8 is dropped**: it is the bridge's credential boundary, not only a 3.3.8 shim. The old "forward `-e` through" action is withdrawn |
+| Nothing, off-path | 7.3, `respawn-window` argument drop | `c20016c` | same commit as row 1 | 2026-09-03 | **yes** | **v3.4.0** | no bridge change; re-check only if a future bundle emits the verb |
+| RETIRED in v2.0.0: was stripping the `%` from `main-pane-width` / `main-pane-height` | 3.9 rule 1a, `options.rs` `u16` parse of a percentage | `38c5c037` | `fix(#628 follow up): type main-pane sizes as tmux does and report out of range values the way tmux does` | 2026-09-04 | **yes** | **v3.4.0** | retired: v2.0.0 forwards the sizing argv byte-identically; at v3.4.0 the `%` form stores |
+| Re-apply the consuming layout after the sizing option | 3.9 rule 1b, `layout.rs` reads the option only inside `apply_layout` | `null` | not fixed in v3.4.0 | `null` | **no** | `null` | keep; setting the option still does not apply a layout |
+| Suppress `resize-pane -x` / `-y` | 3.9 rule 1c, `window_ops.rs` writes a cell count into a percentage array | `null` | not fixed in v3.4.0 | `null` | **no** | `null` | keep; v3.4.0 still turns `-x 99` into about 98% of the window (parity probe: 117/120) |
+| Drop the non-final `-F` on `display` / `display-message` | 3.10 rule D0, `main.rs` folds `-F` into the message text | `null` | not fixed in v3.4.0 | `null` | **no** | `null` | keep; the v3.4.0 client still prints `-F <value>` for these two verbs (parity probe) |
+| RETIRED in v2.0.0: was suppressing `set-option -p ... @omo_attach_*` | 3.10 rule 1d, `mod.rs` refused pane-scoped options at v3.3.8 | `6685cf29` | `fix(options): pane scoped user options (#728)` | 2026-10-03 | **yes** | **v3.4.0** | retired: v2.0.0 forwards the options; at v3.4.0 they store and read back. The effect on OmO's stale-attach sweep is unmeasured |
+| Rewrite the team `resize-pane -t <pane> -x "<n>%"` to `set-option main-pane-width <n>` plus `select-layout main-vertical` | 3.10 rule 1e, `connection.rs` has no percentage spelling that reaches psmux as a cell count | `null` | not fixed in v3.4.0 | `null` | **no** | `null` | keep until the v3.4.0 team-resize parity discrepancy is resolved; the direct backend still turns `-x 30%` into about 35%, not 30% |
 
-The last six rows are seeded exactly like the first three, and for the same
-reason: a semver string cannot prove that an upstream fix is present, so the
-commit is `null` until someone runs the ancestry check named in section 8.1. The
-retirement action is stated in each row because the three layout workarounds are
-**not** independent of one another: rule 1c may only be dropped once 1a and 1b are
-gone, or the suppressed `resize-pane` would become the only thing setting the
-geometry and psmux would still destroy it. Of the three new rows, D0 and 1d
-retire independently of every other row; rule 1e's rewrite exists to produce
-the geometry rules 1a and 1b would otherwise produce for the caller pane, so
-forwarding the raw team resize again is only correct once psmux sizes it
-correctly, whatever the state of the other rows.
+Three rows are RETIRED in v2.0.0: the `--` insertion, rule 1a, and rule
+1d. In each case the v2.0.0 floor (exactly psmux 3.4.0) removed the older
+backend the response served. Rows 1b, 1c and D0 remain unfixed in v3.4.0 by
+source and by the Windows parity probe. Row 1e stays until the team-resize
+discrepancy below is resolved.
+
+**Rule 1e is separate.** The v3.4.0 source still converts `-x <n>%` to a cell
+count and then writes that count into the percentage array, so forwarding the
+raw team resize is still not the intended 30%. The Windows probe also recorded
+a through-bridge outcome that did not match its recorded rewrite; that
+observation is inconclusive and needs a retained execution trace before any
+retirement decision. The rule stays until that is resolved.
 
 Full commit hashes, for exactness:
 
 - `c20016c` = `c20016c1ebd8557748ca3c4a7e7f99f5d872aa90`
 - `4addc0a` = `4addc0a730e57f827c286c76eec24489a5667200`
+- `38c5c037` = `38c5c037d2edc6993ea36167b273a283e796a62c`
+- `6685cf29` = `6685cf29ff9fd84f6e3a11edb306b7d6d0ea10da`
 
-Both hashes were resolved with `git log -1` in the pinned checkout, and both were
-tested with `git merge-base --is-ancestor` against every tag the clone carries
-(`v3.3.4-fix-88`, `v3.3.5`, `v3.3.6`, `v3.3.7`, `v3.3.8`). Neither is an
-ancestor of any of them.
+All four were resolved with `git log -1` in the pinned checkout, and all four
+were tested with `git merge-base --is-ancestor` against v3.4.0. The tags
+containing each are `v3.4.0`; none is an ancestor of v3.3.8.
 
 ### 8.3 `c20016c` also fixes defect 3
 
-INferred from the diff: that commit introduces a
+INFERRED from the diff: that commit introduces a
 `respawn_positional_command` helper and applies it to **both** the
 `respawn-pane` and the `respawn-window` arms. So defect 3 shares a retirement
-condition with defect 1. Recorded so that row 3 of the table is not mistaken for
-an independent dependency.
+condition with defect 1. v3.4.0 is the first tagged release containing it.
 
 ### 8.4 What does *not* retire
 
-Defect 2's fix is a separate commit (`4addc0a`) from defect 1's (`c20016c`), so
-the two workarounds retire independently. A release that ships `c20016c` but not
-`4addc0a` still needs the `-e` self-application.
+Defect 2's fix is a separate commit (`4addc0a`) from defect 1's (`c20016c`), but
+both are in v3.4.0, so the hypothetical "one fix without the other" release does
+not describe this pin. The bridge retains the env-slot delivery because it is
+the credential boundary, not because `4addc0a` is absent.
 
 ---
 
 ## 9. `select-layout` with no `-t`: MEASURED, and Option A is correct
 
-**Status as of 2026-10-07: settled by measurement.** Option A holds — an
-untargeted `select-layout <name>` **does** apply, and it applies to **the window
-that client most recently made current**. The evidence is
+**Status as of 2026-10-07: settled by measurement at v3.3.8.** Option A holds
+— an untargeted `select-layout <name>` **does** apply, and it applies to **the
+window that client most recently made current**. The evidence is
 `.omo/evidence/ci-layout-which-window.json`, produced by an automated
 `windows-latest` run of `layout-which-window.cjs`; its provenance is recorded in
 `.omo/evidence/README-parity-ci.md`. Section 9.3 reads the run out in full. What
 follows is the reasoning that led there, kept because 9.3's conclusion is only
 legible against it, and because one claim in it has since been **refuted by the
 run** and is corrected in place.
+
+**The v3.4.0 target machinery changed, and this measurement was not re-run.**
+v3.4.0 replaced the fire-and-forget temporary focus with validated target
+routing (section 9.2 and `src/server/connection.rs:2236`), so the v3.3.8
+two-window result is not automatically a v3.4.0 result. The 2026-11-04 parity
+probe measured only single-window rules. Treat Option A as measured at v3.3.8
+and still consistent with the v3.4.0 source, not as re-measured at v3.4.0.
 
 Nothing downstream may inject a `-t` onto `select-layout`. That was already
 settled on source (9.1) and the measurement confirms it: an injected `-t` is
@@ -1840,18 +1984,18 @@ The source is decisive about Option B and silent about Option A, and the
 distinction matters. It rules the injected `-t` out on source alone, and says
 nothing at all about whether the untargeted call does what OmO meant.
 
-- `src/server/connection.rs:2741` → `"select-layout" | "selectl" => {`
-- `src/server/connection.rs:2742` → `let layout = args.iter().find(|a| !a.starts_with('-')).unwrap_or(&"tiled").to_string();`
-- `src/server/connection.rs:2743` → `let _ = tx.send(CtrlReq::SelectLayout(layout));`
-- `src/server/connection.rs:973` → `// Build args without -t and its value so command handlers get clean positional args`
-- `src/server/connection.rs:978` → `if args[i] == "-t" {`
-- `src/server/connection.rs:979` → `i += 2; // skip -t and its value`
+- `src/server/connection.rs:4470` → `"select-layout" | "selectl" => {`
+- `src/server/connection.rs:4471` → `let layout = args.iter().find(|a| !a.starts_with('-')).unwrap_or(&"tiled").to_string();`
+- `src/server/connection.rs:4472` → `let _ = tx.send(CtrlReq::SelectLayout(layout));`
+- `src/server/connection.rs:2077` → `let target_scan_end = crate::cli::outer_target_scan_end(cmd, &args);`
+- `src/server/connection.rs:2080` → `if args[i] == "-t" {`
+- `src/server/connection.rs:2097` → `i += 2; continue;`
 
 `-t` and its value are stripped from the argument vector **before any handler sees
 it**, and `SelectLayout` carries no window at all:
 
-- `src/server/mod.rs:4610` → `CtrlReq::SelectLayout(layout) => {`
-- `src/server/mod.rs:4612` → `apply_layout(&mut app, &layout);`
+- `src/server/mod.rs:6647` → `CtrlReq::SelectLayout(layout) => {`
+- `src/server/mod.rs:6649` → `apply_layout(&mut app, &layout);`
 
 INFERRED: an injected `-t` therefore cannot retarget the call — it is discarded
 before dispatch, so Option B is not a riskier way of being right, it is a no-op
@@ -1864,9 +2008,9 @@ determination that Option A is correct.
 What the source does **not** settle is Option A. `apply_layout` opens by taking
 the active window and documents itself as acting on the current one:
 
-- `src/layout.rs:1067` → `/// Apply a named layout to the current window.`
-- `src/layout.rs:1069` → `pub fn apply_layout(app: &mut AppState, layout: &str) {`
-- `src/layout.rs:1070` → `let win = &mut app.windows[app.active_idx];`
+- `src/layout.rs:1298` → `/// Apply a named layout to the current window.`
+- `src/layout.rs:1300` → `pub fn apply_layout(app: &mut AppState, layout: &str) {`
+- `src/layout.rs:1312` → `let win = &mut app.windows[app.active_idx];`
 
 So "the active window" is well defined. Whether that is the window OmO meant is a
 different and harder question: for a detached client in a namespaced server, which
@@ -1900,9 +2044,9 @@ alone settles nothing, because psmux cannot fail this command.
 It claimed that an unrecognised layout name "lands in the catch-all arm and
 quietly falls back to `even-horizontal`", citing:
 
-- `src/layout.rs:1173` → `_ => {`
-- `src/layout.rs:1174` → `// Unknown layout name — try to parse as tmux layout string`
-- `src/layout.rs:1180` → `let sizes = equal_sizes(pane_count);`
+- `src/layout.rs:1415` → `_ => {`
+- `src/layout.rs:1416` → `// Unknown layout name — try to parse as tmux layout string`
+- `src/layout.rs:1422` → `let sizes = equal_sizes(pane_count);`
 
 The cited lines are real and still say what they say. The **conclusion drawn from
 them is not what psmux does.** Measured on a `windows-latest` runner against
@@ -1963,11 +2107,11 @@ main-vertical` exits 0 with `%1 0 59` / `%2 60 140` / `%3 60 140` going to
 (`.omo/evidence/issue-1-team-layout-probe-after.json`, shim arm). That
 targeted call travels psmux's validated temporary-focus path, whose source is:
 
-- `src/server/connection.rs:1032` → `// Validated temporary focus (issue #545): the server resolves the`
+- `src/server/connection.rs:2236` → `// Validated target (issue #545): the server resolves the window/pane`
 
 with the focus request itself dispatched at:
 
-- `src/server/mod.rs:1884` → `CtrlReq::FocusTargetTemp { win, win_is_id, win_name, pane, pane_is_id, resp } => {`
+- `src/server/mod.rs:3000` → `CtrlReq::Targeted(target, inner) => {`
 
 INFERRED: the targeted form therefore has both a mechanism (temporary focus
 resolves the window before the command runs) and a measured application, which
@@ -2308,7 +2452,7 @@ repairs**, not a session left mislaid out with no way back.
 time, and rules 1b and 1e each inject an untargeted `select-layout`. Two overlapping
 injections therefore land on one window and one agent's layout is silently dropped.
 **This is the one measured defect in this document the bridge cannot work around**:
-rule 1a retires when psmux parses a percentage, 1b when the option is read outside
+rule 1a is retired (v3.4.0 parses a percentage); 1b retires when the option is read outside
 `apply_layout`, 1c when `sizes` stops being proportions — but there is no bridge-side
 fix for a global current-window pointer, because the only handle psmux offers (`-t`)
 is discarded before dispatch. The mitigation available is the one measured above: a
@@ -2361,25 +2505,26 @@ one and observes it.
 
 ## 10. The `#{pane_start_command}` trap
 
-`#{pane_start_command}` answers `app.default_shell` for **every** pane at
-v3.3.8:
+At **v3.3.8** `#{pane_start_command}` answered `app.default_shell` for **every**
+pane, so it could not distinguish a placeholder pane from an attach pane from an
+ordinary shell pane. **Fixed at v3.4.0** (#580): the format now reports the
+pane's own start command and an empty string for a pane running the default
+shell:
 
-- `src/format.rs:1525` → `"pane_start_command" => app.default_shell.clone(),`
+- `src/format.rs:2167` → `"pane_start_command" => target_pane()`
+- `src/format.rs:2168` → `.map(|p| crate::pane::start_command_display(&p.start_command))`
 
-There is no per-pane value. It ignores whatever command the pane was actually
-started with.
+The v3.3.8 behavior is preserved as history:
+[`format.rs:1525`](https://github.com/psmux/psmux/blob/66cf61354c473b35d4f0c06c57384fc46d61ffdb/src/format.rs#L1525).
+At v3.4.0 the trap no longer exists; pane ownership keyed on this format would
+now work, but the bridge does not depend on it.
 
-**Contract consequence: pane ownership must never be keyed on
-`#{pane_start_command}`.** It cannot distinguish a placeholder pane from an
-attach pane from an ordinary shell pane, so any teardown or bookkeeping logic
-that reads it will act on the wrong pane, or on all of them.
-
-INFERRED: the correct discriminator is something the bridge itself controls.
-Since the bridge is the only party that inserts `--` and applies `-e` on the
-respawn path (section 7), it can record pane ownership at the moment it performs
-a translation, keyed on the pane id OmO itself supplies (`index.js:8485`,
-`index.js:8572`). This is inference from the cited trap plus the cited pane-id
-capture, and it is the reason `src/descriptor.ts` exists in this project.
+INFERRED: the bridge's own descriptor remains the correct correlation record.
+The bridge is the only party that applies `-e` on the respawn
+path (section 7), so it can record pane ownership at the moment it performs a
+translation, keyed on the pane id OmO itself supplies (`index.js:8485`,
+`index.js:8572`). That is the reason `src/descriptor.ts` exists; it is now a
+design choice rather than a workaround for the v3.3.8 format trap.
 
 ---
 
@@ -2390,8 +2535,8 @@ capture, and it is the reason `src/descriptor.ts` exists in this project.
 psmux's model is the opposite of tmux's. There is no single psmux port to
 discover, hardcode, or health-check:
 
-- `docs/integration.md:421` → \`> **Supervising a namespace.** Unlike tmux, psmux runs one server process per\`
-- `docs/scripting.md:420` → \`psmux runs one server per session, so this is session-scoped\`
+- `docs/integration.md:424` → \`> **Supervising a namespace.** Unlike tmux, psmux runs one server process per\`
+- `docs/scripting.md:477` → \`psmux runs one server per session, so this is session-scoped\`
 
 INFERRED: N sessions means N servers and N unrelated ports. The bridge must
 therefore never cache or hardcode a control port, and must resolve the port per
@@ -2400,7 +2545,7 @@ the ephemeral-port allocation in section 11.2.
 
 ### 11.2 The control port is OS-assigned and ephemeral
 
-- `src/server/mod.rs:884` → `let listener = TcpListener::bind(("127.0.0.1", 0))?;`
+- `src/server/mod.rs:2104` → `let listener = TcpListener::bind(("127.0.0.1", 0))?;`
 
 Port `0` is the OS "assign me any free port" sentinel. There is no base port, no
 scan loop, and no configuration knob.
@@ -2411,49 +2556,52 @@ collision handling or retry logic for psmux's own port, and why the separate
 OpenCode port reservation in the port wrapper is a genuinely different problem
 that does need its own protocol.
 
-### 11.3 `PSMUX_DATA_DIR` is broken as an isolation lever at 3.3.8
+### 11.3 `PSMUX_DATA_DIR` was broken as an isolation lever at 3.3.8
 
-The per-session named mutex is built from the session name alone, with no
-component derived from the data root:
+At **v3.3.8** the per-session named mutex was built from the session name alone,
+with no component derived from the data root, so two roots could not both hold a
+session of the same name (upstream issue #599). **Fixed at v3.4.0**: the mutex
+name now includes the data-root tag, and `PSMUX_DATA_DIR` is validated and
+namespaced:
 
-- `src/platform.rs:333` → `pub fn acquire_session_mutex(name: &str) -> Option<SessionMutex> {`
-- `src/platform.rs:346` → \`let obj = format!("Local\\\\psmux-session-{sanitized}");\`
-- `src/paths.rs:79` → \`if let Some(raw) = std::env::var_os("PSMUX_DATA_DIR") {\`
-- `src/paths.rs:83` → \`"PSMUX_DATA_DIR must be an absolute non-empty path"\`
+- `src/platform.rs:357` → `pub fn acquire_session_mutex(name: &str) -> Option<SessionMutex> {`
+- `src/platform.rs:347` → \`format!("Local\\\\psmux-session-{}-{}", crate::paths::data_root_tag(), sanitized)\`
+- `src/paths.rs:144` → `pub fn data_root_tag() -> String {`
+- `src/paths.rs:100` → \`if let Some(raw) = std::env::var_os("PSMUX_DATA_DIR") {\`
+- `src/paths.rs:91` → \`"PSMUX_DATA_DIR must be an absolute non-empty path"\`
 
-A search for `data_root_tag` across `src/` at v3.3.8 returns **zero**
-occurrences, while the same identifier is present in master's `platform.rs`. So
-the fix for this is master-only.
-
-**Consequence: two different `PSMUX_DATA_DIR` roots cannot both hold a session
-of the same name at v3.3.8** (upstream issue #599). Data-root isolation is not
-available on the pinned version.
+The v3.3.8 source is preserved as history:
+[`paths.rs:79-83`](https://github.com/psmux/psmux/blob/66cf61354c473b35d4f0c06c57384fc46d61ffdb/src/paths.rs#L79-L83)
+and
+[`platform.rs:333-346`](https://github.com/psmux/psmux/blob/66cf61354c473b35d4f0c06c57384fc46d61ffdb/src/platform.rs#L333-L346).
+At v3.4.0, two different `PSMUX_DATA_DIR` roots can hold same-named sessions;
+the bridge and the parity harness still prefer `-L` because it is the lever
+they already verify.
 
 ### 11.4 `-L` is the working isolation lever
 
-- `docs/faq.md:120` → \`**Q: Can I run multiple isolated psmux servers?**\`
-- `docs/faq.md:121` → \`A: Yes, use the \`-L\` flag for server namespaces\`
+- `docs/faq.md:171` → \`**Q: Can I run multiple isolated psmux servers?**\`
+- `docs/faq.md:172` → \`A: Yes, use the \`-L\` flag for server namespaces\`
 
 Server identity is `{namespace}__{session}`:
 
-- `src/types.rs:1345` → `pub fn port_file_base(&self) -> String {`
-- `src/types.rs:1346` → `if let Some(ref sn) = self.socket_name {`
-- `src/types.rs:1347` → `format!("{}__{}", sn, self.session_name)`
+- `src/types.rs:2906` → `pub fn port_file_base(&self) -> String {`
+- `src/types.rs:2907` → `if let Some(ref sn) = self.socket_name {`
+- `src/types.rs:2908` → `format!("{}__{}", sn, self.session_name)`
 
 INFERRED: because the namespace is folded into the discovery-file name and into
 the mutex name, `-L alpha` and `-L beta` are fully independent. Every probe and
-every test that must not touch the user's real registry must therefore use its
-own `-L` namespace and must never rely on `PSMUX_DATA_DIR` for isolation. This
-is the discipline the parity harness already used, per-side, to make pane ids
-directly comparable.
+every test that must not touch the user's real registry uses its own `-L`
+namespace; at v3.4.0 `PSMUX_DATA_DIR` is also a working isolation lever, but the
+parity harness keeps `-L` because that is the lever it already verifies.
 
 ### 11.5 Installed binary names and install directory
 
-- `installer/psmux.nsi:34` → \`InstallDir "$LOCALAPPDATA\\psmux"\`
-- `installer/psmux.nsi:35` → \`InstallDirRegKey HKCU "Software\\psmux" "InstallDir"\`
-- `installer/psmux.nsi:87` → `File "${SOURCE_DIR}\psmux.exe"`
-- `installer/psmux.nsi:88` → `File "${SOURCE_DIR}\pmux.exe"`
-- `installer/psmux.nsi:89` → `File "${SOURCE_DIR}\tmux.exe"`
+- `installer/psmux.nsi:64` → \`InstallDir "$LOCALAPPDATA\\psmux"\`
+- `installer/psmux.nsi:65` → \`InstallDirRegKey HKCU "Software\\psmux" "InstallDir"\`
+- `installer/psmux.nsi:124` → `File "${SOURCE_DIR}\psmux.exe"`
+- `installer/psmux.nsi:125` → `File "${SOURCE_DIR}\pmux.exe"`
+- `installer/psmux.nsi:126` → `File "${SOURCE_DIR}\tmux.exe"`
 
 Three binaries are installed side by side, including `tmux.exe`. This is the
 mechanism that makes `findCommandPath("tmux")` (`index.js:9140`) able to find
@@ -2478,7 +2626,7 @@ resolve to the claimed content. The correct numbers are the ones used above.
 | plan todo 3 and todo 4, draft line 194 | `oh-my-openagent@5.1.17` is the installed bundle | `5.1.17` was never installed; the pin is `5.1.18` | **corrected**: document frozen against 5.1.18 (see also the second discrepancy in section 0.1) |
 | draft line 224, `docs/tmux_args_reference.md:93` | the `respawn-pane` row documenting the `--` form | `:93` is the `rotate-window` row | **corrected**: the `respawn-pane` row is `:91` |
 | draft line 232, `installer/psmux.nsi:89-91` | `psmux.exe`, `pmux.exe`, `tmux.exe` | `:90` is `README.md`, `:91` is `LICENSE` | **corrected**: the three binaries are `:87-89` (which the plan's todo 1 block already had right) |
-| draft line 226 | `cached_shell()` "reads `$SHELL`" | no `$SHELL` read exists in `src/*.rs` at v3.3.8 | **corrected**: it walks `pwsh` → `powershell` → `cmd`; the draft's conclusion holds more strongly than stated |
+| draft line 226 | `cached_shell()` "reads `$SHELL`" | no `$SHELL` read existed in `src/*.rs` at v3.3.8; v3.4.0's `cached_shell()` prefers `$SHELL` when it names a spawnable Windows shell | **corrected for v3.3.8, changed at v3.4.0** (`src/pane.rs:452`, `src/pane.rs:491`) |
 
 Everything else resolved as written, including all the bundle line numbers in
 the plan's todo 3 and todo 4 reference blocks, which are correct for 5.1.18.
@@ -2490,9 +2638,9 @@ the plan's todo 3 and todo 4 reference blocks, which are correct for 5.1.18.
 | # | Question | Settled by |
 |---|---|---|
 | Q-CONTRACT-1 | Does `select-layout <layout>` with no `-t` work against psmux 3.3.8, and which window does it act on? | **SETTLED 2026-10-07.** Measured on a `windows-latest` runner: it applies, and applies to the client's current window. Option A confirmed, no code change required. Section 9.3, evidence `ci-layout-which-window.json`. Residual, not closed: whether the current window is always the one OmO meant, and the two-concurrent-clients case. |
-| Q-CONTRACT-2 | What is psmux 3.3.8's exact stderr text and exit code for `kill-pane` against a dead pane? Section 3.8 makes `/can't find pane/i` load-bearing. | todo 5 sub-probe (i) |
-| Q-CONTRACT-3 | Does psmux 3.3.8 deliver `-e` to a `respawn-pane` pane when the bridge supplies it by its own route? Section 7.2 is source-read only. | todo 5 sub-probe (h) |
-| Q-CONTRACT-4 | Which release will first contain `c20016c` and `4addc0a`? Section 8.2 is seeded `null` deliberately. | upgrade check, section 8.1 rule |
+| Q-CONTRACT-2 | What is psmux's exact stderr text and exit code for `kill-pane` against a dead pane? Section 3.8 makes `/can't find pane/i` load-bearing. | **MEASURED at v3.3.8 (todo 5) and re-observed at v3.4.0**: exit 1 with `psmux: can't find pane: %3`, matching the regex (`.omo/evidence/psmux340-windows-parity.json`). |
+| Q-CONTRACT-3 | Does psmux deliver `-e` to a `respawn-pane` pane when the bridge supplies it by its own route? Section 7.2 is source-read only. | **ANSWERED at v3.4.0**: `4addc0a` applies `-e` via `env_flag_values`; the bridge still self-applies through env slots for the credential boundary. |
+| Q-CONTRACT-4 | Which release first contains `c20016c` and `4addc0a`? | **ANSWERED**: v3.4.0; both commits are ancestors of the tag, and `git tag --contains` returns only v3.4.0. |
 | Q-CONTRACT-5 | Does a pane description containing a double quote survive the placeholder? Section 13.1. | **MEASURED 2026-10-12: NO.** The loss is reachable and user-visible. Not fixed by decision; see 13.1. |
 
 ---
@@ -2599,7 +2747,10 @@ placeholder shell is switched to `pwsh`, that input is lossy on Windows PowerShe
 
 This document is only true of the oh-my-openagent recorded as
 `omo.verifiedAgainst` in `scripts/contract/pins.json` (**5.1.60** at this
-revision) and of psmux **v3.3.8**. When either is upgraded:
+revision) and of psmux **v3.4.0**. The v2.0.0 floor is exactly psmux 3.4.0:
+the retired responses in sections 7 and 8 (rule 1a, the `--` insertion,
+rule 1d) stay retired, and the env-slot delivery stays as the credential
+boundary. When either pin is upgraded:
 
 1. Run `bun run contract:fetch && bun run contract:verify`. This step used to be
    "a person with `sed`" and said so, because there was no checker to run; it is
@@ -2630,11 +2781,11 @@ revision) and of psmux **v3.3.8**. When either is upgraded:
 3. Re-check the `-e` handling table in section 7.2, verb by verb.
 4. Re-run the ancestry check in section 8.1 for both commits, and fill the
    `First release containing it` cells only from a real tag test.
-5. Re-check the three layout rules in section 3.9 against the new psmux source,
-   in the order they depend on each other: if `options.rs` learns to parse a
-   percentage, drop rule 1a; if `apply_layout` reads the sizing option outside
-   itself, drop rule 1b; only then drop rule 1c and forward `resize-pane -x` again.
-   Dropping 1c first re-exposes the layout to the defect it was suppressing.
+5. Re-check the layout rules in section 3.9 against the new psmux source,
+   in the order they depend on each other. Rule 1a is retired in v2.0.0
+   (v3.4.0 parses the `%` form); rule 1b is still present, and rule 1c's
+   cell-count defect is still present. Rule 1c stays: dropping it while 1b
+   holds would re-expose the layout to the defect being suppressed.
 
    **All three now retire on a boolean, not on someone's reading.** All three are
    measured behaviourally — apply, then read the geometry — and rule 1c's claim
@@ -2651,13 +2802,15 @@ revision) and of psmux **v3.3.8**. When either is upgraded:
    if forwarding that command would have done damage, and now that is measured
    rather than assumed.
 
-   So `parity.yml` prints `rule_1a_percent_form_ignored`,
+   So `parity.yml` prints
    `rule_1b_option_alone_inert`, `rule_1b_followup_applies`,
-   `rule_1b_order_matters`, `height_percent_form_ignored` and
-   `rule_1c_defect_present` on every run, and the retirement signal for each rule
-   arrives without anyone deciding to look for it. Retire in the order the booleans
-   go false, not in the order that seems tidy: the dependency is 1a, then 1b, then
-   1c, and dropping 1c while either of the others still holds re-exposes the layout
+   `rule_1b_order_matters`, and
+   `rule_1c_defect_present` on every run (`rule_1a_percent_form_ignored` and
+   `height_percent_form_ignored` stay printed for continuity with the older
+   artifacts, but rule 1a is retired in v2.0.0 and they are not retirement
+   signals any more). Retire in the order the booleans go false, not in the
+   order that seems tidy: with 1a retired, the remaining dependency is 1b
+   before 1c, and dropping 1c while 1b still holds re-exposes the layout
    to the defect being suppressed.
 6. Re-resolve every team-mode citation in section 3.10 by hand, on either
    upgrade (OmO or psmux): the `createTeamLayoutInCallerWindow` sequence, the
@@ -2669,11 +2822,11 @@ revision) and of psmux **v3.3.8**. When either is upgraded:
    if `-F` is parsed as the format selector for `display` / `display-message`,
    retire rule D0 per section 8.2; other verbs' `-F` was never rewritten and
    needs no check.
-8. Re-check pane-option support in the new psmux server source: if psmux
-   stores arbitrary pane options, retire rule 1d per section 8.2. Only then
-   revisit the rules: re-run the ancestry check in section 8.1 for any
-   candidate fix commit, and re-measure the team-layout probe before changing
-   rule 1e, since its caller-is-main assumption rests on a measured run, not
-   on source alone.
+8. Re-check pane-option support in the new psmux server source. v3.4.0 stores
+   arbitrary `@name` pane options (#728), so rule 1d's premise is gone and
+   v2.0.0 retired the rule: the bridge forwards the options. The effect on OmO's
+   stale-attach sweep is unmeasured. Re-measure the team-layout probe before changing rule 1e,
+   since its caller-is-main assumption rests on a measured run, not on source
+   alone.
 
 Until step 1 passes for every citation, treat any bridge behaviour as unverified.

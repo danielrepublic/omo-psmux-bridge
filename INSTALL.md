@@ -4,14 +4,17 @@ A `tmux` shim, so that opencode's `oh-my-openagent` (OmO) plugin can open subage
 panes under [psmux](https://github.com/psmux/psmux) instead of real tmux. No WSL,
 no Git Bash, no Cygwin.
 
-Windows protocol smoke tested with **OpenCode v1 1.19.5**, **OmO 5.1.60**,
+Windows protocol smoke tested with **OpenCode v1 1.19.5**, **OmO 5.1.51+
+(verified at 5.1.60)**,
 and **psmux 3.4.0**. See the [auth smoke driver](.omo/evidence/omo5151-windows-auth-smoke-20261029.cjs),
 which exercises the 5.1.51 payload grammar that is still byte-identical at
 5.1.60, and its [5.1.60 report](.omo/evidence/omo5160-windows-auth-report-20261104.json)
 for authenticated and unauthenticated split, placeholder, respawn, real
 OpenCode attach, team attach, close, plugin loading, and doctor checks.
-This is not a full interactive-parity claim. The detailed source contract still
-pins **psmux 3.3.8**; the newer runtime smoke does not retire its workarounds.
+This is not a full interactive-parity claim. The detailed source contract now
+pins **psmux 3.4.0** (superseding the previous 3.3.8 parity baseline); runtime
+verification still carries an unresolved team-resize observation, so the newer
+runtime smoke does not retire its workarounds.
 
 ---
 
@@ -22,7 +25,7 @@ plugin.
 
 | | Check it with | If it is missing |
 | --- | --- | --- |
-| **psmux** 3.3.8+ | `psmux -V` | Install psmux first. The bridge cannot work without it. |
+| **psmux** 3.4.0 (only) | `psmux -V` | Install psmux first. The bridge cannot work without it. |
 | **opencode** | `opencode -v` | Install opencode first. |
 | **the OmO plugin** | your opencode config lists `oh-my-openagent` under `"plugin"` | See [Step 0](#step-0--the-one-setting-people-miss). |
 
@@ -192,7 +195,7 @@ What the bridge handles for team panes, once that is on:
 | OmO sends | The bridge |
 | --- | --- |
 | `display -p -F ...` to find your pane | Drops the `-F` (psmux reads it as message text, so the lookup would fail and the whole layout would be skipped) |
-| `set-option -p ... @omo_attach_*` per teammate pane | Absorbs it and exits 0 (psmux refuses pane-scoped options, and OmO never reads the results back) |
+| `set-option -p ... @omo_attach_*` per teammate pane | Forwards it to psmux and reports psmux's own result. psmux 3.4.0 stores these options (former rule 1d, retired in v2.0.0); OmO never reads the results back |
 | `resize-pane -t <you> -x "30%"` | Converts it to the equivalent window sizing plus a re-applied layout, so your pane lands at about 30% |
 
 Two limits you should know about:
@@ -201,10 +204,11 @@ Two limits you should know about:
   is present (`pwsh` first, then `powershell`, then `cmd` as a last resort).
   A machine with only `cmd` is unsupported: panes may start, but the attach
   commands the bridge builds assume a PowerShell host.
-- **The stale-attach-pane sweep does not work on psmux.** OmO periodically
+- **The stale-attach-pane sweep did not work on psmux 3.3.8.** OmO periodically
   sweeps dead teammate panes the way it sweeps dead subagent panes, by reading
-  back pane options psmux never stored. Dead team panes stay listed until you
-  close them yourself, same as dead subagent panes.
+  back pane options. psmux 3.3.8 never stored them, so dead team panes stayed
+  listed until you closed them yourself. psmux 3.4.0 now stores pane options,
+  but whether the sweep works there has not been re-measured.
 
 The full grammar, with the measured probe runs behind each row, is
 [`CONTRACT.md` §3.10](CONTRACT.md).
@@ -299,3 +303,20 @@ with the upstream commit for every row, is
 [`CONTRACT.md` §8](CONTRACT.md). It is deliberately not computed by comparing
 version strings: `3.3.9` might contain a given fix or might not, and nothing in
 the string says which.
+
+Retired in v2.0.0 — the support floor is exactly psmux 3.4.0, so these are
+gone, not dormant:
+
+- the `respawn-pane` `--` insertion (§7.1)
+- the rule 1a `%` strip on `main-pane-width` / `main-pane-height` (§3.9)
+- the rule 1d suppression of `set-option -p ... @omo_attach_*` (§3.10)
+
+Live, because their upstream cause is still present at 3.4.0:
+
+- rule 1b (re-apply the layout after the sizing option)
+- rule 1c (suppress `resize-pane -x` / `-y` cell counts)
+- rule 1e (rewrite the team resize to the sizing option plus a re-applied layout)
+- rule D0 (drop the non-final `-F` on `display` / `display-message`)
+- rule 1f (authenticated team `send-keys` rewritten to the helper)
+- the env-slot/file credential delivery (§7.2) — the credential boundary, kept
+  deliberately rather than as a version shim
