@@ -56,8 +56,8 @@ import type { Translation } from "../src/translate";
 // Fixtures - byte-identical in shape to test/translate.test.ts
 // ---------------------------------------------------------------------------
 
-const BODY_HEAD = "printf '%s\\n%s\\n' \\\"OMO subagent pane ready: ";
-const BODY_TAIL = "\\\" \\\"Focus this pane to attach.\\\"; while :; do sleep 86400; done";
+const BODY_HEAD = "printf '%s\\n%s\\n' 'OMO subagent pane ready: ";
+const BODY_TAIL = "' 'Focus this pane to attach.'; while :; do sleep 86400; done";
 const PH_PLAIN = `/bin/sh -c "${BODY_HEAD}explore the tmux grammar module${BODY_TAIL}"`;
 const AT_PLAIN =
   "/bin/sh -c \"opencode attach 'http://127.0.0.1:4096' --session 'ses_abc123' --dir '/home/dev/proj'\"";
