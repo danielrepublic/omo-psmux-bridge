@@ -1,8 +1,8 @@
 {
   "tool": "omo5151-windows-auth-smoke-20261029.cjs",
   "ok": true,
-  "namespace": "omo-auth-2092570160",
-  "candidateRoot": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-candidate-560",
+  "namespace": "omo-auth-32564538603",
+  "candidateRoot": "C:\\Users\\Daniel\\AppData\\Local\\omo-psmux-bridge",
   "versions": {
     "opencode": "1.19.5"
   },
@@ -10,7 +10,7 @@
     {
       "name": "candidate-tmux-exe-present",
       "pass": true,
-      "detail": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-candidate-560\\bin\\tmux.exe"
+      "detail": "C:\\Users\\Daniel\\AppData\\Local\\omo-psmux-bridge\\bin\\tmux.exe"
     },
     {
       "name": "opencode-1.19.5",
@@ -20,7 +20,7 @@
     {
       "name": "serve-health-ok",
       "pass": true,
-      "detail": "port=63002"
+      "detail": "port=53267"
     },
     {
       "name": "session-created",
@@ -55,7 +55,7 @@
     {
       "name": "auth-placeholder-file-consumed",
       "pass": true,
-      "detail": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-auth-smoke-2092570160\\2092570160-ed1aa32d04c1.sh"
+      "detail": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-auth-smoke-32564538603\\32564538603-85b7e9b4a85148.sh"
     },
     {
       "name": "auth-attach-respawn",
@@ -70,7 +70,7 @@
     {
       "name": "auth-attach-file-consumed",
       "pass": true,
-      "detail": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-auth-smoke-2092570160\\2092570160-51de105a651c3.sh"
+      "detail": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-auth-smoke-32564538603\\32564538603-4a58568c1c90d.sh"
     },
     {
       "name": "team-split",
@@ -90,7 +90,7 @@
     {
       "name": "team-auth-file-consumed",
       "pass": true,
-      "detail": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-auth-smoke-2092570160\\2092570160-599fc1cab6599.sh"
+      "detail": "C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo-auth-smoke-32564538603\\32564538603-16d285b27abad8.sh"
     },
     {
       "name": "log-auth-split-classified",
@@ -124,9 +124,9 @@
     }
   ],
   "paneSamples": {
-    "placeholder": "OMO subagent pane ready: auth placeholder 2092570160\nFocus this pane to attach.",
-    "attach": "┃\n  ┃  BRIDGE_AUTH_2092570160\n  ┃\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n  ┃\n  ┃\n  ┃\n  ┃  Sisyphus - Ultraworker · GPT-6.1 Terra OpenAI · max\n  ╹▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀\n   C:\\Users\\Daniel                                                     tab agents  ctrl+p commands",
-    "team": "┃\n  ┃  BRIDGE_AUTH_2092570160\n  ┃\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n  ┃\n  ┃\n  ┃\n  ┃  Sisyphus -        ·GPT-6.1 Terra Ope· ma\n  ┃  Ultraworker                      nAI  x\n  ┃\n  ╹▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀\n   C:\\Users\\Daniel  tab agents  ctrl+p commands"
+    "placeholder": "OMO subagent pane ready: auth placeholder 32564538603\nFocus this pane to attach.",
+    "attach": "┃\n  ┃  BRIDGE_AUTH_32564538603\n  ┃\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n  ┃\n  ┃\n  ┃\n  ┃  Sisyphus - Ultraworker · GPT-6.1 Terra OpenAI · max\n  ╹▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀\n   C:\\Users\\Daniel                                                     tab agents  ctrl+p commands",
+    "team": "┃\n  ┃  BRIDGE_AUTH_32564538603\n  ┃\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n  ┃\n  ┃\n  ┃\n  ┃  Sisyphus -        ·GPT-6.1 Terra Ope· ma\n  ┃  Ultraworker                      nAI  x\n  ┃\n  ╹▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀\n   C:\\Users\\Daniel  tab agents  ctrl+p commands"
   },
   "cleanup": {
     "namespaceKill": "exit=0",
