@@ -340,8 +340,8 @@ function Get-PsmuxBackend {
 #
 # Confusing the two is not a style problem. `tmux.enabled` is read by
 #   isTmuxIntegrationEnabled(pluginConfig)  -> pluginConfig.tmux?.enabled ?? false
-# (index.js:144880-144881), and pluginConfig is the `[opencode]` block of the OMO
-# config chain (index.js:91087-91090, appendViews(..., block, "[opencode].")).
+# (index.js:153084-153085), and pluginConfig is the `[opencode]` block of the OMO
+# config chain (index.js:99240-99243, appendViews(..., block, "[opencode].")).
 # Probing the opencode config for a top-level "tmux" block therefore reports on a
 # key that is never read, in a file that never carries it, so the installer could
 # print TRUE while panes still did not appear, or FALSE on a fully working setup.
@@ -370,18 +370,19 @@ function Get-OpencodeConfigPath {
 # Resolved exactly the way the installed bundle resolves it, so this installer
 # cannot advise about a file OmO never opens:
 #
-#   index.js:87886  function resolveHomeDir(env = process.env) {
-#   index.js:87887    const homeDir = env.HOME ?? env.USERPROFILE ?? process.cwd();
-#   index.js:87896  function detectUserOmoJsonPath(env, fileSystem) {
-#   index.js:87898    const jsoncPath = join35(configDir, "omo.jsonc");
-#   index.js:87899    if (fileSystem.existsSync(jsoncPath))
-#   index.js:87900      return jsoncPath;
-#   index.js:87901    const jsonPath = join35(configDir, "omo.json");
-#   index.js:87902    return fileSystem.existsSync(jsonPath) ? jsonPath : jsoncPath;
+#   index.js:96015  function resolveHomeDir(env = process.env) {
+#   index.js:96016    const homeDir = env.HOME ?? env.USERPROFILE ?? process.cwd();
+#   index.js:96025  function detectUserOmoJsonPath(env, fileSystem) {
+#   index.js:96027    const jsoncPath = join35(configDir, "omo.jsonc");
+#   index.js:96028    if (fileSystem.existsSync(jsoncPath))
+#   index.js:96029      return jsoncPath;
+#   index.js:96030    const jsonPath = join35(configDir, "omo.json");
+#   index.js:96031    return fileSystem.existsSync(jsonPath) ? jsonPath : jsoncPath;
 #
 # `join35` is node's `path.join` under the bundle's own import alias. The alias
-# suffix is a bundler artefact (a name collision renumbered it again at 5.1.51), so it
-# carries no meaning; it is quoted as the bundle actually spells it.
+# suffix is a bundler artefact (a name collision renumbered it again at 5.1.51;
+# it is still `join35` at 5.1.60), so it carries no meaning; it is quoted as the
+# bundle actually spells it.
 #
 # `??` is NULL coalescing, not truthiness: an EMPTY HOME still wins over
 # USERPROFILE. -not [string]::IsNullOrEmpty would diverge here, so this tests
@@ -665,19 +666,19 @@ Write-Line ('[install] opencode_config=' + $(if ($opencodeConfigPath -eq '') { '
 # OMO config chain, so it is probed there -- see Read-OmoTmuxEnabled.
 $omoConfigPath = Get-OmoConfigPath
 $omoConfigExists = (-not [string]::IsNullOrEmpty($omoConfigPath)) -and (Test-Path -LiteralPath $omoConfigPath -PathType Leaf)
-$omoConfigRule = 'neither omo.jsonc nor omo.json exists; this is the path OmO expects (index.js:87902)'
+$omoConfigRule = 'neither omo.jsonc nor omo.json exists; this is the path OmO expects (index.js:96031)'
 if ($omoConfigExists) {
     $sibling = ''
     if ((Split-Path $omoConfigPath -Leaf) -eq 'omo.jsonc') { $sibling = Join-Path (Split-Path $omoConfigPath -Parent) 'omo.json' }
     else { $sibling = Join-Path (Split-Path $omoConfigPath -Parent) 'omo.jsonc' }
-    if (Test-Path -LiteralPath $sibling -PathType Leaf) { $omoConfigRule = 'both omo.jsonc and omo.json exist; OmO reads omo.jsonc (index.js:87899)' }
-    else { $omoConfigRule = 'omo.' + ((Split-Path $omoConfigPath -Leaf) -replace '^omo\.', '') + ' exists (index.js:87899,87902)' }
+    if (Test-Path -LiteralPath $sibling -PathType Leaf) { $omoConfigRule = 'both omo.jsonc and omo.json exist; OmO reads omo.jsonc (index.js:96028)' }
+    else { $omoConfigRule = 'omo.' + ((Split-Path $omoConfigPath -Leaf) -replace '^omo\.', '') + ' exists (index.js:96028,96031)' }
 }
 $tmuxEnabled = Read-OmoTmuxEnabled -Path $omoConfigPath
 Write-Line ('[install] omo_config=' + $(if ($omoConfigPath -eq '') { '<no home derivable>' } else { $omoConfigPath }))
 Write-Line ('[install] omo_config_exists=' + $omoConfigExists)
 Write-Line ('[install] omo_config_rule=' + $omoConfigRule)
-Write-Line ('[install] prereq_tmux_enabled=' + $tmuxEnabled + '  (read from omo config [opencode].tmux.enabled, index.js:144880-144881)')
+Write-Line ('[install] prereq_tmux_enabled=' + $tmuxEnabled + '  (read from omo config [opencode].tmux.enabled, index.js:153084-153085)')
 
 $machineBefore = Get-MachinePathFingerprint
 
@@ -935,7 +936,7 @@ if (-not $omoConfigExists) {
     Write-Line '[install] a missing pane is otherwise indistinguishable from a broken install.'
     Write-Line '[install] The file is NOT necessarily the one named above: OmO reads'
     Write-Line '[install] $HOME/.omo/omo.jsonc when it exists, else omo.json, and it also merges'
-    Write-Line '[install] project layers and a profile block (index.js:87886-87902, 91087-91090).'
+    Write-Line '[install] project layers and a profile block (index.js:96015-96031, 99240-99243).'
     Write-Line '[install] If you set it and panes still do not appear, run'
     Write-Line '[install] bin\bridge-doctor.cmd  -- it is read-only and names which gate is'
     Write-Line '[install] responsible, and it reports the same file-resolution rules as this.'

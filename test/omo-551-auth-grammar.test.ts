@@ -1,9 +1,9 @@
-// OmO 5.1.51 authenticated pane payloads.
+// OmO 5.1.51+ authenticated pane payloads (still byte-identical at 5.1.60).
 //
-// Source: oh-my-openagent@5.1.51 dist/index.js
-//   :8285-8289  withPaneAuth
-//   :8384-8393  shellQuoteForNestedCommand + buildTmuxAttachCommand
-//   :8404-8412  buildTmuxPlaceholderCommand
+// Source: oh-my-openagent@5.1.60 dist/index.js
+//   :8286-8290  withPaneAuth
+//   :8385-8394  shellQuoteForNestedCommand + buildTmuxAttachCommand
+//   :8405-8413  buildTmuxPlaceholderCommand
 //
 // When OPENCODE_SERVER_PASSWORD is set, every payload body is prefixed with a
 // CONSTANT, escaped POSIX fragment that sources a one-use credential file and
@@ -19,7 +19,8 @@ import { classifyArgv } from "../src/grammar";
 import { parseHelperCommandLine, translateArgv } from "../src/translate";
 
 // Exact payload bodies between the outer quotes, generated from the published
-// 5.1.51 bundle functions. String.raw keeps the backslashes literal.
+// 5.1.51 grammar, re-checked unchanged against the 5.1.60 bundle. String.raw
+// keeps the backslashes literal.
 const AUTH_PREFIX = String.raw`. \"\$OPENCODE_SERVER_PASSWORD_FILE\" && rm -f -- \"\$OPENCODE_SERVER_PASSWORD_FILE\" && `;
 
 const AUTH_PH_PLAIN = String.raw`/bin/sh -c ". \"\$OPENCODE_SERVER_PASSWORD_FILE\" && rm -f -- \"\$OPENCODE_SERVER_PASSWORD_FILE\" && printf '%s\n%s\n' 'OMO subagent pane ready: explore the tmux grammar module' 'Focus this pane to attach.'; while :; do sleep 86400; done"`;

@@ -4,11 +4,12 @@ A `tmux` shim, so that opencode's `oh-my-openagent` (OmO) plugin can open subage
 panes under [psmux](https://github.com/psmux/psmux) instead of real tmux. No WSL,
 no Git Bash, no Cygwin.
 
-Windows protocol smoke tested with **OpenCode v1 1.19.5**, **OmO 5.1.51**,
-and **psmux 3.4.0**. See the [auth smoke driver](.omo/evidence/omo5151-windows-auth-smoke-20261029.cjs)
-and its report for authenticated and unauthenticated split, placeholder,
-respawn, real OpenCode attach, team attach, close, plugin loading, and doctor
-checks.
+Windows protocol smoke tested with **OpenCode v1 1.19.5**, **OmO 5.1.60**,
+and **psmux 3.4.0**. See the [auth smoke driver](.omo/evidence/omo5151-windows-auth-smoke-20261029.cjs),
+which exercises the 5.1.51 payload grammar that is still byte-identical at
+5.1.60, and its [5.1.60 report](.omo/evidence/omo5160-windows-auth-report-20261104.json)
+for authenticated and unauthenticated split, placeholder, respawn, real
+OpenCode attach, team attach, close, plugin loading, and doctor checks.
 This is not a full interactive-parity claim. The detailed source contract still
 pins **psmux 3.3.8**; the newer runtime smoke does not retire its workarounds.
 
@@ -157,9 +158,10 @@ project shipped is treated as an upgrade source.
 
 ---
 
-## OmO 5.1.51 authenticated panes
+## OmO 5.1.51+ authenticated panes
 
-OmO 5.1.51 no longer puts `OPENCODE_SERVER_PASSWORD` in argv. It writes a
+OmO 5.1.51 and later (verified at 5.1.60) no longer puts
+`OPENCODE_SERVER_PASSWORD` in argv. It writes a
 one-use file under `%TEMP%\omo-run-auth-*\` and passes
 `-e OPENCODE_SERVER_PASSWORD_FILE=<path>`; the pane command sources and deletes
 that file. On Windows the bridge's helper consumes the file at pane start,
