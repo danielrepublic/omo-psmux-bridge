@@ -11,10 +11,10 @@ rem     The name is never resolved by bare lookup, because this directory owns
 rem     the name once install.ps1 has run.
 rem  2. `--no-bridge` as the FIRST argument is stripped, and the real psmux runs
 rem     with the INHERITED ENVIRONMENT UNCHANGED -- no PATH extension at all.
-rem  3. NO arguments at all are rewritten to `new -A -s default`. Bare psmux on
-rem     3.3.8 creates a NEW NUMERIC SESSION every time (measured; it is not
-rem     tmux behaviour), and this launcher exists to be tmux-equivalent, which
-rem     means attach-to-`default`.
+rem  3. NO arguments at all are rewritten to `new -A -s default`. Bare psmux
+rem     without an explicit attach target creates a NEW NUMERIC SESSION every
+rem     time (measured; it is not tmux behaviour), and this launcher exists to
+rem     be tmux-equivalent, which means attach-to-`default`.
 rem  4. Every other invocation forwards argv BYTE-FOR-BYTE.
 rem  5. In every bridge-enabled case the bridge bin directory is prepended to
 rem     PATH FOR THE CHILD PROCESS ONLY. `setlocal` scopes it; it is never
@@ -136,7 +136,7 @@ if not defined PSMUX_LAUNCHER_SAWCREATE goto exec
 if not defined PSMUX_LAUNCHER_CPATHQ goto exec
 if exist "%PSMUX_LAUNCHER_CPATHQ%\" goto exec
 >&2 echo [psmux-bridge] WARNING: -c "%PSMUX_LAUNCHER_CPATH%" is not an existing directory.
->&2 echo [psmux-bridge]   psmux 3.3.8 does not validate this path, and fails SILENTLY.
+>&2 echo [psmux-bridge]   psmux does not validate this path, and fails SILENTLY.
 >&2 echo [psmux-bridge]   new-session IGNORES it: the pane starts in the launch directory.
 >&2 echo [psmux-bridge]   split-window -c FALLS BACK TO HOME instead.
 >&2 echo [psmux-bridge]   forwarding the command unchanged anyway.

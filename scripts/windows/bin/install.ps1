@@ -648,7 +648,7 @@ if ($psmux.Found) {
     Write-Line ('[install] prereq_psmux_binary=' + $psmux.Binary)
 } else {
     Write-Line ('[install] prereq_psmux_looked_in=' + ($psmux.LookedIn -join ' | '))
-    Write-Line '[install] prereq_psmux_action=install psmux 3.3.8 or newer, then re-run. The bridge cannot work without it.'
+    Write-Line '[install] prereq_psmux_action=install psmux 3.4.0, then re-run. The bridge cannot work without it.'
 }
 
 $opencodeCmd = Get-Command 'opencode' -ErrorAction SilentlyContinue
