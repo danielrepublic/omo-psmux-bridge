@@ -53,7 +53,6 @@ describe("5.1.51 authenticated payload recognition", () => {
     expect(result.payload).toBe(bodyOf(AUTH_PH_PLAIN));
     expect(result.payload.startsWith(AUTH_PREFIX)).toBe(true);
     expect(result.description).toBe("explore the tmux grammar module");
-    expect(result.descriptionEncoding).toBe("singlequote");
     expect(result.envArgs).toEqual([
       {
         name: "OPENCODE_SERVER_PASSWORD_FILE",
@@ -99,7 +98,7 @@ describe("5.1.51 authenticated payload recognition", () => {
       correlationId: "pane-test-auth",
     });
     expect(translation.kind).toBe("helper");
-    expect(translation.argv).toContain("--");
+    expect(translation.argv).not.toContain("--");
   });
 
   test("the unauthenticated 5.1.51 shapes remain byte-identical to 5.1.48", () => {
