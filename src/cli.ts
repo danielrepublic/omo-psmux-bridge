@@ -117,15 +117,20 @@ export const CLI_CONTRACT = {
    *     strict v2 validator rejects every record this shim now writes. The key is
    *     required and `null` when not suppressed, so its PRESENCE is the schema
    *     change and a v2 reader cannot infer it from any value it already reads.
-   *   * `ShimTraceRecord` gained the required key `rewriteReason` (rule D0,
-   *     issue #1), so a strict v2 validator rejects every record this shim now
-   *     writes. Like `suppressionReason` it is required and `null` when there is
-   *     no hidden rewrite, so its PRESENCE is the schema change and a v2 reader
-   *     cannot infer it from any value it already reads.
-   *
-   *  Leaving it at 1 would mean the version field asserts a compatibility that
-   *  does not exist, which is strictly worse than having no version at all. */
-  recordVersion: 3,
+    *   * `ShimTraceRecord` gained the required key `rewriteReason` (rule D0,
+    *     issue #1), so a strict v2 validator rejects every record this shim now
+    *     writes. Like `suppressionReason` it is required and `null` when there is
+    *     no hidden rewrite, so its PRESENCE is the schema change and a v2 reader
+    *     cannot infer it from any value it already reads.
+    *   * `ShimTraceRecord` LOST a required key (v2.0.0, psmux 3.4.0 only: the
+    *     respawn `--` insertion is retired), so a strict v3 validator rejects
+    *     every record this shim now writes. The removal of a required key is
+    *     the schema change: a v3 reader cannot infer its absence from any value
+    *     it already reads.
+    *
+    *  Leaving it at 1 would mean the version field asserts a compatibility that
+    *  does not exist, which is strictly worse than having no version at all. */
+  recordVersion: 4,
 
   /** Upper bound on one logged argv element, in characters. A 30 KB argument is
    *  a legal thing to forward and a terrible thing to write to a log; the tail
@@ -453,7 +458,6 @@ export interface ShimTraceRecord {
   readonly rewriteReason: string | null;
   readonly rewritten: boolean;
   readonly argc: number;
-  readonly dashDashInserted: boolean;
   readonly envSlotCount: number;
   readonly envSlotNames: readonly string[];
   readonly descriptorFileUsed: boolean;
@@ -513,7 +517,6 @@ export function buildTraceRecord(context: RecordContext): ShimTraceRecord {
     rewriteReason: invocation.translation.rewriteReason ?? null,
     rewritten: invocation.translation.rewritten,
     argc: invocation.translation.argv.length,
-    dashDashInserted: invocation.translation.dashDashInserted,
     envSlotCount: invocation.translation.envSlotCount,
     // NAMES only. `PanelDescriptor.slotNames` is documented as the log-safe half
     // of the slots, and it is the only part of a credential worth having.
@@ -823,7 +826,6 @@ function degradedInvocation(
       rewriteReason: undefined,
       followUps: [],
       rewritten: false,
-      dashDashInserted: false,
       psmuxPath: "",
       envSlots: [],
       envSlotCount: 0,

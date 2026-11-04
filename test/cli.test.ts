@@ -61,8 +61,8 @@ import { fixtureSpawn, writeBackendFixture } from "./fixture-backend";
 const REAL_VERSION_STDOUT = "tmux 3.3.8\npsmux 3.3.8 (66cf613 2026-08-18)\n";
 
 const PH_PLACEHOLDER =
-  "/bin/sh -c \"printf '%s\\n%s\\n' \\\"OMO subagent pane ready: explore the tmux grammar module\\\" " +
-  "\\\"Focus this pane to attach.\\\"; while :; do sleep 86400; done\"";
+  "/bin/sh -c \"printf '%s\\n%s\\n' 'OMO subagent pane ready: explore the tmux grammar module' " +
+  "'Focus this pane to attach.'; while :; do sleep 86400; done\"";
 
 const PH_ATTACH =
   "/bin/sh -c \"opencode attach 'http://127.0.0.1:4096' --session 'ses_abc123' --dir '/home/dev/proj'\"";
@@ -220,7 +220,6 @@ describe("wiring: grammar -> translate -> backend -> exec", () => {
     expect(plan.classification).toBe("pass-through");
     expect(plan.translation.kind).toBe("passthrough");
     expect(plan.translation.rewritten).toBe(false);
-    expect(plan.translation.dashDashInserted).toBe(false);
     expect(plan.translation.argv).toEqual(["-V"]);
     expect(plan.helper).toBeUndefined();
     expect(plan.descriptor).toBeUndefined();
@@ -276,7 +275,6 @@ describe("wiring: grammar -> translate -> backend -> exec", () => {
     expect(plan.classification).toBe("placeholder-split");
     expect(plan.translation.kind).toBe("helper");
     expect(plan.translation.rewritten).toBe(true);
-    expect(plan.translation.dashDashInserted).toBe(false);
     expect(plan.translation.argv[0]).toBe("split-window");
     expect(plan.translation.argv.slice(1, 4)).toEqual(["-h", "-P", "-F"]);
     expect(plan.helper?.commandProgram).toBe("powershell");
@@ -299,21 +297,19 @@ describe("wiring: grammar -> translate -> backend -> exec", () => {
     expect(record.argv.at(-1)).toBe(CLI_CONTRACT.helperInvocationPlaceholder);
   });
 
-  test("the attach shape inserts `--` and reaches the helper as an `opencode attach` vector", () => {
+  test("the attach shape reaches the helper as an `opencode attach` vector, with no `--`", () => {
     const plan = planInvocation(
       ["respawn-pane", "-k", "-t", "%7", PH_ATTACH],
       deps(),
     );
 
     expect(plan.classification).toBe("attach-respawn");
-    expect(plan.translation.dashDashInserted).toBe(true);
     const commandLine = plan.translation.helperCommandLine ?? "";
     expect(plan.translation.argv).toEqual([
       "respawn-pane",
       "-k",
       "-t",
       "%7",
-      "--",
       commandLine,
     ]);
     expect(plan.helper?.commandProgram).toBe("opencode");
@@ -337,7 +333,7 @@ describe("wiring: grammar -> translate -> backend -> exec", () => {
 // `test/translate.test.ts` section 10 for the translation-level rules and
 // `src/translate.ts` for the psmux defects each one works around.
 
-describe("the layout rules reach the backend as a corrected command plus a follow-up", () => {
+describe("the layout rules reach the backend as the preserved command plus a follow-up", () => {
   test("the sizing option runs the re-applied layout AFTER it, and the follow-up's 42 does not become the exit code", async () => {
     const exitCode = await main(["set-window-option", "main-pane-width", "50%"], deps());
 
@@ -346,7 +342,7 @@ describe("the layout rules reach the backend as a corrected command plus a follo
     // `main_pane_width` from inside `apply_layout` (src/layout.rs:1094-1096), so
     // a layout applied first would read the OLD value.
     expect(box.calls().map((c) => c.argv)).toEqual([
-      ["set-window-option", "main-pane-width", "50"],
+      ["set-window-option", "main-pane-width", "50%"],
       ["select-layout", "main-vertical"],
     ]);
   });
@@ -363,7 +359,7 @@ describe("the layout rules reach the backend as a corrected command plus a follo
     // The primary inherits stdio exactly as every other forwarded command does;
     // only the injected follow-up is captured, because its bytes are not OmO's.
     expect(seen.map((s) => s.argv)).toEqual([
-      ["set-window-option", "main-pane-height", "50"],
+      ["set-window-option", "main-pane-height", "50%"],
       ["select-layout", "main-horizontal"],
     ]);
     expect(seen.map((s) => s.captureOutput)).toEqual([undefined, true]);
@@ -380,7 +376,7 @@ describe("the layout rules reach the backend as a corrected command plus a follo
     expect(record?.kind).toBe("suppressed");
     expect(record?.outcome).toBe("suppressed");
     expect(record?.exitCode).toBe(0);
-    // The machine-readable reason distinguishes rule 1c's drop from rule 1d's.
+    // The machine-readable reason names rule 1c's drop.
     expect(record?.suppressionReason).toBe("resize-cell-count-is-not-a-percentage");
     // The dropped command is still on the record, which is what makes the
     // suppression auditable instead of invisible.
@@ -396,7 +392,7 @@ describe("the layout rules reach the backend as a corrected command plus a follo
     expect(record?.outcome).toBe("forwarded");
     // A forwarded command is not suppressed, so the reason is explicitly null.
     expect(record?.suppressionReason).toBeNull();
-    expect(record?.argv).toEqual(["set-window-option", "main-pane-width", "50"]);
+    expect(record?.argv).toEqual(["set-window-option", "main-pane-width", "50%"]);
     expect(record?.followUps).toEqual([
       {
         reason: "psmux-reads-main-pane-size-only-inside-apply-layout",
@@ -423,7 +419,7 @@ describe("the layout rules reach the backend as a corrected command plus a follo
     // Without the globals on the follow-up, the re-layout would land in the
     // default namespace and the option that was just set would not be read.
     expect(box.calls().map((c) => c.argv)).toEqual([
-      ["-L", "ns", "set-window-option", "main-pane-width", "50"],
+      ["-L", "ns", "set-window-option", "main-pane-width", "50%"],
       ["-L", "ns", "select-layout", "main-vertical"],
     ]);
   });
@@ -446,7 +442,7 @@ describe("the layout rules reach the backend as a corrected command plus a follo
     expect(exitCode).toBe(7);
     // The count is the assertion: 2 would mean the gate is missing.
     expect(box.calls()).toHaveLength(1);
-    expect(box.calls()[0]?.argv).toEqual(["set-window-option", "main-pane-width", "50"]);
+    expect(box.calls()[0]?.argv).toEqual(["set-window-option", "main-pane-width", "50%"]);
     // No `select-layout` reached the child at all, and none is claimed on the log.
     expect(box.calls().some((c) => c.argv[0] === "select-layout")).toBe(false);
     expect(callRecords()[0]?.followUps).toEqual([
@@ -466,7 +462,7 @@ describe("the layout rules reach the backend as a corrected command plus a follo
 
     expect(box.calls()).toHaveLength(2);
     expect(box.calls().map((c) => c.argv)).toEqual([
-      ["set-window-option", "main-pane-width", "50"],
+      ["set-window-option", "main-pane-width", "50%"],
       ["select-layout", "main-vertical"],
     ]);
   });
@@ -483,48 +479,38 @@ describe("the layout rules reach the backend as a corrected command plus a follo
 });
 
 // ---------------------------------------------------------------------------
-// 2a. The team-mode rules, end to end (issue #1)
+// 2a. The team-mode rules, end to end (issue #1, v2.0.0)
 // ---------------------------------------------------------------------------
 //
-// D1 must reach the backend ZERO times and exit 0; D2 must reach it as the
+// D1 is retired: psmux 3.4.0 accepts pane-scoped options, so the `@omo_attach_*`
+// forms reach the backend once and exit with its code. D2 must reach it as the
 // sizing option plus the re-applied layout. Both are driven through the same
-// real `psmux.exe` stand-in as section 2, so "zero backend calls" is a fact
-// about a real child rather than about a stub.
+// real `psmux.exe` stand-in as section 2, so the backend calls are facts about
+// a real child rather than about a stub.
 
-describe("the team-mode rules reach the backend as a suppression and a rewrite", () => {
-  test("D1: a pane-scoped `@omo_attach_*` option runs NO backend, exits 0, and logs the reason", async () => {
-    const exitCode = await main(
-      ["set-option", "-p", "-t", "%5", "@omo_attach_server_url", "http://127.0.0.1:7805"],
-      deps(),
-    );
+describe("the team-mode rules reach the backend as a forwarding and a rewrite", () => {
+  test("D1 (retired): a pane-scoped `@omo_attach_*` option is forwarded once, and the record says so", async () => {
+    const argv = ["set-option", "-p", "-t", "%5", "@omo_attach_server_url", "http://127.0.0.1:7805"];
+    const exitCode = await main(argv, deps());
 
     expect(exitCode).toBe(0);
-    expect(box.calls()).toHaveLength(0);
+    expect(box.calls().map((c) => c.argv)).toEqual([argv]);
 
     const record = callRecords()[0];
-    expect(record?.kind).toBe("suppressed");
-    expect(record?.outcome).toBe("suppressed");
-    expect(record?.suppressionReason).toBe("psmux-refuses-pane-scoped-options");
-    expect(record?.argv).toEqual([
-      "set-option",
-      "-p",
-      "-t",
-      "%5",
-      "@omo_attach_server_url",
-      "http://127.0.0.1:7805",
-    ]);
+    expect(record?.kind).toBe("passthrough");
+    expect(record?.outcome).toBe("forwarded");
+    expect(record?.suppressionReason).toBeNull();
+    expect(record?.argv).toEqual(argv);
     expect(record?.followUps).toEqual([]);
   });
 
-  test("D1: the session-id form is suppressed the same way", async () => {
-    const exitCode = await main(
-      ["set-option", "-p", "-t", "%5", "@omo_attach_session_id", "ses_abc"],
-      deps(),
-    );
+  test("D1 (retired): the session-id form is forwarded the same way", async () => {
+    const argv = ["set-option", "-p", "-t", "%5", "@omo_attach_session_id", "ses_abc"];
+    const exitCode = await main(argv, deps());
 
     expect(exitCode).toBe(0);
-    expect(box.calls()).toHaveLength(0);
-    expect(callRecords()[0]?.suppressionReason).toBe("psmux-refuses-pane-scoped-options");
+    expect(box.calls().map((c) => c.argv)).toEqual([argv]);
+    expect(callRecords()[0]?.suppressionReason).toBeNull();
   });
 
   test("D2: the team resize runs `set-option main-pane-width 30` then `select-layout main-vertical`", async () => {
@@ -566,17 +552,20 @@ describe("the team-mode rules reach the backend as a suppression and a rewrite",
 // `ShimCallRecord` gained `followUps` and `ShimOutcome` gained `"suppressed"`
 // WITHOUT a version bump at the time they landed, which is exactly the situation
 // `recordVersion` exists to prevent: a v1 reader cannot tell, from the line, that
-// the schema moved. `CLI_CONTRACT.recordVersion` is therefore 2. These tests pin
+// the schema moved. `CLI_CONTRACT.recordVersion` is therefore read from the
+// constant, not restated here. These tests pin
 // both the version and the exact key set, so a future field cannot be added
 // silently either.
 
 describe("the record schema", () => {
-  test("recordVersion is 3, because `suppressionReason` is a new required key", () => {
+  test("recordVersion is 4, because a required key was removed", () => {
     // Changing this value is a breaking change to every consumer of both logs and
     // must be made loudly, not folded into a feature commit. 1 -> 2 was
     // `followUps` + `outcome: "suppressed"`; 2 -> 3 is the required
-    // `suppressionReason` key, which a strict v2 validator rejects.
-    expect(CLI_CONTRACT.recordVersion).toBe(3);
+    // `suppressionReason` key, which a strict v2 validator rejects; 3 -> 4 is
+    // the REMOVAL of a required key (v2.0.0 retires the respawn `--`
+    // insertion), which a strict v3 validator rejects.
+    expect(CLI_CONTRACT.recordVersion).toBe(4);
   });
 
   test("buildCallRecord emits exactly the documented key set, and no more", async () => {
@@ -595,7 +584,6 @@ describe("the record schema", () => {
       "backendSource",
       "classification",
       "correlationId",
-      "dashDashInserted",
       "descriptorFileUsed",
       "durationMs",
       "envSlotCount",
@@ -721,16 +709,18 @@ describe("the trace hook", () => {
     expect(box.lines(box.tracePath)).toHaveLength(2);
 
     const first = JSON.parse(box.lines(box.tracePath)[0] ?? "{}") as Record<string, unknown>;
-    // BEHAVIOUR CHANGE: was `toBe(1)`, then `toBe(2)`, and is now asserted against
-    // the constant rather than against a literal. `recordVersion` moved 1 -> 2
-    // because `ShimCallRecord` gained the required key `followUps` and
-    // `ShimOutcome` gained `"suppressed"`, and 2 -> 3 because `ShimTraceRecord`
-    // gained the required key `suppressionReason` — each a change an older reader
-    // cannot detect from the line, which is the one thing the field is for.
+    // BEHAVIOUR CHANGE: was `toBe(1)`, then `toBe(2)`, then `toBe(3)`, and is now
+    // asserted against the constant rather than against a literal.
+    // `recordVersion` moved 1 -> 2 because `ShimCallRecord` gained the required
+    // key `followUps` and `ShimOutcome` gained `"suppressed"`, 2 -> 3 because
+    // `ShimTraceRecord` gained the required key `suppressionReason`, and 3 -> 4
+    // because `ShimTraceRecord` LOST a required key — each
+    // a change an older reader cannot detect from the line, which is the one
+    // thing the field is for.
     // Reading it from the constant is what stops the next bump from silently
     // invalidating this assertion.
     expect(first["v"]).toBe(CLI_CONTRACT.recordVersion);
-    expect(first["v"]).toBe(3);
+    expect(first["v"]).toBe(4);
     expect(first["verb"]).toBe("-V");
     expect(first["classification"]).toBe("pass-through");
     expect(first["outcome"]).toBe("forwarded");
