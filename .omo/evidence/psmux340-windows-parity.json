@@ -1,0 +1,677 @@
+{
+  "artifact": "psmux340-windows-parity",
+  "purpose": "Independent isolated runtime parity assessment of psmux 3.4.0 and the installed bridge, with measurements usable to revalidate CONTRACT.md section 14 (steps 5-8: rules 1a/1b/1c/1d/1e/D0).",
+  "measured_utc": "2026-11-04",
+  "backend": {
+    "binary": "C:/Users/Daniel/AppData/Local/psmux/tmux.exe",
+    "V": "tmux 3.4.0 / psmux 3.4.0 (20aa1d7 2026-10-13)",
+    "V_exit": 0
+  },
+  "bridge_shim": {
+    "binary": "C:/Users/Daniel/AppData/Local/omo-psmux-bridge/bin/tmux.exe",
+    "V": "tmux 3.4.0 / psmux 3.4.0 (20aa1d7 2026-10-13)",
+    "V_exit": 0
+  },
+  "method": {
+    "namespaces": [
+      "omo_p340_1793782819 (direct)",
+      "omo_p340_1793782819_shim (bridge)",
+      "omo_p340b_1793782975 (direct micro-2)"
+    ],
+    "isolation": "The probe operator reports that backend invocations were namespaced with -L except read-only list-sessions and -V, and that all cleanup commands targeted the disposable namespaces. A default-namespace session disappeared during the assessment; the retained records do not establish its cause or exclude interference.",
+    "reads": "Geometry read via list-windows/list-panes after each step; each reading polled until two consecutive pane listings agreed (max 6 polls, 300ms apart) instead of a single fixed sleep. Verdicts computed from final stable reads.",
+    "window": "120 columns (direct arm), default psmux window size on this host. Shares (main_width/window_width) are the comparable numbers.",
+    "sanitization": "Only dummy values used (http://127.0.0.1:59999, ses_probe_a, session p340/p340b). No user data or credentials in outputs.",
+    "existing_harness_safety": "Existing scripts/windows/parity probes scope every invocation with -L <ns> and namespace their kill-server, so they cannot touch default-socket user sessions; but they use FIXED shared namespaces (omo_t19..omo_t24) with preemptive kill-session/kill-server, so concurrent runs could reap each other. Measured minimally with unique disposable namespaces instead; existing probes were read but not executed."
+  },
+  "verdicts": {
+    "gate_4_4_V_exit_0": {
+      "result": "PASS",
+      "reason": "Backend and installed shim both answer -V with exit 0.",
+      "backend_V_exit": 0,
+      "shim_V_exit": 0
+    },
+    "rule_1a_percent_form": {
+      "result": "DEFECT-PREMISE-NO-LONGER-HOLDS on 3.4.0",
+      "reason": "set-window-option main-pane-width \"50%\" alone left share at 0.5917, but the follow-up untargeted select-layout moved it to 0.4917 with nothing else stored in between (direct steps A -> A2: 71 -> 59 of 120). Same on height axis (F 0.5667 -> F2 0.3667 with only the \"40%\" form set). On 3.3.8 the follow-up left the share unchanged (CI evidence). The 3.4.0 source and this observation support that the % form is stored. Bridge S1 (strip to bare 50 + injected layout) yielded geometry 59 in this trial.",
+      "direct": {
+        "baseline_share": 0.5917,
+        "after_percent_set": 0.5917,
+        "after_followup_layout": 0.4917,
+        "height_baseline": 0.5667,
+        "height_after_followup": 0.3667
+      }
+    },
+    "rule_1b_layout_followup": {
+      "result": "PASS (still required on 3.4.0)",
+      "reason": "Storing alone applies nothing (A: 0.5917 unchanged; F-height: 0.5667 unchanged; D2 order claim: layout-then-set-40 leaves 0.4917 unchanged), and the follow-up applies it (A->A2: 0.5917 -> 0.4917; F->F2: 0.5667 -> 0.3667). Bridge-injected follow-up verified in shim call log (followUps reason psmux-reads-main-pane-size-only-inside-apply-layout) and by S1 geometry 59.",
+      "rule_1b_option_alone_inert": true,
+      "rule_1b_followup_applies": true,
+      "rule_1b_order_matters": true
+    },
+    "rule_1c_resize_cells_suppressed": {
+      "result": "PASS (defect still present, suppression works)",
+      "reason": "Direct resize-pane -t <pane> -x 99 on the 120-column main-vertical window yields main width 117 (share 0.975, ~98% of usable width): the cell count arrives as a percentage. Identical argv through the bridge exits 0, is logged kind=suppressed reason=resize-cell-count-is-not-a-percentage, and leaves geometry at 59 (0.4917).",
+      "direct_main_width": 117,
+      "direct_share": 0.975,
+      "shim_main_width": 59
+    },
+    "rule_1d_pane_scoped_suppression": {
+      "result": "BEHAVIOR-CHANGE on 3.4.0 (premise false; bridge still suppresses)",
+      "reason": "Direct set-option -p -t <pane> @omo_attach_* now exits 0 with empty stderr (on 3.3.8 it exited 1 with \"pane-scoped option ... is not supported\"). The URL value is stored: show-options -p -t <pane> reads back \"@omo_attach_server_url http://127.0.0.1:59999\" with exit 0 (micro-2). Bridge still suppresses its tested URL write (exit 0, logged reason psmux-refuses-pane-scoped-options, no backend call), so the reason no longer describes this backend. Effects on OmO's stale-attach sweep were not measured."
+    },
+    "rule_1e_team_resize_rewrite": {
+      "result": "INCONCLUSIVE (backend defect shape holds; through-bridge outcome unresolved)",
+      "reason": "Direct resize-pane -t <caller> -x \"30%\" yielded main width 42 (share 0.35). Through the bridge, exit was 0 and geometry stayed 59 (0.4917); the probe operator reports a call-log record of a rewrite to set-option main-pane-width 30 with a select-layout main-vertical follow-up. In a separate namespace, the recorded direct set-option plus layout control yielded width 35 (0.2917). The retained artifact does not include complete setup, target-window context, or the actual follow-up execution record; the discrepancy is inconclusive and its cause is unknown.",
+      "direct_share": 0.35,
+      "direct_main_width": 42,
+      "shim_share": 0.4917,
+      "shim_main_width": 59,
+      "direct_pair_control_share": 0.2917
+    },
+    "rule_D0_display_F_rewrite": {
+      "result": "PASS (defect still present, rewrite works)",
+      "reason": "Direct display -p -F \"#{session_id}\" prints \"-F $171\" and display -p -F \"#{session_name}:#{window_index}\" prints \"-F p340:0\" (client folds -F into message text, as on 3.3.8). Through the bridge both print clean values (\"$173\", \"p340:0\") with rewriteReason psmux-client-treats-display-F-as-message-text logged and exit 0.",
+      "direct": [
+        "-F $171",
+        "-F p340:0"
+      ],
+      "shim": [
+        "$173",
+        "p340:0"
+      ]
+    },
+    "teardown_dead_pane_wording": {
+      "result": "PASS (HOLDS on 3.4.0)",
+      "reason": "kill-pane against an already-dead pane exits 1 with stderr containing \"psmux: can't find pane: %3\", matching OmO's /can't find pane/i success-on-failure gate (CONTRACT 3.8)."
+    }
+  },
+  "arms": [
+    {
+      "via": "direct",
+      "namespace": "omo_p340_1793782819",
+      "caller": "%1",
+      "aborted": null,
+      "steps": [
+        {
+          "tag": "baseline main-vertical",
+          "via": "direct",
+          "argv": [],
+          "exit": null,
+          "stdout": "",
+          "stderr": "",
+          "window_width": 120,
+          "main_width": 71,
+          "main_share": 0.5917,
+          "main_height_share": 1
+        },
+        {
+          "tag": "A set main-pane-width 50pct",
+          "via": "direct",
+          "argv": [
+            "set-window-option",
+            "main-pane-width",
+            "50%"
+          ],
+          "exit": 0,
+          "stdout": "",
+          "stderr": "",
+          "window_width": 120,
+          "main_width": 71,
+          "main_share": 0.5917,
+          "main_height_share": 1
+        },
+        {
+          "tag": "A2 untargeted select-layout main-vertical",
+          "via": "direct",
+          "argv": [
+            "select-layout",
+            "main-vertical"
+          ],
+          "exit": 0,
+          "stdout": "",
+          "stderr": "",
+          "window_width": 120,
+          "main_width": 59,
+          "main_share": 0.4917,
+          "main_height_share": 1
+        },
+        {
+          "tag": "B set main-pane-width 50 no layout",
+          "via": "direct",
+          "argv": [
+            "set-window-option",
+            "main-pane-width",
+            "50"
+          ],
+          "exit": 0,
+          "stdout": "",
+          "stderr": "",
+          "window_width": 120,
+          "main_width": 59,
+          "main_share": 0.4917,
+          "main_height_share": 1
+        },
+        {
+          "tag": "C follow-up select-layout main-vertical",
+          "via": "direct",
+          "argv": [
+            "select-layout",
+            "main-vertical"
+          ],
+          "exit": 0,
+          "stdout": "",
+          "stderr": "",
+          "window_width": 120,
+          "main_width": 59,
+          "main_share": 0.4917,
+          "main_height_share": 1
+        },
+        {
+          "tag": "D layout first then set 40",
+          "via": "direct",
+          "argv": [
+            "select-layout",
+            "main-vertical"
+          ],
+          "exit": 0,
+          "stdout": "",
+          "stderr": "",
+          "window_width": 120,
+          "main_width": 59,
+          "main_share": 0.4917,
+          "main_height_share": 1
+        },
+        {
+          "tag": "D2 set main-pane-width 40 after layout",
+          "via": "direct",
+          "argv": [
+            "set-window-option",
+            "main-pane-width",
+            "40"
+          ],
+          "exit": 0,
+          "stdout": "",
+          "stderr": "",
+          "window_width": 120,
+          "main_width": 59,
+          "main_share": 0.4917,
+          "main_height_share": 1
+        },
+        {
+          "tag": "F0 main-horizontal baseline",
+          "via": "direct",
+          "argv": [],
+          "exit": null,
+          "stdout": "",
+          "stderr": "",
+          "window_width": 120,
+          "main_width": 120,
+          "main_share": 1,
+          "main_height_share": 0.5667
+        },
+        {
+          "tag": "F set main-pane-height 40pct",
+          "via": "direct",
+          "argv": [
+            "set-window-option",
+            "main-pane-height",
+            "40%"
+          ],
+          "exit": 0,
+          "stdout": "",
+          "stderr": "",
+          "window_width": 120,
+          "main_width": 120,
+          "main_share": 1,
+          "main_height_share": 0.5667
+        },
+        {
+          "tag": "F2 follow-up select-layout main-horizontal",
+          "via": "direct",
+          "argv": [
+            "select-layout",
+            "main-horizontal"
+          ],
+          "exit": 0,
+          "stdout": "",
+          "stderr": "",
+          "window_width": 120,
+          "main_width": 120,
+          "main_share": 1,
+          "main_height_share": 0.3667
+        },
+        {
+          "tag": "G set main-pane-height 40 no layout",
+          "via": "direct",
+          "argv": [
+            "set-window-option",
+            "main-pane-height",
+            "40"
+          ],
+          "exit": 0,
+          "stdout": "",
+          "stderr": "",
+          "window_width": 120,
+          "main_width": 120,
+          "main_share": 1,
+          "main_height_share": 0.3667
+        },
+        {
+          "tag": "G2 follow-up select-layout main-horizontal",
+          "via": "direct",
+          "argv": [
+            "select-layout",
+            "main-horizontal"
+          ],
+          "exit": 0,
+          "stdout": "",
+          "stderr": "",
+          "window_width": 120,
+          "main_width": 120,
+          "main_share": 1,
+          "main_height_share": 0.3667
+        },
+        {
+          "tag": "H DIRECT resize-pane -x 99",
+          "via": "direct",
+          "argv": [
+            "resize-pane",
+            "-t",
+            "%1",
+            "-x",
+            "99"
+          ],
+          "exit": 0,
+          "stdout": "",
+          "stderr": "",
+          "window_width": 120,
+          "main_width": 117,
+          "main_share": 0.975,
+          "main_height_share": 1
+        },
+        {
+          "tag": "I DIRECT set-option -p url",
+          "via": "direct",
+          "argv": [
+            "set-option",
+            "-p",
+            "-t",
+            "%1",
+            "@omo_attach_server_url",
+            "http://127.0.0.1:59999"
+          ],
+          "exit": 0,
+          "stdout": "",
+          "stderr": "",
+          "window_width": 120,
+          "main_width": 117,
+          "main_share": 0.975,
+          "main_height_share": 1
+        },
+        {
+          "tag": "I2 DIRECT set-option -p sid",
+          "via": "direct",
+          "argv": [
+            "set-option",
+            "-p",
+            "-t",
+            "%1",
+            "@omo_attach_session_id",
+            "ses_probe_a"
+          ],
+          "exit": 0,
+          "stdout": "",
+          "stderr": "",
+          "window_width": 120,
+          "main_width": 117,
+          "main_share": 0.975,
+          "main_height_share": 1
+        },
+        {
+          "tag": "J DIRECT resize-pane -x 30pct (team shape)",
+          "via": "direct",
+          "argv": [
+            "resize-pane",
+            "-t",
+            "%1",
+            "-x",
+            "30%"
+          ],
+          "exit": 0,
+          "stdout": "",
+          "stderr": "",
+          "window_width": 120,
+          "main_width": 42,
+          "main_share": 0.35,
+          "main_height_share": 1
+        },
+        {
+          "tag": "K DIRECT display -F session_id",
+          "via": "direct",
+          "argv": [
+            "display",
+            "-p",
+            "-F",
+            "#{session_id}",
+            "-t",
+            "%1"
+          ],
+          "exit": 0,
+          "stdout": "-F $171",
+          "stderr": "",
+          "window_width": 120,
+          "main_width": 42,
+          "main_share": 0.35,
+          "main_height_share": 1
+        },
+        {
+          "tag": "K2 DIRECT display -F window target",
+          "via": "direct",
+          "argv": [
+            "display",
+            "-p",
+            "-F",
+            "#{session_name}:#{window_index}",
+            "-t",
+            "%1"
+          ],
+          "exit": 0,
+          "stdout": "-F p340:0",
+          "stderr": "",
+          "window_width": 120,
+          "main_width": 42,
+          "main_share": 0.35,
+          "main_height_share": 1
+        },
+        {
+          "tag": "L dead-pane kill-pane again",
+          "via": "direct",
+          "argv": [
+            "kill-pane",
+            "-t",
+            "%3"
+          ],
+          "exit": 1,
+          "stdout": "",
+          "stderr": "tmux.exe : psmux: can't find pane: %3\r\n位於 C:\\Users\\Daniel\\AppData\\Local\\Temp\\omo_p340_1793782819-probe.ps1:15 字元:3\r\n+   & $bin @full > $OF 2> $EF\r\n+   ~~~~~~~~~~~~~~~~~~~~~~~~~\r\n    + CategoryInfo          : NotSpecified: (psmux: can't find pane: %3:String) [], RemoteException\r\n    + FullyQualifiedErrorId : NativeCommandError",
+          "window_width": 120,
+          "main_width": 59,
+          "main_share": 0.4917,
+          "main_height_share": 1
+        }
+      ],
+      "cleanup": {
+        "sessions_after_kill": "",
+        "kill_server_exit": 1,
+        "list_after_killserver": "",
+        "kill_session_exit": 0,
+        "list_after_killserver_exit": 1
+      }
+    },
+    {
+      "via": "shim",
+      "namespace": "omo_p340_1793782819_shim",
+      "caller": "%1",
+      "aborted": null,
+      "steps": [
+        {
+          "tag": "baseline main-vertical",
+          "via": "shim",
+          "argv": [],
+          "exit": null,
+          "stdout": "",
+          "stderr": "",
+          "window_width": 120,
+          "main_width": 71,
+          "main_share": 0.5917,
+          "main_height_share": 1
+        },
+        {
+          "tag": "S1 shim set-window-option 50pct (rule 1a)",
+          "via": "shim",
+          "argv": [
+            "set-window-option",
+            "main-pane-width",
+            "50%"
+          ],
+          "exit": 0,
+          "stdout": "",
+          "stderr": "",
+          "window_width": 120,
+          "main_width": 59,
+          "main_share": 0.4917,
+          "main_height_share": 1
+        },
+        {
+          "tag": "S1b shim select-layout main-vertical (rule 1b)",
+          "via": "shim",
+          "argv": [
+            "select-layout",
+            "main-vertical"
+          ],
+          "exit": 0,
+          "stdout": "",
+          "stderr": "",
+          "window_width": 120,
+          "main_width": 59,
+          "main_share": 0.4917,
+          "main_height_share": 1
+        },
+        {
+          "tag": "S2 shim resize-pane -x 99 (rule 1c)",
+          "via": "shim",
+          "argv": [
+            "resize-pane",
+            "-t",
+            "%1",
+            "-x",
+            "99"
+          ],
+          "exit": 0,
+          "stdout": "",
+          "stderr": "",
+          "window_width": 120,
+          "main_width": 59,
+          "main_share": 0.4917,
+          "main_height_share": 1
+        },
+        {
+          "tag": "S3 shim set-option -p url (rule 1d)",
+          "via": "shim",
+          "argv": [
+            "set-option",
+            "-p",
+            "-t",
+            "%1",
+            "@omo_attach_server_url",
+            "http://127.0.0.1:59999"
+          ],
+          "exit": 0,
+          "stdout": "",
+          "stderr": "",
+          "window_width": 120,
+          "main_width": 59,
+          "main_share": 0.4917,
+          "main_height_share": 1
+        },
+        {
+          "tag": "S4 shim resize-pane -x 30pct (rule 1e)",
+          "via": "shim",
+          "argv": [
+            "resize-pane",
+            "-t",
+            "%1",
+            "-x",
+            "30%"
+          ],
+          "exit": 0,
+          "stdout": "",
+          "stderr": "",
+          "window_width": 120,
+          "main_width": 59,
+          "main_share": 0.4917,
+          "main_height_share": 1
+        },
+        {
+          "tag": "S5 shim display -F session_id (rule D0)",
+          "via": "shim",
+          "argv": [
+            "display",
+            "-p",
+            "-F",
+            "#{session_id}",
+            "-t",
+            "%1"
+          ],
+          "exit": 0,
+          "stdout": "$173",
+          "stderr": "",
+          "window_width": 120,
+          "main_width": 59,
+          "main_share": 0.4917,
+          "main_height_share": 1
+        },
+        {
+          "tag": "S5b shim display -F window target (rule D0)",
+          "via": "shim",
+          "argv": [
+            "display",
+            "-p",
+            "-F",
+            "#{session_name}:#{window_index}",
+            "-t",
+            "%1"
+          ],
+          "exit": 0,
+          "stdout": "p340:0",
+          "stderr": "",
+          "window_width": 120,
+          "main_width": 59,
+          "main_share": 0.4917,
+          "main_height_share": 1
+        }
+      ],
+      "cleanup": {
+        "sessions_after_kill": "",
+        "kill_server_exit": 1,
+        "list_after_killserver": "",
+        "kill_session_exit": 0,
+        "list_after_killserver_exit": 1
+      }
+    }
+  ],
+  "micro2_readback": {
+    "namespace": "omo_p340b_1793782975",
+    "caller": "%1",
+    "steps": [
+      {
+        "tag": "baseline",
+        "argv": [],
+        "exit": null,
+        "stdout": "",
+        "stderr": "",
+        "share": 0.5917
+      },
+      {
+        "tag": "bare set-option 30 + layout",
+        "argv": [
+          "set-option",
+          "main-pane-width",
+          "30"
+        ],
+        "exit": 0,
+        "stdout": "",
+        "stderr": "",
+        "share": 0.2917
+      },
+      {
+        "tag": "set-window-option 30 + layout",
+        "argv": [],
+        "exit": 0,
+        "stdout": "",
+        "stderr": "",
+        "share": 0.2917
+      },
+      {
+        "tag": "set-option -p write",
+        "argv": [
+          "set-option",
+          "-p",
+          "-t",
+          "%1",
+          "@omo_attach_server_url",
+          "http://127.0.0.1:59999"
+        ],
+        "exit": 0,
+        "stdout": "",
+        "stderr": "",
+        "share": 0.2917
+      },
+      {
+        "tag": "readback: show-options -p -t %1 @omo_attach_server_url",
+        "argv": [
+          "show-options",
+          "-p",
+          "-t",
+          "%1",
+          "@omo_attach_server_url"
+        ],
+        "exit": 0,
+        "stdout": "@omo_attach_server_url http://127.0.0.1:59999",
+        "stderr": "",
+        "share": null
+      },
+      {
+        "tag": "readback: show-options -p -t %1",
+        "argv": [
+          "show-options",
+          "-p",
+          "-t",
+          "%1"
+        ],
+        "exit": 0,
+        "stdout": "@omo_attach_server_url http://127.0.0.1:59999",
+        "stderr": "",
+        "share": null
+      },
+      {
+        "tag": "readback: show-options -t %1 @omo_attach_server_url",
+        "argv": [
+          "show-options",
+          "-t",
+          "%1",
+          "@omo_attach_server_url"
+        ],
+        "exit": 0,
+        "stdout": "@omo_attach_server_url",
+        "stderr": "",
+        "share": null
+      }
+    ],
+    "cleanup": {
+      "sessions_after_kill": "",
+      "kill_server_exit": 1,
+      "kill_session_exit": 0,
+      "list_after": "",
+      "list_after_exit": 1
+    }
+  },
+  "bridge_call_log_excerpts": "Operator-reported log summary for the _shim namespace: S1 set-window-option forwarded as bare 50 with a planned select-layout follow-up; S2 resize -x 99 and S3 set-option -p marked suppressed; S4 resize-pane rewritten to set-option main-pane-width 30 with a planned select-layout follow-up; S5/S5b display marked rewritten. Full per-record log JSON is not included in this artifact, and the planned follow-up alone does not establish that it succeeded.",
+  "cleanup_proof": {
+    "namespaces_after": {
+      "omo_p340_1793782819": "no server running",
+      "omo_p340_1793782819_shim": "no server running",
+      "omo_p340b_1793782975": "no server running"
+    },
+    "sessions_left": "[] in all three namespaces (kill-session exit 0; trailing list-sessions exit 1 = no server)",
+    "remote_temp_files": "All probe/result/log/shimlog copies removed from %TEMP%; REMOTE-CLEAN-DONE verified with no leftovers listed.",
+    "default_socket_note": "A session (0: 1 windows, attached) existed on the default socket at the operator's first read-only check; at the final read-only check no default-socket server was running. The operator reports that cleanup kills used -L with the disposable namespaces. The cause of the default session's disappearance is not established by the retained records."
+  },
+  "limits": [
+    "One session, one window, one client, sequential calls; 120-column default window. No multi-window, concurrent-client, or team-layout end-to-end replay (deferred; team probe needs the resolved 1e question first).",
+    "The S4/1e discrepancy rests on geometry and reported call-log intent, not a retained execution trace; window targeting and whether the follow-up executed require further investigation.",
+    "The disposable probe script and complete call logs were not retained, so this artifact alone cannot independently reproduce the exact setup or establish whether the default namespace was affected.",
+    "Rule retirement decisions (CONTRACT 8.2) need more than this artifact. The c20016c and 4addc0a ancestry check was run separately (both are in v3.4.0), but rule 1d stale-attach-sweep effect and rule 1e bridge discrepancy remain unresolved."
+  ]
+}
