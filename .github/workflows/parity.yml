@@ -73,7 +73,7 @@ jobs:
           bun-version: ${{ env.BUN_VERSION }}
 
       # The tag lives in pins.json, which is the single source of truth for what
-      # this repository is allowed to make claims about. Hardcoding "3.3.8" here
+      # this repository is allowed to make claims about. Hardcoding "3.4.0" here
       # would create a second place to update on every psmux bump, and this file
       # is exactly the kind of copy that silently goes stale.
       - name: Read the pinned psmux tag

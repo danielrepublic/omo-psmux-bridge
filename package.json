@@ -1,6 +1,6 @@
 {
   "name": "omo-psmux-bridge",
-  "version": "5.1.60-1",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
   "scripts": {

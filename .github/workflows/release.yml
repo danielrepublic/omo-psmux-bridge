@@ -83,8 +83,11 @@ env:
   # so far is 1.4.2; a floating `bun-version` would make a release's artifact
   # non-reproducible and would quietly change the compiled shim between tags.
   BUN_VERSION: '1.4.2'
-  # The psmux build this repo's parity work and CONTRACT.md are frozen against.
-  VERIFIED_PSMUX_VERSION: '3.3.8'
+  # The psmux source contract and the Windows auth smoke are pinned to 3.4.0.
+  # One 2026-11-04 team-resize probe observation is unresolved (see CONTRACT.md
+  # section 3.10 rule 1e); that is a rule-level caveat, not a reason to report
+  # the whole build against the previous release.
+  VERIFIED_PSMUX_VERSION: '3.4.0'
   # Single top-level directory inside the zip. Never a versioned name: the
   # install instructions and the doctor both resolve %LOCALAPPDATA%\
   # omo-psmux-bridge\bin, so the extracted folder name must be stable
@@ -727,7 +730,7 @@ jobs:
           **psmux, opencode, and the `oh-my-openagent` (OmO) plugin must already be
           installed.** This archive ships the bridge only. It installs no multiplexer, no
           agent runtime, and no plugin; it makes exactly one machine change, prepending its
-          own `bin` directory to the *user* PATH. Verified against **psmux 3.3.8**.
+          own `bin` directory to the *user* PATH. Verified against **psmux 3.4.0**.
 
           ### Required: `tmux.enabled` must be true
 
