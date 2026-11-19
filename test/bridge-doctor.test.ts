@@ -1,4 +1,4 @@
-// Regression coverage for the contracted 5.1.60 bridge-doctor anchors.
+// Regression coverage for the contracted 5.1.79 bridge-doctor anchors.
 // Both the version and the line/text pairs must match the installed bundle.
 //
 // WHAT THE PREVIOUS VERSION OF THIS FILE GOT WRONG, because it is the whole
@@ -90,20 +90,20 @@ function parseAnchors(source: string): Anchor[] {
 
 const shippedAnchors = parseAnchors(doctor);
 
-/** The 11 check-5 anchors, verified against the installed 5.1.60 dist/index.js. */
+/** The 11 check-5 anchors, verified against the installed 5.1.79 dist/index.js. */
 const EXPECTED_ANCHORS: ReadonlyArray<Anchor> = [
-  { line: 8294, text: "function isInsideTmuxEnvironment(environment) {" },
-  { line: 8334, text: "async function isServerRunning(serverUrl, options = {}) {" },
-  { line: 8346, text: 'const healthUrl = new URL("/global/health", serverUrl).toString();' },
-  { line: 8456, text: "const serverRunning = await deps.isServerRunning(serverUrl);" },
-  { line: 8461, text: "const tmux = await deps.getTmuxPath();" },
-  { line: 9139, text: "async function findVerifiedTmuxPath() {" },
-  { line: 9145, text: 'const verifyProc = spawn([path, "-V"], {' },
-  { line: 9151, text: "if (verifyExitCode !== 0) {" },
-  { line: 99949, text: "enabled: z51.boolean().default(false)," },
-  { line: 169745, text: "function resolveServerUrl(rawServerUrl, env, log) {" },
+  { line: 8295, text: "function isInsideTmuxEnvironment(environment) {" },
+  { line: 8335, text: "async function isServerRunning(serverUrl, options = {}) {" },
+  { line: 8347, text: 'const healthUrl = new URL("/global/health", serverUrl).toString();' },
+  { line: 8457, text: "const serverRunning = await deps.isServerRunning(serverUrl);" },
+  { line: 8462, text: "const tmux = await deps.getTmuxPath();" },
+  { line: 9132, text: "async function findVerifiedTmuxPath() {" },
+  { line: 9138, text: 'const verifyProc = spawn([path, "-V"], {' },
+  { line: 9144, text: "if (verifyExitCode !== 0) {" },
+  { line: 100265, text: "enabled: z53.boolean().default(false)," },
+  { line: 171289, text: "function resolveServerUrl(rawServerUrl, env, log) {" },
   {
-    line: 169755,
+    line: 171299,
     text: 'log("[tmux-session-manager] ctx.serverUrl has port 0; falling back. "',
   },
 ];
@@ -285,14 +285,14 @@ describe("bridge-doctor check-5 anchors match the contract as PAIRS", () => {
 
   test("each GATE range starts on a line the anchors actually check", () => {
     // Only the three silent-failure gate ranges are covered by the check-5
-    // anchor table. The config-resolution ranges (96015-96031, 99229-99243) are
+    // anchor table. The config-resolution ranges (96250-96266, 99561-99575) are
     // deliberately NOT anchors -- they describe which file is read, not what is
     // at a line -- and they are verified by the isolated-home cases in
     // scripts/windows/harness/install-config-probe.ps1 instead.
     const GATE_RANGES: ReadonlyArray<readonly [string, number]> = [
-      ["9139-9160", 9139],
-      ["8334-8375", 8334],
-      ["169745-169768", 169745],
+      ["9132-9153", 9132],
+      ["8335-8376", 8335],
+      ["171289-171312", 171289],
     ];
     for (const [span, start] of GATE_RANGES) {
       expect({
@@ -303,7 +303,7 @@ describe("bridge-doctor check-5 anchors match the contract as PAIRS", () => {
     }
 
     // And the config ranges are cited without being passed off as anchors.
-    for (const span of ["96015-96031", "99229-99243"]) {
+    for (const span of ["96250-96266", "99561-99575"]) {
       expect({
         span,
         cited: doctor.includes(`index.js:${span}`),
@@ -324,7 +324,7 @@ describe("bridge-doctor frozen version", () => {
   test("the pin this file reads is the one the contract checker reads", () => {
     // If pins.json ever stops carrying omo.verifiedAgainst, this file would
     // silently start comparing against `undefined`.
-    expect(pins.omo.verifiedAgainst).toBe("5.1.60");
+    expect(pins.omo.verifiedAgainst).toBe("5.1.79");
     expect(pins.omo.bundleGlob).toContain("oh-my-openagent");
   });
 

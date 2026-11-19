@@ -117,7 +117,7 @@ lives and where it keeps living.
 $HOME/.cache/opencode/packages/oh-my-openagent@latest/node_modules/oh-my-openagent/dist/index.js
 ```
 
-**Which version this document was last verified against:** **5.1.60**, read from
+**Which version this document was last verified against:** **5.1.79**, read from
 that package's own `package.json`. This number is a *record of a past
 verification*, not an install instruction, and the two must not be confused —
 that confusion is what made the pin unusable before.
@@ -132,7 +132,7 @@ that confusion is what made the pin unusable before.
 
 **A `PIN_DRIFT` on the OmO side is routine, not an incident.** OmO ships with the
 agent and moves to a new version often, so `@latest` will outrun this document
-regularly. What `PIN_DRIFT` means is precisely: *re-verify the 90 bundle
+regularly. What `PIN_DRIFT` means is precisely: *re-verify the 85 bundle
 citations against the new bundle, then bump `omo.verifiedAgainst`.* Suppressing
 it would be worse than useless — it would turn "the document is stale" into
 silence, which is the exact failure this whole mechanism exists to prevent.
@@ -439,7 +439,7 @@ records names a line in the current tree, and all of them were re-resolved in
 function scope for this pass.
 
 Note the asymmetry with
-§0.2 — the psmux tree is pinned to a commit and did not move at all, so all 90
+§0.2 — the psmux tree is pinned to a commit and did not move at all, so all
 psmux citations were untouched by this pass, and that is also why they are worth
 having a mechanism for in the first place.
 
@@ -452,6 +452,48 @@ records that the churn did **not** happen at `5.1.40`; the eighth records that
 it **did** happen at `5.1.42` (`z45`→`z46`, `z49`→`z50`). This is therefore a
 recurring cost rather than a one-off: the aliases survived one release and
 moved on the next.
+
+**Eleventh discrepancy, recorded 2026-11-19.** The tree reached **`5.1.79`**,
+read here as
+`sha256 39c4a975ebf5609e8a9fcb40837dbdb0c4f007a127ef68d4c364717db3c4e488` and
+reported byte-identical to the bundle the Windows host loaded. The bundle
+citation count drops from 90 to **85** after re-resolving the quotations and
+consolidating fragments of two argv arrays. All **195** citations resolve,
+including the unchanged **110** on the psmux v3.4.0 side.
+Four changed quotes track the zod aliases again, one bundler generation
+on: `z47`→`z49` in `TeamModeConfigSchema` (`index.js:100191`,
+`index.js:100193`) and `z51`→`z53` in `TmuxConfigSchema` (`index.js:100264`,
+`index.js:100265`). Other changes track formatting and the extraction below.
+
+The offsets are regional, and all of them are box movement rather than grammar.
+The pane-command, auth, spawn and teardown citations move by **−1 to +1**,
+because `activateTmuxPane`'s `respawn-pane` call and the already-exists
+`new-window` arm are each emitted on one line now. The layout group moves by
+**−10 to −7**; `isOmoAttachPane` moves by **−7**; the team-layout family by
+**+114 to +142**; the two config schemas relocate by **+1316**; and
+`resolveServerUrl` moves by **+1544**. Two calls are emitted across several
+lines that 5.1.60 emitted on one: the window-target `display` at
+`index.js:21742-21749` and the second `set-option -p` at
+`index.js:21832-21839` (both bare).
+
+**One extraction, no grammar change.** At 5.1.79 layout application is its own
+`applyLayout` function (`index.js:8968`), not part of `calculateMainPaneWidth`,
+which now only computes a width; `applyLayout` issues `select-layout` and
+`set-window-option` with exactly the argv the previous record captured.
+`spawnTmuxSession` carries a `managerId` parameter that suffixes the isolated
+session name (`index.js:8738-8739`, bare), a value the bridge forwards rather
+than a change to the grammar that carries it. Every emitted argv is otherwise
+unchanged: `split-window`, both `respawn-pane` shapes, `new-window`,
+`new-session`, the `select-pane` title call, the auth `-e` pairs, the `-F`
+rewrite target and the layout triple keep their order and their operands. The
+bridge needs no `src/*.ts` change for `5.1.79`; this pass is citation,
+doctor-anchor and version maintenance only.
+
+**Windows preflight observation (unrecorded).** After the update to OpenCode
+v1.19.6, a model-free server start loaded the npm-installed `5.1.79` bundle.
+The previously installed doctor, frozen at `5.1.64`, failed only its version
+check (check 5, exit `50`). The comparison above verifies the bundle source;
+it does not establish full interactive pane parity on Windows.
 
 ### 0.2 psmux
 
@@ -506,7 +548,7 @@ OmO does not ask what shell the platform has. It hardcodes POSIX `sh`, as a
 module-level constant with no environment override, no platform branch, and no
 configuration key:
 
-- `index.js:8413` → `var TMUX_COMMAND_SHELL = "/bin/sh", PLACEHOLDER_DESCRIPTION_LIMIT = 2000, PANE_TITLE_DESCRIPTION_LIMIT = 20;`
+- `index.js:8414` → `var TMUX_COMMAND_SHELL = "/bin/sh", PLACEHOLDER_DESCRIPTION_LIMIT = 2000, PANE_TITLE_DESCRIPTION_LIMIT = 20;`
 
 This is the single most important clause in the document. Every payload OmO
 emits begins with `/bin/sh -c "`, which does not exist on a stock Windows
@@ -518,8 +560,8 @@ Values interpolated into the nested command are wrapped in single quotes and the
 escaped. The escaping order is: single-quote replacement first, then a blanket
 backslash doubling, then `$`, then backtick, then double-quote:
 
-- `index.js:8385` → `function shellQuoteForNestedCommand(value) {`
-- `index.js:8386` → `value.replaceAll("'`
+- `index.js:8386` → `function shellQuoteForNestedCommand(value) {`
+- `index.js:8387` → `value.replaceAll("'`
 
 ### 1.2 The two payload templates
 
@@ -529,8 +571,8 @@ shell from section 1.
 **Template A: the attach payload.** Used when a pane becomes a real, focusable
 subagent session.
 
-- `index.js:8388` → `function buildTmuxAttachCommand(serverUrl, sessionId, directory = process.cwd()) {`
-- `index.js:8393` → `opencode attach ${escapedUrl} --session ${escapedSessionId} --dir ${escapedDirectory}`
+- `index.js:8389` → `function buildTmuxAttachCommand(serverUrl, sessionId, directory = process.cwd()) {`
+- `index.js:8394` → `opencode attach ${escapedUrl} --session ${escapedSessionId} --dir ${escapedDirectory}`
 
 Rendered shape, with `Q` standing for whatever `shellQuoteForNestedCommand`
 produced:
@@ -542,13 +584,13 @@ produced:
 **Template B: the placeholder payload.** Used for the pane's brief pre-attach
 life, so the pane is titled and survivable rather than dead on arrival.
 
-- `index.js:8405` → `function buildTmuxPlaceholderCommand(description) {`
-- `index.js:8408` → `const banner = shellQuoteForNestedCommand(\`OMO subagent pane ready: ${shown}\`);`
-- `index.js:8411` → `while :; do sleep 86400; done`
+- `index.js:8406` → `function buildTmuxPlaceholderCommand(description) {`
+- `index.js:8409` → `const banner = shellQuoteForNestedCommand(\`OMO subagent pane ready: ${shown}\`);`
+- `index.js:8412` → `while :; do sleep 86400; done`
 
-The description is first NUL-stripped (`index.js:8395`, bare) and truncated to
+The description is first NUL-stripped (`index.js:8396`, bare) and truncated to
 2000 characters with an ellipsis (`PLACEHOLDER_DESCRIPTION_LIMIT`,
-`index.js:8413`), then quoted with the same `Q` helper as Template A — not with
+`index.js:8414`), then quoted with the same `Q` helper as Template A — not with
 a separate double-quote escaper. The old `shellEscapeForDoubleQuotedCommand`
 helper is gone from the bundle: a search for the name returns zero occurrences.
 Both the banner and the hint (`"Focus this pane to attach."`) are
@@ -574,17 +616,17 @@ loop exists in the template.
 OmO passes server credentials to the pane as `-e NAME=VALUE` argv pairs, built by
 one function:
 
-- `index.js:8267` → `function buildPaneAuthEnvironmentArgs() {`
-- `index.js:8268` → `const password = process.env.OPENCODE_SERVER_PASSWORD;`
-- `index.js:8270` → `return [];`
-- `index.js:8280` → `const args = ["-e", \`OPENCODE_SERVER_PASSWORD_FILE=${file}\`];`
-- `index.js:8283` → `args.push("-e", \`OPENCODE_SERVER_USERNAME=${username}\`);`
-- `index.js:8284` → `return args;`
+- `index.js:8268` → `function buildPaneAuthEnvironmentArgs() {`
+- `index.js:8269` → `const password = process.env.OPENCODE_SERVER_PASSWORD;`
+- `index.js:8271` → `return [];`
+- `index.js:8281` → `const args = ["-e", \`OPENCODE_SERVER_PASSWORD_FILE=${file}\`];`
+- `index.js:8284` → `args.push("-e", \`OPENCODE_SERVER_USERNAME=${username}\`);`
+- `index.js:8285` → `return args;`
 
 ### 2.1 The empty-`-e` case is the normal case
 
 `OPENCODE_SERVER_PASSWORD` is unset in the ordinary case, so
-`buildPaneAuthEnvironmentArgs()` returns an **empty array** (`index.js:8270`)
+`buildPaneAuthEnvironmentArgs()` returns an **empty array** (`index.js:8271`)
 and the `-e` pairs simply do not appear in argv. The consequence for the
 translator is precise and load-bearing: **`-e` must be a genuinely optional
 element of the grammar, with a real zero-occurrence path.** A parser that
@@ -594,7 +636,7 @@ about the common case rather than an edge case.
 INFERRED: because the empty case is the default, any bridge logic that
 special-cases "the credential args" must be written against the empty array
 first and treat the populated case as the exception. This follows directly from
-`index.js:8270` returning `[]` whenever the password is falsy.
+`index.js:8271` returning `[]` whenever the password is falsy.
 
 ### 2.2 Credential in argv, recorded, not fixed
 
@@ -608,7 +650,7 @@ username, when set, is still placed into argv verbatim, so the two
 consequences below stand with the redaction target widened from the password
 value to the file path and the username:
 
-- `index.js:8280` → `OPENCODE_SERVER_PASSWORD_FILE=${file}`
+- `index.js:8281` → `OPENCODE_SERVER_PASSWORD_FILE=${file}`
 
 This is recorded as a non-blocking security note and explicitly **not** in
 scope to fix, because the only fix would be patching OmO. Two consequences
@@ -636,14 +678,14 @@ Every one is followed by a `select-pane` title call.
 
 ### 3.1 `split-window` (the `isolation: "inline"` path)
 
-- `index.js:8472` → `deps.isCmuxCompatEnvironment() ? buildTmuxAttachCommand`
-- `index.js:8473` → `const args = [`
-- `index.js:8474` → `"split-window",`
-- `index.js:8475` → `splitDirection,`
-- `index.js:8480` → `...targetPaneId ? ["-t", targetPaneId] : [],`
-- `index.js:8481` → `...authEnvArgs,`
-- `index.js:8482` → `initialCmd`
-- `index.js:8484` → `const result = await runTmuxCommand(tmux, args);`
+- `index.js:8473` → `deps.isCmuxCompatEnvironment() ? buildTmuxAttachCommand`
+- `index.js:8474` → `const args = [`
+- `index.js:8475` → `"split-window",`
+- `index.js:8476` → `splitDirection,`
+- `index.js:8481` → `...targetPaneId ? ["-t", targetPaneId] : [],`
+- `index.js:8482` → `...authEnvArgs,`
+- `index.js:8483` → `initialCmd`
+- `index.js:8485` → `const result = await runTmuxCommand(tmux, args);`
 
 Exact argv, in order:
 
@@ -665,8 +707,8 @@ only that it occupies the second position and is a bare flag.
 
 ### 3.2 `respawn-pane` with the placeholder (`replaceTmuxPane`)
 
-- `index.js:8571` → `const placeholderCmd = buildTmuxPlaceholderCommand(description);`
-- `index.js:8572` → `["respawn-pane", "-k", ...authEnvArgs, "-t", paneId, placeholderCmd]`
+- `index.js:8572` → `const placeholderCmd = buildTmuxPlaceholderCommand(description);`
+- `index.js:8573` → `["respawn-pane", "-k", ...authEnvArgs, "-t", paneId, placeholderCmd]`
 
 Exact argv, in order:
 
@@ -684,14 +726,11 @@ absence is the whole of defect 1 in section 7.
 
 ### 3.3 `respawn-pane` with the attach command (`activateTmuxPane`)
 
-Same verb and same shape, but multi-line and carrying Template A instead of
-Template B:
+Same verb and same shape, but carrying Template A instead of Template B (5.1.79
+emits the whole call on one line; the argv is unchanged):
 
-- `index.js:8618` → `const opencodeCmd = buildTmuxAttachCommand(serverUrl, sessionId, directory);`
-- `index.js:8619` → `const result = await deps.runTmuxCommand(tmux, [`
-- `index.js:8620` → `"respawn-pane",`
-- `index.js:8621` → `"-k",`
-- `index.js:8625` → `opencodeCmd`
+- `index.js:8619` → `const opencodeCmd = buildTmuxAttachCommand(serverUrl, sessionId, directory);`
+- `index.js:8620` → `["respawn-pane", "-k", ...authEnvArgs, "-t", paneId, opencodeCmd]`
 
 Exact argv, in order:
 
@@ -706,13 +745,13 @@ respawn-pane
 
 ### 3.4 `new-window` (`spawnTmuxWindow`)
 
-- `index.js:8688` → `const args = [`
-- `index.js:8689` → `"new-window",`
-- `index.js:8690` → `"-d",`
-- `index.js:8692` → `ISOLATED_WINDOW_NAME,`
-- `index.js:8695` → `"#{pane_id}",`
-- `index.js:8697` → `placeholderCmd`
-- `index.js:8718` → `var ISOLATED_WINDOW_NAME = "omo-agents";`
+- `index.js:8687` → `const args = [`
+- `index.js:8688` → `"new-window",`
+- `index.js:8689` → `"-d",`
+- `index.js:8691` → `ISOLATED_WINDOW_NAME,`
+- `index.js:8694` → `"#{pane_id}",`
+- `index.js:8696` → `placeholderCmd`
+- `index.js:8717` → `var ISOLATED_WINDOW_NAME = "omo-agents";`
 
 Exact argv, in order:
 
@@ -728,20 +767,21 @@ new-window
   <payload>                     # placeholder template
 ```
 
-The window name is the literal `omo-agents`, from `index.js:8718`. There is no
+The window name is the literal `omo-agents`, from `index.js:8717`. There is no
 `-t` on this shape.
 
 ### 3.5 `new-session`, and its already-exists variant (`spawnTmuxSession`)
 
 This is one call site producing **two** argv shapes, chosen by a runtime branch:
 
-- `index.js:8798` → `const args = sessionAlreadyExists ? [`
-- `index.js:8799` → `"new-window",`
-- `index.js:8801` → `isolatedSessionName,`
-- `index.js:8807` → `] : [`
-- `index.js:8809` → `"-d",`
-- `index.js:8812` → `...sizeArgs,`
-- `index.js:8817` → `placeholderCmd`
+- `index.js:8797` → `const args = sessionAlreadyExists ? ["new-window", "-t", isolatedSessionName, "-P", "-F", "#{pane_id}", ...authEnvArgs, placeholderCmd] : [`
+- `index.js:8798` → `"new-session",`
+- `index.js:8799` → `"-d",`
+- `index.js:8802` → `...sizeArgs,`
+- `index.js:8807` → `placeholderCmd`
+
+The already-exists arm is emitted on one line in 5.1.79; both arms carry the
+same argv as the blocks below.
 
 When the session does **not** exist:
 
@@ -779,10 +819,10 @@ translator must tolerate its absence; it must not require it.
 
 Every payload verb is immediately followed by a title call:
 
-- `index.js:8489` → `const title = buildSubagentPaneTitle(description);`
-- `index.js:8490` → `["select-pane", "-t", paneId, "-T", title]`
-- `index.js:8577` → `const title = buildSubagentPaneTitle(description);`
-- `index.js:8578` → `["select-pane", "-t", paneId, "-T", title]`
+- `index.js:8490` → `const title = buildSubagentPaneTitle(description);`
+- `index.js:8491` → `["select-pane", "-t", paneId, "-T", title]`
+- `index.js:8578` → `const title = buildSubagentPaneTitle(description);`
+- `index.js:8579` → `["select-pane", "-t", paneId, "-T", title]`
 
 Exact argv:
 
@@ -794,8 +834,8 @@ select-pane
   omo-subagent-<first 20 NUL-stripped chars of description, `#` doubled>
 ```
 
-The title is built by `buildSubagentPaneTitle` (`index.js:8401`–`index.js:8404`,
-bare): NUL-strip, slice to `PANE_TITLE_DESCRIPTION_LIMIT` (20, `index.js:8413`),
+The title is built by `buildSubagentPaneTitle` (`index.js:8402`–`index.js:8405`,
+bare): NUL-strip, slice to `PANE_TITLE_DESCRIPTION_LIMIT` (20, `index.js:8414`),
 and `escapeTmuxFormat` doubling every `#` to `##` so tmux does not read it as a
 format opener.
 
@@ -804,8 +844,8 @@ one of the five. It is listed because it always follows one of them.
 
 ### 3.7 Pane-id capture
 
-- `index.js:8485` → `const paneId = result.output;`
-- `index.js:8486` → `if (result.exitCode !== 0 || !paneId) {`
+- `index.js:8486` → `const paneId = result.output;`
+- `index.js:8487` → `if (result.exitCode !== 0 || !paneId) {`
 
 The pane id is read from `result.output` and is **not trimmed**, and an empty
 string counts as failure. So the bridge must not introduce a trailing newline
@@ -815,9 +855,9 @@ side.
 
 ### 3.8 Teardown, and the success-on-failure rule
 
-- `index.js:8519` → `["send-keys", "-t", paneId, "C-c"]`
-- `index.js:8522` → `["kill-pane", "-t", paneId]`
-- `index.js:8524` → `result.exitCode !== 0 && /can't find pane/i.test(trimmedStderr)`
+- `index.js:8520` → `["send-keys", "-t", paneId, "C-c"]`
+- `index.js:8523` → `["kill-pane", "-t", paneId]`
+- `index.js:8525` → `result.exitCode !== 0 && /can't find pane/i.test(trimmedStderr)`
 
 A `kill-pane` against an already-dead pane is **treated as success** by OmO, but
 only when the stderr matches `/can't find pane/i`. If psmux's wording for that
@@ -871,9 +911,9 @@ close, in this order, as three separate process invocations:
 
 | # | argv | source |
 |---|---|---|
-| 1 | `select-layout main-vertical` | `index.js:8985` |
-| 2 | `set-window-option <main-pane-width\|main-pane-height> <n>%` | `index.js:8991-8992` |
-| 3 | `resize-pane -t <mainPaneId> -x <cells>` | `index.js:9008` |
+| 1 | `select-layout main-vertical` | `index.js:8975` |
+| 2 | `set-window-option <main-pane-width\|main-pane-height> <n>%` | `index.js:8981-8982` |
+| 3 | `resize-pane -t <mainPaneId> -x <cells>` | `index.js:9001` |
 
 `main-vertical` is the correct layout and the bridge does not change which layout
 is used: in psmux it is the `Horizontal` split whose first child is the main pane
@@ -986,7 +1026,7 @@ means.** A `set-window-option` without `-g` now writes the target window's own
 option table (`src/server/connection.rs:3901` through
 `src/server/connection.rs:3921`), and `apply_layout` reads the option from the
 window it is applying the layout to, falling back to the global store. OmO emits
-both calls without `-t` (`index.js:8991-8992`), so the write and the follow-up
+both calls without `-t` (`index.js:8981-8982`), so the write and the follow-up
 land on the same active window. A caller that targets the write but leaves the
 follow-up untargeted could split the two; the bridge is not such a caller and
 does not invent a `-t` for the follow-up.
@@ -1008,19 +1048,19 @@ The mapping is not a guess. `main_pane_width` is read by the `main-vertical` arm
 and `main_pane_height` by the `main-horizontal` arm, and OmO emits exactly these
 two options for its two `main-*` layouts:
 
-- `index.js:8990` → `if (layout.startsWith("main-")) {`
-- `index.js:8991` → `const dimension = layout === "main-horizontal" ? "main-pane-height" : "main-pane-width";`
+- `index.js:8980` → `if (layout.startsWith("main-")) {`
+- `index.js:8981` → `const dimension = layout === "main-horizontal" ? "main-pane-height" : "main-pane-width";`
 
 The re-applied command carries **no `-t`**, matching the `select-layout` shape
-OmO itself emits at `index.js:8985`, and carries the same leading `-L` / `-S` /
+OmO itself emits at `index.js:8975`, and carries the same leading `-L` / `-S` /
 `-f` globals as the primary command, so both reach the same psmux server.
 Section 9 records separately that an injected `-t` would be discarded by psmux
 before dispatch; this rule does not rest on that, and would be unchanged if
 section 9 settled the other way. Its stdout, stderr and exit code are all
 discarded: OmO spawns its own layout calls with `stdout: "ignore", stderr:
-"ignore"` (`index.js:8986-8987`, `index.js:8992`) and awaits each without reading
-a code (`index.js:8989`, `index.js:8993`), and the primary command's exit code is
-the only one OmO branches on (`index.js:8486`).
+"ignore"` (`index.js:8976-8977`, `index.js:8982`) and awaits each without reading
+a code (`index.js:8979`, `index.js:8986`), and the primary command's exit code is
+the only one OmO branches on (`index.js:8487`).
 
 **MEASURED 2026-10-07 at v3.3.8, and this rule needed it more than rule 1a did.**
 The same run as rule 1a — `.omo/evidence/ci-main-pane-width-probe.json` — tests
@@ -1273,7 +1313,7 @@ number as a percentage.
 **Scope note, because `-l` exposes it.** Rule 1c keys on a bare `-x` or `-y`
 element, so a `-l`-form `resize-pane` would **pass through** and land on that
 downward-step fallback. No cited OmO argv takes that form: the two `resize-pane`
-invocations in the bundle are `index.js:9008` (`-x <cells>`) and `index.js:21703`
+invocations in the bundle are `index.js:9001` (`-x <cells>`) and `index.js:21845`
 (`-x "30%"`, in team-mode layout). The second one is a percentage form, so rule
 1c suppresses it as well, and by the `-x 99%` reasoning above that suppression is
 correct on psmux. An agent-authored `-l` argv is not off-path in the same way and
@@ -1300,8 +1340,8 @@ recorded. Nothing else in this document suppresses a command.
 
 **What is verified here, and what is not — stated before the rules rather than
 after them.** Every psmux line this section cites is now mechanically re-checked
-against the pinned tree: `bun run contract:verify` reads all 200 citations in this
-document and reports 0 problems, including the 90 on the psmux side. So the
+against the pinned tree: `bun run contract:verify` reads all 195 citations in this
+document and reports 0 problems, including the 110 on the psmux side. So the
 *premises* quoted below are confirmed present-and-unchanged at v3.4.0.
 
 That is a narrower claim than it looks, and the gap should be named rather than
@@ -1328,63 +1368,67 @@ demonstrated.
 OmO's team-mode visualization is gated separately from the subagent-pane gates
 in section 4. The config key is `team_mode.tmux_visualization`, off by default:
 
-- `index.js:99875` → `var TeamModeConfigSchema = z47.object({`
-- `index.js:99877` → `tmux_visualization: z47.boolean().default(false),`
+- `index.js:100191` → `var TeamModeConfigSchema = z49.object({`
+- `index.js:100193` → `tmux_visualization: z49.boolean().default(false),`
 
-(The schema runs to `index.js:99887`; the default is the whole of the gating
-fact.) When `resolveCallerTmuxSession` (`index.js:21616-21637`) returns null,
+(The schema runs to `index.js:100203`; the default is the whole of the gating
+fact.) When `resolveCallerTmuxSession` (`index.js:21730-21758`) returns null,
 no layout is attempted at all:
 
-- `index.js:21736` → `deps.log("tmux visualization requires a resolvable caller tmux pane, skipping", { teamRunId });`
+- `index.js:21878` → `deps.log("tmux visualization requires a resolvable caller tmux pane, skipping", { teamRunId });`
 
-The caller session is resolved with two `display` calls carrying `-F`:
+The caller session is resolved with two `display` calls carrying `-F`; in
+5.1.79 the second is emitted multi-line at `index.js:21742-21749` (bare), and
+the cited line is its format selector:
 
-- `index.js:21620` → `const sessionResult = await runCommand(tmuxPath, ["display", "-p", "-F", "#{session_id}", "-t", callerPaneId]);`
-- `index.js:21628` → `const windowResult = await runCommand(tmuxPath, ["display", "-p", "-F", "#{session_name}:#{window_index}", "-t", callerPaneId]);`
+- `index.js:21734` → `const sessionResult = await runCommand(tmuxPath, ["display", "-p", "-F", "#{session_id}", "-t", callerPaneId]);`
+- `index.js:21746` → `"#{session_name}:#{window_index}",`
 
 and the returned strings must match the session and window-target patterns
-(`index.js:21625` tests `TMUX_SESSION_ID_PATTERN` against the session id;
-`index.js:21633` tests `TMUX_WINDOW_TARGET_PATTERN` against the window
+(`index.js:21739` tests `TMUX_SESSION_ID_PATTERN` against the session id;
+`index.js:21754` tests `TMUX_WINDOW_TARGET_PATTERN` against the window
 target). Anything that corrupts the `display` output therefore skips the whole
 team layout, which is why rule D0 below is load-bearing rather than cosmetic.
 
-Per member, `createTeamLayoutInCallerWindow` (`index.js:21684-21707`) emits, in
+Per member, `createTeamLayoutInCallerWindow` (`index.js:21819-21849`) emits, in
 this order: `list-panes` in the caller window first (via `listPanesInWindow`):
 
-- `index.js:21656` → `const result = await deps.runTmuxCommand(tmuxPath, ["list-panes", "-t", windowTarget, "-F", "#{pane_id}"]);`
+- `index.js:21777` → `const result = await deps.runTmuxCommand(tmuxPath, ["list-panes", "-t", windowTarget, "-F", "#{pane_id}"]);`
 
-then `split-window`, built by `buildSplitArgs` (the first split carries
-`-l 70%`; later splits carry no `-l`, alternate `-v`/`-h`, and split the middle
-teammate pane rather than the last — second arm at `index.js:21670-21682`,
-bare):
+then `split-window`, built by `buildSplitArgs` (the first split — emitted at
+`index.js:21789-21803`, bare — carries `-l 70%`; later splits carry no `-l`,
+alternate `-v`/`-h`, and split the middle teammate pane rather than the last —
+second arm at `index.js:21805-21817`, bare):
 
-- `index.js:21668` → `return ["split-window", ...environmentArgs, "-t", callerPaneId, "-h", "-d", "-l", "70%", "-P", "-F", "#{pane_id}", "-c", escapeTmuxFormat(getPaneWorkingDirectory(member))];`
+- `index.js:21797` → `"70%",`
 
 The working directory now travels as a `-c` operand, tmux-format-escaped
 (`escapeTmuxFormat`, same `##` helper as the pane titles). The team attach
 command itself is single-quote-only (`shellSingleQuote`,
-`index.js:21611-21613`, bare), a narrower escaper than the subagent path's
+`index.js:21725-21727`, bare), a narrower escaper than the subagent path's
 `shellQuoteForNestedCommand`. No claim is made here about whether that narrower
 escaper round-trips every directory spelling; the bridge forwards the team
 attach verbatim and the classification below does not depend on it.
 
 then a `select-pane` title call:
 
-- `index.js:21695` → `await deps.runTmuxCommand(tmuxPath, ["select-pane", "-t", paneId, "-T", `${TEAM_PANE_TITLE_PREFIX}${member.name}`]);`
+- `index.js:21830` → `await deps.runTmuxCommand(tmuxPath, ["select-pane", "-t", paneId, "-T", `${TEAM_PANE_TITLE_PREFIX}${member.name}`]);`
 
 then two `set-option -p` calls:
 
-- `index.js:21696` → `await deps.runTmuxCommand(tmuxPath, ["set-option", "-p", "-t", paneId, OMO_ATTACH_SERVER_URL_OPTION2, serverUrl]);`
-- `index.js:21697` → `await deps.runTmuxCommand(tmuxPath, ["set-option", "-p", "-t", paneId, OMO_ATTACH_SESSION_ID_OPTION, member.sessionId]);`
+- `index.js:21831` → `await deps.runTmuxCommand(tmuxPath, ["set-option", "-p", "-t", paneId, OMO_ATTACH_SERVER_URL_OPTION2, serverUrl]);`
+- `index.js:21837` → `OMO_ATTACH_SESSION_ID_OPTION,`
+
+(The second write is emitted across `index.js:21832-21839` in 5.1.79, bare.)
 
 then `send-keys` with the attach command plus `Enter`:
 
-- `index.js:21698` → `await deps.runTmuxCommand(tmuxPath, ["send-keys", "-t", paneId, buildAttachCommand(member, serverUrl), "Enter"]);`
+- `index.js:21840` → `await deps.runTmuxCommand(tmuxPath, ["send-keys", "-t", paneId, buildAttachCommand(member, serverUrl), "Enter"]);`
 
 and after all members, a targeted `select-layout` and a caller resize:
 
-- `index.js:21700` → `const layoutResult = await deps.runTmuxCommand(tmuxPath, ["select-layout", "-t", windowTarget, "main-vertical"]);`
-- `index.js:21703` → `const resizeResult = await deps.runTmuxCommand(tmuxPath, ["resize-pane", "-t", callerPaneId, "-x", "30%"]);`
+- `index.js:21842` → `const layoutResult = await deps.runTmuxCommand(tmuxPath, ["select-layout", "-t", windowTarget, "main-vertical"]);`
+- `index.js:21845` → `const resizeResult = await deps.runTmuxCommand(tmuxPath, ["resize-pane", "-t", callerPaneId, "-x", "30%"]);`
 
 None of these carries a payload, so all classify as `pass-through`, and all
 are handled on the translate stage on the same branch as rules 1b-1c. One live
@@ -1424,15 +1468,15 @@ the slug with it — `SuppressionReason` in `src/translate.ts` now carries only
 rule 1c's slug — because a forwarded write needs no reason.
 
 Forwarding is safe because OmO ignores both results: the two calls at
-`index.js:21696-21697` are awaited bare, with no success check and no branch
+`index.js:21831-21839` are awaited bare, with no success check and no branch
 on the outcome. `@omo_attach_session_id` has no readers anywhere else in the
-bundle (a search for the string finds only its definition at `index.js:21804`
-and the write at `index.js:21697`). The only reader of
+bundle (a search for the string finds only its definition at `index.js:21950`
+and the write at `index.js:21837`). The only reader of
 `@omo_attach_server_url` skips a pane whose URL resolves to null:
 
-- `index.js:9483` → `const rawServerUrl = pane.attachServerUrl || extractAttachServerUrl(pane.commandLine);`
-- `index.js:9484` → `if (rawServerUrl === null)`
-- `index.js:9485` → `continue;`
+- `index.js:9476` → `const rawServerUrl = pane.attachServerUrl || extractAttachServerUrl(pane.commandLine);`
+- `index.js:9477` → `if (rawServerUrl === null)`
+- `index.js:9478` → `continue;`
 
 so absence reads as "unknown", not as failure.
 
@@ -1457,7 +1501,7 @@ them at all.
 
 #### Rule 1e: the team resize becomes `set-option main-pane-width <n>` plus a re-applied layout
 
-`resize-pane -t <callerPane> -x "30%"` (`index.js:21703`) carries a bare `-x`,
+`resize-pane -t <callerPane> -x "30%"` (`index.js:21845`) carries a bare `-x`,
 so rule 1c would suppress it, leaving psmux's 60% default. But this exact
 shape is a PERCENTAGE on `-x` with no `-y` and no `-Z`, and psmux has a sizing
 option that means the same thing: `main-pane-width` is parsed as a bare
@@ -1534,11 +1578,11 @@ psmux and stays byte-identical.
 "psmux-client-treats-display-F-as-message-text"` (`src/translate.ts`
 `RewriteReason`; `src/cli.ts` record key), because the logged argv alone
 cannot say whether the caller omitted the flag or the bridge did. OmO's use
-sites are `index.js:21620` and `index.js:21628`. Without this rule the whole
+sites are `index.js:21734` and `index.js:21742`. Without this rule the whole
 team layout is skipped: the corrupted `-F $N` output fails the session-id
 pattern test, `resolveCallerTmuxSession` returns null, and the layout logs
 the skip (measured baseline: `-F $1303` against the pattern at
-`index.js:21625`; `.omo/evidence/issue-1-team-layout-probe-before.json`,
+`index.js:21739`; `.omo/evidence/issue-1-team-layout-probe-before.json`,
 direct arm).
 
 #### Measured results, with on-disk artifacts
@@ -1581,18 +1625,18 @@ look identical from outside, which is why they are recorded together.
 
 ### 4.1 Gate one: config enabled
 
-- `index.js:99948` → `var TmuxConfigSchema = z51.object({`
-- `index.js:99949` → `enabled: z51.boolean().default(false),`
+- `index.js:100264` → `var TmuxConfigSchema = z53.object({`
+- `index.js:100265` → `enabled: z53.boolean().default(false),`
 
 Off by default. This is the reason a stock Windows OmO produces zero panes and
 no error.
 
 ### 4.2 Gate two: inside a multiplexer
 
-- `index.js:8294` → `function isInsideTmuxEnvironment(environment) {`
-- `index.js:8295` → `return Boolean(environment.TMUX);`
-- `index.js:8300` → `function isInsideTmux() {`
-- `index.js:8449` → `if (!deps.isInsideTmux() && !deps.isCmuxCompatEnvironment()) {`
+- `index.js:8295` → `function isInsideTmuxEnvironment(environment) {`
+- `index.js:8296` → `return Boolean(environment.TMUX);`
+- `index.js:8301` → `function isInsideTmux() {`
+- `index.js:8450` → `if (!deps.isInsideTmux() && !deps.isCmuxCompatEnvironment()) {`
 
 The predicate is a bare truthiness test on the `TMUX` environment variable. No
 value validation, no socket check, no liveness probe. Section 5 explains why
@@ -1600,10 +1644,10 @@ that is enough, given psmux.
 
 ### 4.3 Gate three: the OpenCode server answers a health check
 
-- `index.js:8456` → `const serverRunning = await deps.isServerRunning(serverUrl);`
-- `index.js:8461` → `const tmux = await deps.getTmuxPath();`
-- `index.js:169745` → `function resolveServerUrl(rawServerUrl, env, log) {`
-- `index.js:169755` → `ctx.serverUrl has port 0; falling back.`
+- `index.js:8457` → `const serverRunning = await deps.isServerRunning(serverUrl);`
+- `index.js:8462` → `const tmux = await deps.getTmuxPath();`
+- `index.js:171289` → `function resolveServerUrl(rawServerUrl, env, log) {`
+- `index.js:171299` → `ctx.serverUrl has port 0; falling back.`
 
 INFERRED: `resolveServerUrl` reads `OPENCODE_PORT` and otherwise falls back to a
 default, so on Windows an `opencode` that binds no explicit port produces a
@@ -1617,11 +1661,11 @@ plus that warning.
 This is the gate that makes the whole bridge mechanism work, and it is stricter
 than it looks:
 
-- `index.js:9139` → `async function findVerifiedTmuxPath() {`
-- `index.js:9140` → `const path = await findCommandPath("tmux");`
-- `index.js:9145` → `const verifyProc = spawn([path, "-V"], {`
-- `index.js:9151` → `if (verifyExitCode !== 0) {`
-- `index.js:8461` → `const tmux = await deps.getTmuxPath();`
+- `index.js:9132` → `async function findVerifiedTmuxPath() {`
+- `index.js:9133` → `const path = await findCommandPath("tmux");`
+- `index.js:9138` → `const verifyProc = spawn([path, "-V"], {`
+- `index.js:9144` → `if (verifyExitCode !== 0) {`
+- `index.js:8462` → `const tmux = await deps.getTmuxPath();`
 
 **The contract consequence, stated as a requirement:** the shim must answer
 `-V` with **exit code 0**. A shim that answers `-V` correctly but exits non-zero,
@@ -1630,13 +1674,13 @@ makes `getTmuxPath()` return null, and every tmux feature then silently no-ops
 with no error at all.
 
 INFERRED: the requirement that `-V` exit 0 is derived directly from
-`index.js:9151` returning null on non-zero and from `index.js:8461` feeding that
+`index.js:9144` returning null on non-zero and from `index.js:8462` feeding that
 null into the skip path. The silent-no-op consequence is inferred from there
 being no error branch on that path.
 
 ### 4.5 There is no config field for the tmux binary
 
-`TmuxConfigSchema` (`index.js:99948`) has no path or binary field, and its
+`TmuxConfigSchema` (`index.js:100264`) has no path or binary field, and its
 generated JSON schema sets `additionalProperties: false`.
 
 INFERRED: therefore no OmO configuration key and no environment variable can
@@ -1738,7 +1782,7 @@ credential boundary (§8.2).
 ### 7.1 Defect 1: `respawn-pane` dropped a positional command operand at v3.3.8
 
 At **v3.3.8** the command operand was read **only** behind `--`. There was no
-positional fallback, so OmO's no-`--` argv (`index.js:8572`, `index.js:8620`)
+positional fallback, so OmO's no-`--` argv (`index.js:8573`, `index.js:8620`)
 lost its payload and the pane came back as a default shell.
 
 **Fixed at v3.4.0.** The command is now read behind `--` or, when `--` is
@@ -1820,7 +1864,7 @@ credential-delivery mechanism, it keeps values out of the psmux argv, and it
 preserves the helper's consume-once and verified-delete behavior (§2.2).
 Forwarding `-e` through psmux instead would put the values back in argv and
 bypass that boundary. The `OPENCODE_SERVER_PASSWORD_FILE` path
-(`index.js:8280`) is delivered by the same mechanism.
+(`index.js:8281`) is delivered by the same mechanism.
 
 INFERRED: the credential must still be redacted from the bridge's own logs
 (section 2.2), and the env-slot/file delivery remains the shipped path at
@@ -1956,16 +2000,18 @@ Nothing downstream may inject a `-t` onto `select-layout`. That was already
 settled on source (9.1) and the measurement confirms it: an injected `-t` is
 stripped before dispatch, so it cannot retarget anything.
 
-OmO applies the layout with no target at all:
+OmO applies the layout with no target at all. At 5.1.79 the calls live in
+`applyLayout`; `calculateMainPaneWidth` is now a pure width calculation, and the
+5.1.60 record listed these same calls under it:
 
-- `index.js:8969` → `function calculateMainPaneWidth(windowWidth, options) {`
-- `index.js:8985` → `const layoutProc = spawnCommand([tmux, "select-layout", layout], {`
-- `index.js:8992` → `const sizeProc = spawnCommand([tmux, "set-window-option", dimension, \`${mainPaneSize}%\`], {`
-- `index.js:9008` → `await deps.runTmuxCommand(tmux, ["resize-pane", "-t", mainPaneId, "-x", String(mainWidth)]);`
+- `index.js:8968` → `async function applyLayout(tmux, layout, mainPaneSize, deps) {`
+- `index.js:8975` → `const layoutProc = spawnCommand([tmux, "select-layout", layout], {`
+- `index.js:8982` → `const sizeProc = spawnCommand([tmux, "set-window-option", dimension, \`${mainPaneSize}%\`], {`
+- `index.js:9001` → `await deps.runTmuxCommand(tmux, ["resize-pane", "-t", mainPaneId, "-x", String(mainWidth)]);`
 
 Note the asymmetry in that last group. The **width** enforcement carries an
-explicit target (`-t mainPaneId`, `index.js:9008`). The **layout** call does not
-(`index.js:8985`). So `select-layout` is the odd one out among the layout verbs.
+explicit target (`-t mainPaneId`, `index.js:9001`). The **layout** call does not
+(`index.js:8975`). So `select-layout` is the odd one out among the layout verbs.
 
 Two options, and the bridge must be built to survive either until the question
 is settled:
@@ -2522,8 +2568,8 @@ now work, but the bridge does not depend on it.
 INFERRED: the bridge's own descriptor remains the correct correlation record.
 The bridge is the only party that applies `-e` on the respawn
 path (section 7), so it can record pane ownership at the moment it performs a
-translation, keyed on the pane id OmO itself supplies (`index.js:8485`,
-`index.js:8572`). That is the reason `src/descriptor.ts` exists; it is now a
+translation, keyed on the pane id OmO itself supplies (`index.js:8486`,
+`index.js:8573`). That is the reason `src/descriptor.ts` exists; it is now a
 design choice rather than a workaround for the v3.3.8 format trap.
 
 ---
@@ -2604,7 +2650,7 @@ parity harness keeps `-L` because that is the lever it already verifies.
 - `installer/psmux.nsi:126` → `File "${SOURCE_DIR}\tmux.exe"`
 
 Three binaries are installed side by side, including `tmux.exe`. This is the
-mechanism that makes `findCommandPath("tmux")` (`index.js:9140`) able to find
+mechanism that makes `findCommandPath("tmux")` (`index.js:9133`) able to find
 something at all on a Windows box with no tmux installed.
 
 INFERRED: the shim must be named `tmux.exe` and must precede psmux's own
@@ -2746,7 +2792,7 @@ placeholder shell is switched to `pwsh`, that input is lossy on Windows PowerShe
 ## 14. Maintenance
 
 This document is only true of the oh-my-openagent recorded as
-`omo.verifiedAgainst` in `scripts/contract/pins.json` (**5.1.60** at this
+`omo.verifiedAgainst` in `scripts/contract/pins.json` (**5.1.79** at this
 revision) and of psmux **v3.4.0**. The v2.0.0 floor is exactly psmux 3.4.0:
 the retired responses in sections 7 and 8 (rule 1a, the `--` insertion,
 rule 1d) stay retired, and the env-slot delivery stays as the credential
