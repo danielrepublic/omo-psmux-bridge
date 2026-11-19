@@ -16,6 +16,16 @@ pins **psmux 3.4.0** (superseding the previous 3.3.8 parity baseline); runtime
 verification still carries an unresolved team-resize observation, so the newer
 runtime smoke does not retire its workarounds.
 
+The figures above stay the historical Windows protocol report: **OpenCode v1
+1.19.5**, **OmO 5.1.60**. The current source contract,
+[CONTRACT.md](CONTRACT.md), is verified against **OmO 5.1.79**, which is the
+version `scripts/contract/pins.json` pins and the doctor reads. Keep installing
+`oh-my-openagent@latest`; the drift check is deliberate, and no number is
+recommended as a pin. A live doctor run under **v1.19.6** passed 5/5 checks and
+11/11 frozen anchors, and an isolated synthetic pane smoke passed 23/23 — host
+observations, not checked-in Windows evidence, and not a full interactive-parity
+claim.
+
 ---
 
 ## What you need already installed
