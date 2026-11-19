@@ -212,7 +212,6 @@ const PAYLOAD_CASES: readonly PayloadCase[] = [
     name: "placeholder-respawn (index.js:8507-8508)",
     argv: ["respawn-pane", "-k", ...AUTH_ARGS, "-t", "%7", PH_HOSTILE],
     kind: "placeholder-respawn",
-    dashDash: true,
     payloadBody: PH_HOSTILE_BODY,
     command: PLACEHOLDER_HOSTILE_COMMAND,
     envCount: 2,
